@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+</head>
+<body>
+  <input id="connect_button" type="button" value="Connect" onclick="connectWallet()" style="display: none"></input>
+  <p id="account_address" style="display: block"></p>
+  <p id="web3_message"></p>
+  <hr>
+  <input type="button" value="Roll" onclick="_commit()"></input>
+  <hr>
+  <p id="local_wallet_address"></p>
+  <p id="local_wallet_private_key"></p>
+  <p id="local_wallet_balance"></p>
+  <input type="number" id="deposit_amount" placeholder="Amount in ETH"></input>
+  <input type="button" value="Deposit ETH" onclick="_depositEth()"></input>
+  <hr>
+  <p id="game_state"></p>
+  <p id="commitment_info"></p>
+  <hr>
+  <div id="event_log"></div>
+  <hr>
+  
+  <input type="button" value="Reveal" onclick="_reveal()"></input>
+  <input type="button" value="Clear Secret" onclick="_clearSecret()"></input>
+  <input type="button" value="Forfeit" onclick="_forfeit()"></input>
+  <br>
+  <br>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.3.5/web3.min.js"></script>
+  <script type="text/javascript" src="blockchain_stuff.js"></script>
+</body>
+</html>
+
+<script>
+  function _commit() {
+    commit();
+  }
+
+  function _reveal() {
+    reveal();
+  }
+
+  function _depositEth() {
+    amount = document.getElementById("deposit_amount").value;
+    depositEth(amount);
+  }
+
+  function _clearSecret() {
+    clearStoredSecret();
+  }
+
+  function _forfeit() {
+    forfeit();
+  }
+</script>
