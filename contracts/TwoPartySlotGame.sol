@@ -1,21 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract TwoPartySlotGame {
-    enum State { NotStarted, Committed, Revealed }
+contract TwoPartyWarGame {
+    enum State { NotStarted, Committed, HashPosted }
 
     struct Game {
-        address player;
-        address house;
         bytes32 playerCommit;
         bytes32 houseHash;
         bytes32 playerSecret;
-        uint256 playerStake;
-        uint256 houseStake;
-        State playerState;
-        bool housePosted;
-        uint256 result;
-        address winner;
+        State gameState;
     }
 
     // Map player address to their game
@@ -23,14 +16,9 @@ contract TwoPartySlotGame {
     address public immutable house;
     uint256 public constant STAKE_AMOUNT = 0.0000000003 ether;
 
-    event GameResult(address indexed player, address winner, uint256 result);
+    event GameResult(address indexed player, address winner, uint256 playerCard, uint256 houseCard);
     event GameForfeited(address indexed player, address house);
     event GameCreated(address indexed player, bytes32 commitHash);
-
-    modifier onlyPlayer() {
-        require(games[msg.sender].player == msg.sender, "Not player");
-        _;
-    }
 
     modifier onlyHouse() {
         require(msg.sender == house, "Not house");
@@ -49,13 +37,10 @@ contract TwoPartySlotGame {
     /// @dev Player commits to the game by sending ETH and a hash of their secret
     function commit(bytes32 _commitHash) external payable hasStaked {
         Game storage playerGame = games[msg.sender];
-        require(playerGame.playerState == State.NotStarted, "Player already committed");
+        require(playerGame.gameState == State.NotStarted, "Player already committed");
         
-        playerGame.player = msg.sender;
-        playerGame.house = house;
         playerGame.playerCommit = _commitHash;
-        playerGame.playerStake = msg.value;
-        playerGame.playerState = State.Committed;
+        playerGame.gameState = State.Committed;
         
         emit GameCreated(msg.sender, _commitHash);
     }
@@ -64,36 +49,44 @@ contract TwoPartySlotGame {
     function postHash(address player, bytes32 _hash) external payable hasStaked {
         require(msg.sender == house, "Only house can post hash");
         Game storage playerGame = games[player];
-        require(playerGame.playerState == State.Committed, "Player must commit first");
-        require(!playerGame.housePosted, "House already posted hash");
+        require(playerGame.gameState == State.Committed, "Player must commit first");
         
         playerGame.houseHash = _hash;
-        playerGame.houseStake = msg.value;
-        playerGame.housePosted = true;
+        playerGame.gameState = State.HashPosted;
     }
 
     /// @dev Player reveals their secret and the result is computed
     function reveal(bytes32 _secret) external {
         Game storage playerGame = games[msg.sender];
-        require(playerGame.playerState == State.Committed, "Player not ready to reveal");
-        require(playerGame.housePosted, "House must post hash first");
+        require(playerGame.gameState == State.HashPosted, "Game not ready for reveal");
         require(keccak256(abi.encode(_secret)) == playerGame.playerCommit, "Player secret invalid");
         
         playerGame.playerSecret = _secret;
-        playerGame.playerState = State.Revealed;
         
-        // Generate result using house's hash directly
-        uint256 xorResult = (uint256(_secret) ^ uint256(playerGame.houseHash)) & 0xFFFFFFFF;
+        // Generate result using house's hash and player's secret
+        uint256 xorResult = uint256(_secret) ^ uint256(playerGame.houseHash);
         
-        address winner = (xorResult % 2 == 0) ? playerGame.player : playerGame.house;
-        uint256 totalStake = playerGame.houseStake + playerGame.playerStake;
+        // Extract two card values (1-13) from the XOR result
+        uint256 playerCard = ((xorResult >> 128) % 13) + 1;
+        uint256 houseCard = ((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) % 13) + 1;
+        
+        // Determine winner: highest card wins, ties go to house
+        address winner;
+        if (playerCard > houseCard) {
+            winner = msg.sender;
+        } else {
+            winner = house;
+        }
         
         // Reset game state BEFORE transfer
         _resetGame(msg.sender);
         
-        // Emit event and transfer after reset
-        emit GameResult(msg.sender, winner, xorResult);
+        // Transfer stakes to winner
+        uint256 totalStake = STAKE_AMOUNT * 2;
         payable(winner).transfer(totalStake);
+        
+        // Emit event after transfer
+        emit GameResult(msg.sender, winner, playerCard, houseCard);
     }
 
     /// @dev Internal function to reset the game
@@ -102,30 +95,24 @@ contract TwoPartySlotGame {
         playerGame.playerCommit = bytes32(0);
         playerGame.houseHash = bytes32(0);
         playerGame.playerSecret = bytes32(0);
-        playerGame.playerStake = 0;
-        playerGame.houseStake = 0;
-        playerGame.playerState = State.NotStarted;
-        playerGame.housePosted = false;
-        playerGame.result = 0;
-        playerGame.winner = address(0);
+        playerGame.gameState = State.NotStarted;
     }
 
     /// @dev Player can forfeit the game if they lost their secret
     function forfeit() external {
         Game storage playerGame = games[msg.sender];
-        require(playerGame.playerState == State.Committed, "Player must be committed to forfeit");
-        require(playerGame.housePosted, "House must have posted hash to forfeit");
-        
-        // House wins by default
-        uint256 totalStake = playerGame.houseStake + playerGame.playerStake;
+        require(playerGame.gameState == State.HashPosted, "Game not in correct state to forfeit");
         
         // Reset game state BEFORE transfer
         _resetGame(msg.sender);
         
-        // Emit event and transfer after reset
-        emit GameForfeited(msg.sender, house);
-        emit GameResult(msg.sender, house, 0); // 0 indicates forfeit
+        // Transfer stakes to house
+        uint256 totalStake = STAKE_AMOUNT * 2;
         payable(house).transfer(totalStake);
+        
+        // Emit events
+        emit GameForfeited(msg.sender, house);
+        emit GameResult(msg.sender, house, 0, 0);
     }
 
     // Add a function to check contract balance
@@ -151,19 +138,40 @@ contract TwoPartySlotGame {
 
     // Function to get game state for a specific player
     function getGameState(address player) external view returns (
-        State playerState,
-        bool housePosted,
-        uint256 playerStake,
-        uint256 houseStake,
-        address winner
+        State gameState,
+        bytes32 playerCommit,
+        bytes32 houseHash,
+        bytes32 playerSecret
     ) {
         Game storage playerGame = games[player];
         return (
-            playerGame.playerState,
-            playerGame.housePosted,
-            playerGame.playerStake,
-            playerGame.houseStake,
-            playerGame.winner
+            playerGame.gameState,
+            playerGame.playerCommit,
+            playerGame.houseHash,
+            playerGame.playerSecret
         );
+    }
+
+    // Helper function to get card name
+    function getCardName(uint256 cardValue) public pure returns (string memory) {
+        require(cardValue >= 1 && cardValue <= 13, "Invalid card value");
+        
+        if (cardValue == 1) return "Ace";
+        if (cardValue == 11) return "Jack";
+        if (cardValue == 12) return "Queen";
+        if (cardValue == 13) return "King";
+        
+        // Convert number to string for cards 2-10
+        if (cardValue == 2) return "2";
+        if (cardValue == 3) return "3";
+        if (cardValue == 4) return "4";
+        if (cardValue == 5) return "5";
+        if (cardValue == 6) return "6";
+        if (cardValue == 7) return "7";
+        if (cardValue == 8) return "8";
+        if (cardValue == 9) return "9";
+        if (cardValue == 10) return "10";
+        
+        return "";
     }
 }

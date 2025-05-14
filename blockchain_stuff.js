@@ -1,6 +1,6 @@
 const NETWORK_ID = 6342
 
-const MY_CONTRACT_ADDRESS = "0x0eaF1D6dC09bCBD260d4b23A7De52002bd8a4230"
+const MY_CONTRACT_ADDRESS = "0x862A40C84E1A092363C3b87d492B8fCee3f9292E"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
@@ -131,7 +131,9 @@ const onContractInitCallback = async () => {
     
     sortedEvents.forEach(event => {
       const timestamp = new Date().toLocaleTimeString();
-      logElement.innerHTML += `<br>[${timestamp}] Game Result: Winner: ${event.returnValues.winner}, Result: ${event.returnValues.result}`;
+      const playerCard = event.returnValues.playerCard;
+      const houseCard = event.returnValues.houseCard;
+      logElement.innerHTML += `<br>[${timestamp}] War Game: Player: ${playerCard} (${getCardName(playerCard)}), House: ${houseCard} (${getCardName(houseCard)}), Winner: ${event.returnValues.winner}`;
     });
 
     // Subscribe to new events
@@ -142,11 +144,13 @@ const onContractInitCallback = async () => {
       }
       const logElement = document.getElementById("event_log");
       const timestamp = new Date().toLocaleTimeString();
+      const playerCard = event.returnValues.playerCard;
+      const houseCard = event.returnValues.houseCard;
       // Add new event at the top
-      logElement.innerHTML = `<br>[${timestamp}] Game Result: Winner: ${event.returnValues.winner}, Result: ${event.returnValues.result}` + logElement.innerHTML;
+      logElement.innerHTML = `<br>[${timestamp}] War Game: Player: ${playerCard} (${getCardName(playerCard)}), House: ${houseCard} (${getCardName(houseCard)}), Winner: ${event.returnValues.winner}` + logElement.innerHTML;
     });
 
-    // In onContractInitCallback, add this to the event subscriptions
+    // Subscribe to GameForfeited events
     my_contract.events.GameForfeited({}, function(error, event) {
         if (error) {
             console.error("Error in event subscription:", error);
@@ -174,17 +178,10 @@ const onContractInitCallback = async () => {
         const gameState = await my_contract.methods.getGameState(wallet.address).call();
         const commitHash = web3.utils.soliditySha3(secretData.secret);
         const isSecretValid = 
-          gameState.playerState === "1"; // Just check if player is committed
-        
-        // Comment out automatic clearing
-        // if (!isSecretValid) {
-        //     clearStoredSecret();
-        // }
+          gameState.gameState === "1"; // Committed state
       }
     } catch (error) {
       console.error("Error checking secret validity:", error);
-      // Comment out automatic clearing
-      // clearStoredSecret();
     }
   }
 
@@ -193,30 +190,6 @@ const onContractInitCallback = async () => {
 
   // Start the game loop
   startGameLoop();
-}
-
-async function updateGameState() {
-  const wallet = getLocalWallet();
-  if (!wallet) return;
-
-  try {
-    const gameState = await my_contract.methods.getGameState(wallet.address).call();
-    const stakeAmount = await my_contract.methods.STAKE_AMOUNT().call();
-    
-    const stateText = `
-      Your State: ${gameState.playerState === "0" ? "Not Started" : 
-                   gameState.playerState === "1" ? "Committed" : "Revealed"}
-      Your Stake: ${web3.utils.fromWei(gameState.playerStake, 'ether')} ETH
-      House Status: ${gameState.housePosted ? "Hash Posted" : "Not Posted"}
-      Required Stake: ${web3.utils.fromWei(stakeAmount, 'ether')} ETH
-      ${gameState.winner !== "0x0000000000000000000000000000000000000000" ? 
-        `Game Result: ${gameState.winner === wallet.address ? "You Won!" : "House Won!"}` : ''}
-    `;
-    
-    document.getElementById("game_state").textContent = stateText;
-  } catch (error) {
-    console.error("Error updating game state:", error);
-  }
 }
 
 function generateRandomBytes32() {
@@ -266,6 +239,70 @@ function clearStoredSecret() {
     updateCommitmentInfo();
 }
 
+// Function to get card display value (J, Q, K, A or number)
+function getCardDisplay(cardValue) {
+    if (cardValue === 1) return "A";
+    if (cardValue === 11) return "J";
+    if (cardValue === 12) return "Q";
+    if (cardValue === 13) return "K";
+    return cardValue.toString();
+}
+
+// Function to update the card display
+function updateCardDisplay(playerCard, houseCard) {
+    document.getElementById("player-card").textContent = getCardDisplay(playerCard);
+    document.getElementById("house-card").textContent = getCardDisplay(houseCard);
+    
+    // Determine and display the winner
+    if (playerCard > houseCard) {
+        document.getElementById("game-status").textContent = "You won!";
+        document.getElementById("game-status").style.color = "#28a745"; // Green
+    } else {
+        document.getElementById("game-status").textContent = "House wins";
+        document.getElementById("game-status").style.color = "#dc3545"; // Red
+    }
+}
+
+// Function to reset card display
+function resetCardDisplay() {
+    document.getElementById("player-card").textContent = "0";
+    document.getElementById("house-card").textContent = "0";
+    document.getElementById("game-status").textContent = "";
+}
+
+// Update the game loop function
+async function gameLoop() {
+    const wallet = getLocalWallet();
+    if (!wallet) {
+        console.log("No wallet found, skipping game loop");
+        return;
+    }
+
+    try {
+        const gameState = await checkGameState();
+        if (!gameState) return;
+
+        const secretData = getStoredSecret();
+        
+        // If game is in HashPosted state and we have a secret, calculate and reveal
+        if (gameState.gameState === "2" && // HashPosted
+            secretData) {
+            
+            // Calculate cards locally
+            const result = calculateCards(secretData.secret, gameState.houseHash);
+            
+            // Update the card display with results
+            updateCardDisplay(result.playerCard, result.houseCard);
+            
+            console.log("Conditions met for reveal, attempting...");
+            await performReveal(wallet, secretData.secret);
+        }
+    } catch (error) {
+        console.error("Error in game loop:", error);
+    }
+}
+
+// Update the commit function to show "Please wait"
 async function commit() {
     const wallet = getLocalWallet();
     if (!wallet) {
@@ -276,13 +313,19 @@ async function commit() {
     try {
         // Check if player is already committed
         const gameState = await my_contract.methods.getGameState(wallet.address).call();
-        if (gameState.playerState !== "0") { // NotStarted
+        console.log("Game state:", gameState);
+        if (gameState.gameState !== "0") { // NotStarted
             alert("You have already committed to this game!");
             return;
         }
 
+        // Reset card display and show waiting status
+        resetCardDisplay();
+        document.getElementById("game-status").textContent = "Please wait...";
+
         // Generate random secret
         const secret = generateRandomBytes32();
+        storeSecret(secret);
         const commitHash = web3.utils.soliditySha3(secret);
         
         const stakeAmount = await my_contract.methods.STAKE_AMOUNT().call();
@@ -302,8 +345,6 @@ async function commit() {
 
         const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-
-        storeSecret(secret);
         
         if (receipt.status) {
             document.getElementById("web3_message").textContent = "Commit successful! Waiting for house to post hash...";
@@ -320,6 +361,7 @@ async function commit() {
     } catch (error) {
         console.error("Error in commit:", error);
         document.getElementById("web3_message").textContent = "Error in commit!";
+        document.getElementById("game-status").textContent = "";
     }
 }
 
@@ -331,11 +373,10 @@ async function checkGameState() {
 
         const gameState = await my_contract.methods.getGameState(wallet.address).call();
         return {
-            playerState: gameState.playerState,
-            housePosted: gameState.housePosted,
-            playerStake: gameState.playerStake,
-            houseStake: gameState.houseStake,
-            winner: gameState.winner
+            gameState: gameState.gameState,
+            playerCommit: gameState.playerCommit,
+            houseHash: gameState.houseHash,
+            playerSecret: gameState.playerSecret
         };
     } catch (error) {
         console.error("Error checking game state:", error);
@@ -343,30 +384,79 @@ async function checkGameState() {
     }
 }
 
-// Add game loop function
-async function gameLoop() {
-    const wallet = getLocalWallet();
-    if (!wallet) {
-        console.log("No wallet found, skipping game loop");
-        return;
+// Add this function to calculate cards locally
+function calculateCards(secret, houseHash) {
+    // Convert to BigInt for proper handling of large numbers
+    const secretBig = BigInt(secret);
+    const houseHashBig = BigInt(houseHash);
+    
+    // XOR the secret and house hash
+    const xorResult = secretBig ^ houseHashBig;
+    
+    // Extract two card values (1-13) from the XOR result
+    // Player card from upper 128 bits
+    const playerCard = Number((xorResult >> 128n) % 13n) + 1;
+    // House card from lower 128 bits
+    const houseCard = Number((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn) % 13n) + 1;
+    
+    // Determine winner
+    let winner;
+    if (playerCard > houseCard) {
+        winner = 'Player';
+    } else {
+        winner = 'House';
     }
+    
+    return { playerCard, houseCard, winner };
+}
 
-    try {
-        const gameState = await checkGameState();
-        if (!gameState) return;
+// Function to get card name
+function getCardName(cardValue) {
+    if (cardValue === 1) return "Ace";
+    if (cardValue === 11) return "Jack";
+    if (cardValue === 12) return "Queen";
+    if (cardValue === 13) return "King";
+    return cardValue.toString();
+}
 
+// Also update updateGameState to show card calculation when hash is posted
+async function updateGameState() {
+  const wallet = getLocalWallet();
+  if (!wallet) return;
+
+  try {
+    const gameState = await my_contract.methods.getGameState(wallet.address).call();
+    const stakeAmount = await my_contract.methods.STAKE_AMOUNT().call();
+    
+    const stateNames = ["Not Started", "Committed", "Hash Posted"];
+    const currentState = stateNames[parseInt(gameState.gameState)];
+    
+    let cardInfo = "";
+    
+    // If hash is posted and we have a secret, calculate cards and update display
+    if (gameState.gameState === "2" && gameState.houseHash !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
         const secretData = getStoredSecret();
-        
-        // If player is committed and has a secret, and house has posted hash, reveal
-        if (gameState.playerState === "1" && // Committed
-            gameState.housePosted && 
-            secretData) {
-            console.log("Conditions met for reveal, attempting...");
-            await performReveal(wallet, secretData.secret);
+        if (secretData) {
+            const result = calculateCards(secretData.secret, gameState.houseHash);
+            // Update the card display
+            updateCardDisplay(result.playerCard, result.houseCard);
+            cardInfo = `\nPredicted Result: Player: ${result.playerCard} (${getCardName(result.playerCard)}), House: ${result.houseCard} (${getCardName(result.houseCard)}), Winner: ${result.winner}`;
         }
-    } catch (error) {
-        console.error("Error in game loop:", error);
     }
+    
+    const stateText = `
+      Game State: ${currentState}
+      Required Stake: ${web3.utils.fromWei(stakeAmount, 'ether')} ETH
+      ${gameState.playerCommit !== '0x0000000000000000000000000000000000000000000000000000000000000000' ? 
+        `Your Commitment: ${gameState.playerCommit}` : 'No commitment yet'}
+      ${gameState.houseHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' ? 
+        `House Hash: ${gameState.houseHash}` : 'House hash not posted yet'}${cardInfo}
+    `;
+    
+    document.getElementById("game_state").textContent = stateText;
+  } catch (error) {
+    console.error("Error updating game state:", error);
+  }
 }
 
 // Start the game loop
@@ -379,7 +469,6 @@ function startGameLoop() {
 
 const onWalletConnectedCallback = async () => {
 }
-
 
 //// Functions ////
 
@@ -405,6 +494,11 @@ async function checkLocalWalletBalance() {
   if (wallet) {
     const balance = await web3.eth.getBalance(wallet.address);
     const ethBalance = web3.utils.fromWei(balance, 'ether');
+    
+    // Update the top-right balance display
+    document.getElementById("balance-display").textContent = `Balance: ${parseFloat(ethBalance).toFixed(4)} ETH`;
+    
+    // Update the detailed wallet info (in the collapsible section)
     document.getElementById("local_wallet_address").textContent = 
       `Local Wallet Address: ${wallet.address}`;
     document.getElementById("local_wallet_private_key").textContent = 
