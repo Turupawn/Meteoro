@@ -42,6 +42,14 @@ async function postHashForPlayer(playerAddress, gameId) {
         processingGameIds.add(gameId);
         console.log(`Started processing game ${gameId}`);
 
+        // Check if game is still in committed state
+        const gameState = await contract.methods.getGameState(playerAddress).call();
+        if (gameState.gameState !== "1") { // Not in Committed state
+            console.log(`Game ${gameId} is no longer in committed state, skipping`);
+            processingGameIds.delete(gameId);
+            return;
+        }
+
         const hash = generateRandomHash();
         const stakeAmount = await contract.methods.STAKE_AMOUNT().call();
         
@@ -63,12 +71,10 @@ async function postHashForPlayer(playerAddress, gameId) {
             });
         } else {
             console.error(`Transaction failed for game ${gameId}:`, receipt);
-            // Remove from processing set if transaction failed
             processingGameIds.delete(gameId);
         }
     } catch (error) {
         console.error('Error posting hash:', error);
-        // Remove from processing set if there was an error
         processingGameIds.delete(gameId);
     }
 }
@@ -92,28 +98,51 @@ async function checkForNewGames() {
         const toBlock = Math.min(currentBlock, lastProcessedBlock + 5);
 
         try {
-            const events = await contract.getPastEvents('GameCreated', {
-                fromBlock: lastProcessedBlock + 1,
-                toBlock: toBlock,
-                // Add these options to handle block range issues
-                filter: {},
-                topics: []
-            });
+            // Get both GameCreated and GameForfeited events
+            const [createdEvents, forfeitedEvents] = await Promise.all([
+                contract.getPastEvents('GameCreated', {
+                    fromBlock: lastProcessedBlock + 1,
+                    toBlock: toBlock
+                }),
+                contract.getPastEvents('GameForfeited', {
+                    fromBlock: lastProcessedBlock + 1,
+                    toBlock: toBlock
+                })
+            ]);
 
-            // Process events in order
-            for (const event of events) {
-                const playerAddress = event.returnValues.player;
-                const gameId = event.returnValues.gameId;
-                console.log('New game created:', { player: playerAddress, gameId: gameId });
-                
-                await postHashForPlayer(playerAddress, gameId);
+            // Process created events
+            for (const event of createdEvents) {
+                try {
+                    const playerAddress = event.returnValues.player;
+                    const gameId = event.returnValues.gameId;
+                    console.log('New game created:', { player: playerAddress, gameId: gameId });
+                    
+                    await postHashForPlayer(playerAddress, gameId);
+                } catch (error) {
+                    console.error('Error processing game created event:', error);
+                    // Continue with next event
+                }
+            }
+
+            // Process forfeited events
+            for (const event of forfeitedEvents) {
+                try {
+                    const playerAddress = event.returnValues.player;
+                    console.log('Game forfeited:', { player: playerAddress });
+                    // Remove from processing set if it was being processed
+                    processingGameIds.delete(playerAddress);
+                } catch (error) {
+                    console.error('Error processing forfeit event:', error);
+                    // Continue with next event
+                }
             }
 
             // Only update lastProcessedBlock if we successfully processed all blocks
             lastProcessedBlock = toBlock;
         } catch (error) {
             if (error.message.includes('block meta not found') || 
-                error.message.includes('invalid block range params')) {
+                error.message.includes('invalid block range params') ||
+                error.message.includes('data out-of-bounds')) {
                 // If block not found or invalid range, try again with a smaller range
                 lastProcessedBlock = Math.max(lastProcessedBlock, currentBlock - 5);
                 console.log('Block range error, adjusting lastProcessedBlock to:', lastProcessedBlock);

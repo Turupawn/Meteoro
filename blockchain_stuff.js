@@ -2,7 +2,7 @@ const NETWORK_ID = 6342
 
 const POLL_INTERVAL = 500
 
-const MY_CONTRACT_ADDRESS = "0xB45E4C947aC539F274fb8086a2Bef338533fdE1a"
+const MY_CONTRACT_ADDRESS = "0x905158B964A1a0a1185d84798B65862C7c1f57b2"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
@@ -171,9 +171,9 @@ async function gameLoop() {
         }
 
         if(wallet) {
-            const balance = await web3.eth.getBalance(wallet.address);
-            const ethBalance = web3.utils.fromWei(balance, 'ether');
-            console.log("Wallet:",{address: wallet.address, privateKey: wallet.privateKey, balance: ethBalance})
+          const balance = await web3.eth.getBalance(wallet.address);
+          const ethBalance = web3.utils.fromWei(balance, 'ether');
+          console.log("Wallet:",{address: wallet.address, privateKey: wallet.privateKey, balance: ethBalance})
         } else {
             console.log("No wallet found")
         }
