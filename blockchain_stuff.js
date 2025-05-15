@@ -1,10 +1,15 @@
 const NETWORK_ID = 6342
 
-const MY_CONTRACT_ADDRESS = "0x2BffeA4381db67Df5a2f5ca1399dd291440dFe3D"
+const POLL_INTERVAL = 500
+
+const MY_CONTRACT_ADDRESS = "0x18DC1Db17140Cd4Ef790B712b302fD97E5F8f6F5"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
 var web3
+
+// Add at the top with other global variables
+const processingGameIds = new Set(); // Track games being processed
 
 // Simplify web3 initialization without MetaMask
 const getWeb3 = async () => {
@@ -166,16 +171,17 @@ async function gameLoop() {
         }
 
         if(wallet) {
-          const balance = await web3.eth.getBalance(wallet.address);
-          const ethBalance = web3.utils.fromWei(balance, 'ether');
-          console.log("Wallet:",{address: wallet.address, privateKey: wallet.privateKey, balance: ethBalance})
+            const balance = await web3.eth.getBalance(wallet.address);
+            const ethBalance = web3.utils.fromWei(balance, 'ether');
+            console.log("Wallet:",{address: wallet.address, privateKey: wallet.privateKey, balance: ethBalance})
         } else {
-          console.log("No wallet found")
+            console.log("No wallet found")
         }
         
         // If game is in HashPosted state and we have a secret, calculate and reveal
         if (gameState.gameState === "2" && // HashPosted
-            secretData) {
+            secretData &&
+            !processingGameIds.has(gameState.gameId)) { // Only attempt reveal if not already processing
             
             // Calculate cards locally
             const result = calculateCards(secretData.secret, gameState.houseHash);
@@ -255,11 +261,13 @@ async function checkGameState() {
         const wallet = getLocalWallet();
         if (!wallet) return null;
 
-        const gameState = await my_contract.methods.getGameState(wallet.address).call();
+        // Use 'pending' block tag to get latest state including mini blocks
+        const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
         return {
             gameState: gameState.gameState,
             playerCommit: gameState.playerCommit,
-            houseHash: gameState.houseHash
+            houseHash: gameState.houseHash,
+            gameId: gameState.gameId
         };
     } catch (error) {
         console.error("Error checking game state:", error);
@@ -299,7 +307,8 @@ async function updateGameState() {
     const wallet = getLocalWallet();
     if (!wallet) return;
 
-    const gameState = await my_contract.methods.getGameState(wallet.address).call();
+    // Use 'pending' block tag to get latest state including mini blocks
+    const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
     
     // Update current game state display
     const gameStateElement = document.getElementById("game-state");
@@ -336,8 +345,8 @@ async function updateGameState() {
 function startGameLoop() {
     // Run immediately
     gameLoop();
-    // Then run every 2 seconds
-    setInterval(gameLoop, 2000);
+    // Then run every 500ms instead of 2000ms since we're using pending block tag
+    setInterval(gameLoop, POLL_INTERVAL);
 }
 
 const onWalletConnectedCallback = async () => {
@@ -409,9 +418,23 @@ async function forfeit() {
     }
 }
 
-// Add the perform reveal function
+// Update the performReveal function
 async function performReveal(wallet, secret) {
     try {
+        // Get current game state to check game ID
+        const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
+        const gameId = gameState.gameId;
+
+        // Check if we're already processing this game
+        if (processingGameIds.has(gameId)) {
+            console.log(`Already processing game ${gameId}, skipping reveal`);
+            return;
+        }
+
+        // Mark game as processing immediately
+        processingGameIds.add(gameId);
+        console.log(`Started processing reveal for game ${gameId}`);
+
         const data = my_contract.methods.reveal(secret).encodeABI();
         const nonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
         const gasPrice = await web3.eth.getGasPrice();
@@ -438,14 +461,19 @@ async function performReveal(wallet, secret) {
         if (receipt.status) {
             console.log("Reveal successful, clearing secret");
             clearStoredSecret();
-          } else {
+        } else {
             console.log("Reveal failed");
             console.log(receipt);
+            // Remove from processing set if transaction failed
+            processingGameIds.delete(gameId);
         }
         
         updateGameState();
     } catch (error) {
         console.error("Error in reveal:", error);
+        // Remove from processing set if there was an error
+        const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
+        processingGameIds.delete(gameState.gameId);
     }
 }
 

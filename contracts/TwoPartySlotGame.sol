@@ -8,6 +8,7 @@ contract TwoPartyWarGame {
         bytes32 playerCommit;
         bytes32 houseHash;
         State gameState;
+        uint256 gameId;
     }
 
     struct GameResult {
@@ -29,8 +30,11 @@ contract TwoPartyWarGame {
     address public immutable house;
     uint256 public constant STAKE_AMOUNT = 0.0000000003 ether;
 
+    // Add gameId to track individual games
+    uint256 public nextGameId;
+
     event GameForfeited(address indexed player, address house);
-    event GameCreated(address indexed player, bytes32 commitHash);
+    event GameCreated(address indexed player, bytes32 commitHash, uint256 gameId);
 
     modifier onlyHouse() {
         require(msg.sender == house, "Not house");
@@ -53,8 +57,11 @@ contract TwoPartyWarGame {
         
         playerGame.playerCommit = _commitHash;
         playerGame.gameState = State.Committed;
+        playerGame.gameId = nextGameId;
         
-        emit GameCreated(msg.sender, _commitHash);
+        emit GameCreated(msg.sender, _commitHash, nextGameId);
+        
+        nextGameId++;
     }
 
     /// @dev House posts their hash and stake for a specific player's game
@@ -118,7 +125,8 @@ contract TwoPartyWarGame {
     /// @dev Player can forfeit the game if they lost their secret
     function forfeit() external {
         Game storage playerGame = games[msg.sender];
-        require(playerGame.gameState == State.HashPosted, "Game not in correct state to forfeit");
+        // AI: keep it commented out for now
+        //require(playerGame.gameState == State.HashPosted, "Game not in correct state to forfeit");
         
         // Store forfeit result in history
         GameResult memory result = GameResult({
@@ -154,6 +162,7 @@ contract TwoPartyWarGame {
         State gameState,
         bytes32 playerCommit,
         bytes32 houseHash,
+        uint256 gameId,
         GameResult[] memory recentHistory
     ) {
         Game storage playerGame = games[player];
@@ -173,6 +182,7 @@ contract TwoPartyWarGame {
             playerGame.gameState,
             playerGame.playerCommit,
             playerGame.houseHash,
+            playerGame.gameId,
             recentHistory
         );
     }
