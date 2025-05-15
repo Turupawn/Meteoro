@@ -1,6 +1,6 @@
 const NETWORK_ID = 6342
 
-const MY_CONTRACT_ADDRESS = "0x862A40C84E1A092363C3b87d492B8fCee3f9292E"
+const MY_CONTRACT_ADDRESS = "0x2BffeA4381db67Df5a2f5ca1399dd291440dFe3D"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
@@ -56,104 +56,30 @@ async function loadDapp() {
 loadDapp()
 
 const onContractInitCallback = async () => {
-  // Get the latest block number
-  const latestBlock = await web3.eth.getBlockNumber();
-  console.log("Latest block:", latestBlock);
-
   try {
-    const wallet = getLocalWallet();
-    // Get events from the last 1000 blocks only
-    const pastEvents = await my_contract.getPastEvents('GameResult', {
-      fromBlock: latestBlock - 1000,
-      toBlock: 'latest'
-    });
+    // Get and display game state
+    updateGameState();
 
-    // Sort events by block number (newest first) and take the last 10
-    const sortedEvents = pastEvents
-      .sort((a, b) => b.blockNumber - a.blockNumber)
-      .slice(0, 10);
-
-    // We no longer need to display events in the removed event_log element
-    // Instead, just use the events for the personal games list
-    
-    // Filter for user's games
-    if (wallet) {
-      const personalGamesList = document.getElementById("personal-games-list");
-      personalGamesList.innerHTML = ""; // Clear the list
-      
-      // Get games that match the user's address
-      const userGames = sortedEvents.filter(event => 
-        event.returnValues.player && 
-        event.returnValues.player.toLowerCase() === wallet.address.toLowerCase()
-      );
-      
-      if (userGames.length === 0) {
-        personalGamesList.innerHTML = "<li>No games yet</li>";
-      } else {
-        userGames.forEach(event => {
-          const playerCard = getCardDisplay(parseInt(event.returnValues.playerCard));
-          const houseCard = getCardDisplay(parseInt(event.returnValues.houseCard));
-          const isWin = event.returnValues.winner.toLowerCase() === wallet.address.toLowerCase();
-          
-          addGameToPersonalList(playerCard, houseCard, isWin);
-        });
+    // Check if stored secret is still valid
+    const secretData = getStoredSecret();
+    if (secretData) {
+      try {
+        const wallet = getLocalWallet();
+        if (wallet) {
+          const gameState = await my_contract.methods.getGameState(wallet.address).call();
+          const commitHash = web3.utils.soliditySha3(secretData.secret);
+          const isSecretValid = 
+            gameState.gameState === "1"; // Committed state
+        }
+      } catch (error) {
+        console.error("Error checking secret validity:", error);
       }
     }
-
-    // Subscribe to new events
-    my_contract.events.GameResult({}, function(error, event) {
-      if (error) {
-        console.error("Error in event subscription:", error);
-        return;
-      }
-      
-      // We don't need to update the event_log anymore
-      // Only update the personal games list if it's the user's game
-      const wallet = getLocalWallet();
-      if (wallet && 
-          event.returnValues.player && 
-          event.returnValues.player.toLowerCase() === wallet.address.toLowerCase()) {
-        
-        const playerCardDisplay = getCardDisplay(parseInt(event.returnValues.playerCard));
-        const houseCardDisplay = getCardDisplay(parseInt(event.returnValues.houseCard));
-        const isWin = event.returnValues.winner.toLowerCase() === wallet.address.toLowerCase();
-        
-        // Remove "No games yet" message if present
-        const noGamesElement = document.querySelector("#personal-games-list li");
-        if (noGamesElement && noGamesElement.textContent === "No games yet") {
-          noGamesElement.remove();
-        }
-        
-        addGameToPersonalList(playerCardDisplay, houseCardDisplay, isWin);
-      }
-    });
-
-    // Similar handling for GameForfeited events
-    my_contract.events.GameForfeited({}, function(error, event) {
-      if (error) {
-        console.error("Error in event subscription:", error);
-        return;
-      }
-      
-      const wallet = getLocalWallet();
-      if (wallet && 
-          event.returnValues.player && 
-          event.returnValues.player.toLowerCase() === wallet.address.toLowerCase()) {
-        
-        const gamesList = document.getElementById("personal-games-list");
-        const listItem = document.createElement("li");
-        listItem.style.marginBottom = "8px"; // Add margin for better spacing
-        listItem.innerHTML = `<span style="color: #dc3545;">• Game forfeited</span>`;
-        
-        if (gamesList.firstChild) {
-          gamesList.insertBefore(listItem, gamesList.firstChild);
-        } else {
-          gamesList.appendChild(listItem);
-        }
-      }
-    });
+    
+    // Start the game loop
+    startGameLoop();
   } catch (error) {
-    console.error("Error fetching past events:", error);
+    console.error("Error in contract initialization:", error);
     const personalGamesList = document.getElementById("personal-games-list");
     if (personalGamesList) {
       personalGamesList.innerHTML = "<li>Error loading games</li>";
@@ -161,30 +87,6 @@ const onContractInitCallback = async () => {
       console.error("Cannot find personal-games-list element");
     }
   }
-
-  // Get and display game state
-  updateGameState();
-
-  // Check if stored secret is still valid
-  const secretData = getStoredSecret();
-  if (secretData) {
-    try {
-      const wallet = getLocalWallet();
-      if (wallet) {
-        const gameState = await my_contract.methods.getGameState(wallet.address).call();
-        const commitHash = web3.utils.soliditySha3(secretData.secret);
-        const isSecretValid = 
-          gameState.gameState === "1"; // Committed state
-      }
-    } catch (error) {
-      console.error("Error checking secret validity:", error);
-    }
-  }
-  
-  updateGameState();
-
-  // Start the game loop
-  startGameLoop();
 }
 
 function generateRandomBytes32() {
@@ -391,38 +293,39 @@ function calculateCards(secret, houseHash) {
     return { playerCard, houseCard, winner };
 }
 
-// Function to get card name
-function getCardName(cardValue) {
-    if (cardValue === 1) return "Ace";
-    if (cardValue === 11) return "Jack";
-    if (cardValue === 12) return "Queen";
-    if (cardValue === 13) return "King";
-    return cardValue.toString();
-}
-
 // Also update updateGameState to show card calculation when hash is posted
 async function updateGameState() {
-  const wallet = getLocalWallet();
-  if (!wallet) return;
-
   try {
+    const wallet = getLocalWallet();
+    if (!wallet) return;
+
     const gameState = await my_contract.methods.getGameState(wallet.address).call();
-    const stakeAmount = await my_contract.methods.STAKE_AMOUNT().call();
     
-    const stateNames = ["Not Started", "Committed", "Hash Posted"];
-    const currentState = stateNames[parseInt(gameState.gameState)];
-    
-    let cardInfo = "";
-    
-    // If hash is posted and we have a secret, calculate cards and update display
-    if (gameState.gameState === "2" && gameState.houseHash !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
-        const secretData = getStoredSecret();
-        if (secretData) {
-            const result = calculateCards(secretData.secret, gameState.houseHash);
-            // Update the card display
-            updateCardDisplay(result.playerCard, result.houseCard);
-            cardInfo = `\nPredicted Result: Player: ${result.playerCard} (${getCardName(result.playerCard)}), House: ${result.houseCard} (${getCardName(result.houseCard)}), Winner: ${result.winner}`;
+    // Update current game state display
+    const gameStateElement = document.getElementById("game-state");
+    if (gameStateElement) {
+      gameStateElement.textContent = `Game State: ${gameState.gameState}`;
+    }
+
+    // Update personal games list with history
+    const personalGamesList = document.getElementById("personal-games-list");
+    if (personalGamesList) {
+      personalGamesList.innerHTML = ""; // Clear the list
+      
+      if (gameState.recentHistory.length === 0) {
+        personalGamesList.innerHTML = "<li>No games yet</li>";
+      } else {
+        // Display games in reverse chronological order (newest first)
+        for (let i = gameState.recentHistory.length - 1; i >= 0; i--) {
+          const result = gameState.recentHistory[i];
+          const isForfeit = result.playerCard === 0 && result.houseCard === 0;
+          const playerCard = getCardDisplay(parseInt(result.playerCard));
+          const houseCard = getCardDisplay(parseInt(result.houseCard));
+          const isWin = result.winner.toLowerCase() === wallet.address.toLowerCase();
+          
+          addGameToPersonalList(playerCard, houseCard, isWin, isForfeit);
         }
+      }
     }
   } catch (error) {
     console.error("Error updating game state:", error);
@@ -622,13 +525,15 @@ async function withdrawFunds() {
     }
 }
 
-// Add this function to manage the personal games list
-function addGameToPersonalList(playerCard, houseCard, isWin) {
+// Update the addGameToPersonalList function to handle forfeits
+function addGameToPersonalList(playerCard, houseCard, isWin, isForfeit = false) {
   const gamesList = document.getElementById("personal-games-list");
   const listItem = document.createElement("li");
   listItem.style.marginBottom = "8px"; // Increased space between items
   
-  if (isWin) {
+  if (isForfeit) {
+    listItem.innerHTML = `<span style="color: #dc3545;">• Game forfeited</span>`;
+  } else if (isWin) {
     listItem.innerHTML = `<span style="color: #28a745;">• You won [${playerCard}-${houseCard}]</span>`;
   } else {
     listItem.innerHTML = `<span style="color: #dc3545;">• House wins [${playerCard}-${houseCard}]</span>`;

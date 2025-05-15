@@ -10,12 +10,25 @@ contract TwoPartyWarGame {
         State gameState;
     }
 
-    // Map player address to their game
+    struct GameResult {
+        uint256 playerCard;
+        uint256 houseCard;
+        address winner;
+        uint256 timestamp;
+    }
+
+    // Map player address to their current game
     mapping(address => Game) public games;
+    
+    // Map player address to their game history
+    mapping(address => GameResult[]) public gameHistory;
+    
+    // Maximum number of games to return in getGameState
+    uint256 public constant MAX_RETURN_HISTORY = 10;
+    
     address public immutable house;
     uint256 public constant STAKE_AMOUNT = 0.0000000003 ether;
 
-    event GameResult(address indexed player, address winner, uint256 playerCard, uint256 houseCard);
     event GameForfeited(address indexed player, address house);
     event GameCreated(address indexed player, bytes32 commitHash);
 
@@ -75,15 +88,23 @@ contract TwoPartyWarGame {
             winner = house;
         }
         
+        // Store game result in history
+        GameResult memory result = GameResult({
+            playerCard: playerCard,
+            houseCard: houseCard,
+            winner: winner,
+            timestamp: block.timestamp
+        });
+        
+        // Add to history (no size limit)
+        gameHistory[msg.sender].push(result);
+        
         // Reset game state BEFORE transfer
         _resetGame(msg.sender);
         
         // Transfer stakes to winner
         uint256 totalStake = STAKE_AMOUNT * 2;
         payable(winner).transfer(totalStake);
-        
-        // Emit event after transfer
-        emit GameResult(msg.sender, winner, playerCard, houseCard);
     }
 
     /// @dev Internal function to reset the game
@@ -99,6 +120,17 @@ contract TwoPartyWarGame {
         Game storage playerGame = games[msg.sender];
         require(playerGame.gameState == State.HashPosted, "Game not in correct state to forfeit");
         
+        // Store forfeit result in history
+        GameResult memory result = GameResult({
+            playerCard: 0,
+            houseCard: 0,
+            winner: house,
+            timestamp: block.timestamp
+        });
+        
+        // Add to history (no size limit)
+        gameHistory[msg.sender].push(result);
+        
         // Reset game state BEFORE transfer
         _resetGame(msg.sender);
         
@@ -108,12 +140,6 @@ contract TwoPartyWarGame {
         
         // Emit events
         emit GameForfeited(msg.sender, house);
-        emit GameResult(msg.sender, house, 0, 0);
-    }
-
-    // Add a function to check contract balance
-    function getContractBalance() external view returns (uint256) {
-        return address(this).balance;
     }
 
     // Add a function to withdraw stuck funds (only house)
@@ -123,49 +149,31 @@ contract TwoPartyWarGame {
         payable(house).transfer(balance);
     }
 
-    // Helper functions
-    function helper01String(string memory str) public pure returns(bytes32) {
-        return bytes32(abi.encodePacked(str));
-    }
-
-    function helper02Commit(bytes32 b32) public pure returns(bytes32) {
-        return keccak256(abi.encodePacked(b32));
-    }
-
-    // Function to get game state for a specific player
+    // Function to get game state and last 10 games for a specific player
     function getGameState(address player) external view returns (
         State gameState,
         bytes32 playerCommit,
-        bytes32 houseHash
+        bytes32 houseHash,
+        GameResult[] memory recentHistory
     ) {
         Game storage playerGame = games[player];
+        GameResult[] storage fullHistory = gameHistory[player];
+        
+        // Create a new array for the last 10 games
+        uint256 historyLength = fullHistory.length;
+        uint256 returnLength = historyLength > MAX_RETURN_HISTORY ? MAX_RETURN_HISTORY : historyLength;
+        recentHistory = new GameResult[](returnLength);
+        
+        // Copy the last 10 games (or all if less than 10)
+        for (uint256 i = 0; i < returnLength; i++) {
+            recentHistory[i] = fullHistory[historyLength - returnLength + i];
+        }
+        
         return (
             playerGame.gameState,
             playerGame.playerCommit,
-            playerGame.houseHash
+            playerGame.houseHash,
+            recentHistory
         );
-    }
-
-    // Helper function to get card name
-    function getCardName(uint256 cardValue) public pure returns (string memory) {
-        require(cardValue >= 1 && cardValue <= 13, "Invalid card value");
-        
-        if (cardValue == 1) return "Ace";
-        if (cardValue == 11) return "Jack";
-        if (cardValue == 12) return "Queen";
-        if (cardValue == 13) return "King";
-        
-        // Convert number to string for cards 2-10
-        if (cardValue == 2) return "2";
-        if (cardValue == 3) return "3";
-        if (cardValue == 4) return "4";
-        if (cardValue == 5) return "5";
-        if (cardValue == 6) return "6";
-        if (cardValue == 7) return "7";
-        if (cardValue == 8) return "8";
-        if (cardValue == 9) return "9";
-        if (cardValue == 10) return "10";
-        
-        return "";
     }
 }

@@ -49,35 +49,17 @@
 		"type": "event"
 	},
 	{
-		"anonymous": false,
-		"inputs": [
+		"inputs": [],
+		"name": "MAX_RETURN_HISTORY",
+		"outputs": [
 			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "player",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "winner",
-				"type": "address"
-			},
-			{
-				"indexed": false,
 				"internalType": "uint256",
-				"name": "playerCard",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "houseCard",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "GameResult",
-		"type": "event"
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
 		"inputs": [],
@@ -118,6 +100,45 @@
 				"internalType": "address",
 				"name": "",
 				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "gameHistory",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "playerCard",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "houseCard",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "winner",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
 			}
 		],
 		"name": "games",
@@ -133,46 +154,9 @@
 				"type": "bytes32"
 			},
 			{
-				"internalType": "bytes32",
-				"name": "playerSecret",
-				"type": "bytes32"
-			},
-			{
 				"internalType": "enum TwoPartyWarGame.State",
 				"name": "gameState",
 				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "cardValue",
-				"type": "uint256"
-			}
-		],
-		"name": "getCardName",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getContractBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -204,50 +188,34 @@
 				"type": "bytes32"
 			},
 			{
-				"internalType": "bytes32",
-				"name": "playerSecret",
-				"type": "bytes32"
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "playerCard",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "houseCard",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "winner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct TwoPartyWarGame.GameResult[]",
+				"name": "recentHistory",
+				"type": "tuple[]"
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "str",
-				"type": "string"
-			}
-		],
-		"name": "helper01String",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "b32",
-				"type": "bytes32"
-			}
-		],
-		"name": "helper02Commit",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
-		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
