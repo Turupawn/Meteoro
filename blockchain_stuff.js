@@ -99,15 +99,16 @@ function generateRandomBytes32() {
 }
 
 function storeSecret(secret) {
-    console.log("Storing secret:", secret);
+    console.log("=== STORE SECRET ===");
+    console.log("Previous secret:", getStoredSecret());
+    console.log("New secret:", secret);
+    console.log("Commitment:", web3.utils.soliditySha3(secret));
     localStorage.setItem('playerSecret', JSON.stringify({
         secret: secret,
         timestamp: Date.now()
     }));
-    // Add a small delay to ensure localStorage is updated
-    setTimeout(() => {
-        console.log("Updating commitment info after storing secret");
-    }, 100);
+    console.log("Stored secret:", getStoredSecret());
+    console.log("===================");
 }
 
 function getStoredSecret() {
@@ -116,7 +117,11 @@ function getStoredSecret() {
 }
 
 function clearStoredSecret() {
+    console.log("=== CLEAR SECRET ===");
+    console.log("Secret before clearing:", getStoredSecret());
     localStorage.removeItem('playerSecret');
+    console.log("Secret after clearing:", getStoredSecret());
+    console.log("===================");
 }
 
 // Function to get card display value (J, Q, K, A or number)
@@ -159,11 +164,24 @@ async function gameLoop() {
     }
 
     try {
+        console.log("=== GAME LOOP START ===");
         const gameState = await checkGameState();
-        console.log("Game state:", gameState);
-        if (!gameState) return;
-
+        console.log("Current game state:", gameState);
+        
         const secretData = getStoredSecret();
+        console.log("Secret in storage:", secretData);
+        
+        if (gameState.gameState === "2" && !secretData) {
+            console.log("=== CRITICAL STATE DETECTED ===");
+            console.log("Game is in HashPosted state but no secret found!");
+            console.log("Game state:", gameState);
+            console.log("Local storage state:", {
+                secret: getStoredSecret(),
+                wallet: getLocalWallet()
+            });
+            console.log("========================");
+        }
+        
         if(secretData) {
             console.log("Secret:",{secret: secretData.secret, commitment: web3.utils.soliditySha3(secretData.secret)})
         } else {
@@ -171,9 +189,9 @@ async function gameLoop() {
         }
 
         if(wallet) {
-          const balance = await web3.eth.getBalance(wallet.address);
-          const ethBalance = web3.utils.fromWei(balance, 'ether');
-          console.log("Wallet:",{address: wallet.address, privateKey: wallet.privateKey, balance: ethBalance})
+            const balance = await web3.eth.getBalance(wallet.address);
+            const ethBalance = web3.utils.fromWei(balance, 'ether');
+            console.log("Wallet:",{address: wallet.address, privateKey: wallet.privateKey, balance: ethBalance})
         } else {
             console.log("No wallet found")
         }
@@ -192,6 +210,8 @@ async function gameLoop() {
             console.log("Conditions met for reveal, attempting...");
             await performReveal(wallet, secretData.secret);
         }
+        
+        console.log("=== GAME LOOP END ===");
     } catch (error) {
         console.error("Error in game loop:", error);
     }
@@ -209,6 +229,15 @@ async function commit() {
         // Check if player is already committed
         const gameState = await my_contract.methods.getGameState(wallet.address).call();
         console.log("Game state:", gameState);
+        
+        // Check if we have a stored secret from a previous game
+        const storedSecret = getStoredSecret();
+        if (storedSecret) {
+            console.log("Found stored secret from previous game:", storedSecret);
+            alert("Cannot start new game while previous game's secret is still stored. Please wait for the current game to complete.");
+            return;
+        }
+
         if (gameState.gameState !== "0") { // NotStarted
             alert("You have already committed to this game!");
             return;
@@ -303,42 +332,47 @@ function calculateCards(secret, houseHash) {
 
 // Also update updateGameState to show card calculation when hash is posted
 async function updateGameState() {
-  try {
-    const wallet = getLocalWallet();
-    if (!wallet) return;
+    try {
+        const wallet = getLocalWallet();
+        if (!wallet) return;
 
-    // Use 'pending' block tag to get latest state including mini blocks
-    const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
-    
-    // Update current game state display
-    const gameStateElement = document.getElementById("game-state");
-    if (gameStateElement) {
-      gameStateElement.textContent = `Game State: ${gameState.gameState}`;
-    }
-
-    // Update personal games list with history
-    const personalGamesList = document.getElementById("personal-games-list");
-    if (personalGamesList) {
-      personalGamesList.innerHTML = ""; // Clear the list
-      
-      if (gameState.recentHistory.length === 0) {
-        personalGamesList.innerHTML = "<li>No games yet</li>";
-      } else {
-        // Display games in reverse chronological order (newest first)
-        for (let i = gameState.recentHistory.length - 1; i >= 0; i--) {
-          const result = gameState.recentHistory[i];
-          const isForfeit = result.playerCard === 0 && result.houseCard === 0;
-          const playerCard = getCardDisplay(parseInt(result.playerCard));
-          const houseCard = getCardDisplay(parseInt(result.houseCard));
-          const isWin = result.winner.toLowerCase() === wallet.address.toLowerCase();
-          
-          addGameToPersonalList(playerCard, houseCard, isWin, isForfeit);
+        // Use 'pending' block tag to get latest state including mini blocks
+        const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
+        
+        // Update current game state display
+        const gameStateElement = document.getElementById("game-state");
+        if (gameStateElement) {
+            let stateText = `Game State: ${gameState.gameState}`;
+            // Add warning if we're in HashPosted state but have no secret
+            if (gameState.gameState === "2" && !getStoredSecret()) {
+                stateText += " (Secret lost - can forfeit)";
+            }
+            gameStateElement.textContent = stateText;
         }
-      }
+
+        // Update personal games list with history
+        const personalGamesList = document.getElementById("personal-games-list");
+        if (personalGamesList) {
+            personalGamesList.innerHTML = ""; // Clear the list
+            
+            if (gameState.recentHistory.length === 0) {
+                personalGamesList.innerHTML = "<li>No games yet</li>";
+            } else {
+                // Display games in reverse chronological order (newest first)
+                for (let i = gameState.recentHistory.length - 1; i >= 0; i--) {
+                    const result = gameState.recentHistory[i];
+                    const isForfeit = result.playerCard === 0 && result.houseCard === 0;
+                    const playerCard = getCardDisplay(parseInt(result.playerCard));
+                    const houseCard = getCardDisplay(parseInt(result.houseCard));
+                    const isWin = result.winner.toLowerCase() === wallet.address.toLowerCase();
+                    
+                    addGameToPersonalList(playerCard, houseCard, isWin, isForfeit);
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Error updating game state:", error);
     }
-  } catch (error) {
-    console.error("Error updating game state:", error);
-  }
 }
 
 // Start the game loop
@@ -412,7 +446,13 @@ async function forfeit() {
             status: receipt.status ? "Confirmed" : "Failed",
             gasUsed: receipt.gasUsed
         });
-        updateGameState();
+
+        if (receipt.status) {
+            // Reload the page on successful forfeit
+            window.location.reload();
+        } else {
+            updateGameState();
+        }
     } catch (error) {
         console.error("Error in forfeit:", error);
     }
@@ -421,9 +461,18 @@ async function forfeit() {
 // Update the performReveal function
 async function performReveal(wallet, secret) {
     try {
+        console.log("=== PERFORM REVEAL START ===");
+        console.log("Current secret in storage:", getStoredSecret());
+        
         // Get current game state to check game ID
         const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
         const gameId = gameState.gameId;
+        console.log("Game state at reveal start:", {
+            gameId: gameId,
+            gameState: gameState.gameState,
+            playerCommit: gameState.playerCommit,
+            houseHash: gameState.houseHash
+        });
 
         // Check if we're already processing this game
         if (processingGameIds.has(gameId)) {
@@ -448,6 +497,7 @@ async function performReveal(wallet, secret) {
             data: data
         };
 
+        console.log("Sending reveal transaction...");
         const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
         
@@ -457,21 +507,39 @@ async function performReveal(wallet, secret) {
             status: receipt.status ? "Confirmed" : "Failed",
             gasUsed: receipt.gasUsed
         });
-        
+
         if (receipt.status) {
-            console.log("Reveal successful, clearing secret");
-            clearStoredSecret();
+            console.log("=== REVEAL SUCCESSFUL ===");
+            console.log("Secret in storage before state check:", getStoredSecret());
+            
+            // Get the current game state again to check if we're still on the same game
+            const currentGameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
+            console.log("Game state after reveal:", {
+                gameId: currentGameState.gameId,
+                gameState: currentGameState.gameState,
+                playerCommit: currentGameState.playerCommit,
+                houseHash: currentGameState.houseHash
+            });
+            
+            // Only clear the secret if we're still on the same game AND the game state has changed
+            // AND the player commit is zero (indicating a truly completed game)
+            if (currentGameState.gameId === gameId && 
+                currentGameState.gameState === "0" && 
+                currentGameState.playerCommit === "0x0000000000000000000000000000000000000000000000000000000000000000") {
+                console.log("Same game ID, completed state, and zero commit - clearing secret");
+                clearStoredSecret();
+            } else {
+                console.log("Game state changed or new game started, keeping secret");
+            }
         } else {
             console.log("Reveal failed");
-            console.log(receipt);
-            // Remove from processing set if transaction failed
             processingGameIds.delete(gameId);
         }
         
+        console.log("=== PERFORM REVEAL END ===");
         updateGameState();
     } catch (error) {
         console.error("Error in reveal:", error);
-        // Remove from processing set if there was an error
         const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
         processingGameIds.delete(gameState.gameId);
     }
