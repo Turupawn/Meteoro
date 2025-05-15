@@ -7,7 +7,6 @@ contract TwoPartyWarGame {
     struct Game {
         bytes32 playerCommit;
         bytes32 houseHash;
-        bytes32 playerSecret;
         State gameState;
     }
 
@@ -61,8 +60,6 @@ contract TwoPartyWarGame {
         require(playerGame.gameState == State.HashPosted, "Game not ready for reveal");
         require(keccak256(abi.encode(_secret)) == playerGame.playerCommit, "Player secret invalid");
         
-        playerGame.playerSecret = _secret;
-        
         // Generate result using house's hash and player's secret
         uint256 xorResult = uint256(_secret) ^ uint256(playerGame.houseHash);
         
@@ -94,7 +91,6 @@ contract TwoPartyWarGame {
         Game storage playerGame = games[player];
         playerGame.playerCommit = bytes32(0);
         playerGame.houseHash = bytes32(0);
-        playerGame.playerSecret = bytes32(0);
         playerGame.gameState = State.NotStarted;
     }
 
@@ -140,15 +136,13 @@ contract TwoPartyWarGame {
     function getGameState(address player) external view returns (
         State gameState,
         bytes32 playerCommit,
-        bytes32 houseHash,
-        bytes32 playerSecret
+        bytes32 houseHash
     ) {
         Game storage playerGame = games[player];
         return (
             playerGame.gameState,
             playerGame.playerCommit,
-            playerGame.houseHash,
-            playerGame.playerSecret
+            playerGame.houseHash
         );
     }
 

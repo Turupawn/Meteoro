@@ -184,8 +184,7 @@ const onContractInitCallback = async () => {
       console.error("Error checking secret validity:", error);
     }
   }
-
-  updateCommitmentInfo();
+  
   updateGameState();
 
   // Start the game loop
@@ -205,38 +204,16 @@ function storeSecret(secret) {
     // Add a small delay to ensure localStorage is updated
     setTimeout(() => {
         console.log("Updating commitment info after storing secret");
-        updateCommitmentInfo();
     }, 100);
-}
-
-function updateCommitmentInfo() {
-    console.log("Updating commitment info");
-    const secretData = getStoredSecret();
-    console.log("Retrieved secret data:", secretData);
-    const commitmentElement = document.getElementById("commitment_info");
-    
-    if (secretData) {
-        const commitHash = web3.utils.soliditySha3(secretData.secret);
-        console.log("Generated commit hash:", commitHash);
-        commitmentElement.innerHTML = `
-            Secret: ${secretData.secret}<br>
-            Commitment Hash: ${commitHash}
-        `;
-    } else {
-        console.log("No secret data found");
-        commitmentElement.textContent = "No active commitment";
-    }
 }
 
 function getStoredSecret() {
     const secretData = localStorage.getItem('playerSecret');
-    console.log("Raw secret data from localStorage:", secretData);
     return secretData ? JSON.parse(secretData) : null;
 }
 
 function clearStoredSecret() {
     localStorage.removeItem('playerSecret');
-    updateCommitmentInfo();
 }
 
 // Function to get card display value (J, Q, K, A or number)
@@ -280,9 +257,23 @@ async function gameLoop() {
 
     try {
         const gameState = await checkGameState();
+        console.log("Game state:", gameState);
         if (!gameState) return;
 
         const secretData = getStoredSecret();
+        if(secretData) {
+            console.log("Secret:",{secret: secretData.secret, commitment: web3.utils.soliditySha3(secretData.secret)})
+        } else {
+            console.log("No secret data found")
+        }
+
+        if(wallet) {
+          const balance = await web3.eth.getBalance(wallet.address);
+          const ethBalance = web3.utils.fromWei(balance, 'ether');
+          console.log("Wallet:",{address: wallet.address, privateKey: wallet.privateKey, balance: ethBalance})
+        } else {
+          console.log("No wallet found")
+        }
         
         // If game is in HashPosted state and we have a secret, calculate and reveal
         if (gameState.gameState === "2" && // HashPosted
@@ -375,8 +366,7 @@ async function checkGameState() {
         return {
             gameState: gameState.gameState,
             playerCommit: gameState.playerCommit,
-            houseHash: gameState.houseHash,
-            playerSecret: gameState.playerSecret
+            houseHash: gameState.houseHash
         };
     } catch (error) {
         console.error("Error checking game state:", error);
@@ -443,17 +433,6 @@ async function updateGameState() {
             cardInfo = `\nPredicted Result: Player: ${result.playerCard} (${getCardName(result.playerCard)}), House: ${result.houseCard} (${getCardName(result.houseCard)}), Winner: ${result.winner}`;
         }
     }
-    
-    const stateText = `
-      Game State: ${currentState}
-      Required Stake: ${web3.utils.fromWei(stakeAmount, 'ether')} ETH
-      ${gameState.playerCommit !== '0x0000000000000000000000000000000000000000000000000000000000000000' ? 
-        `Your Commitment: ${gameState.playerCommit}` : 'No commitment yet'}
-      ${gameState.houseHash !== '0x0000000000000000000000000000000000000000000000000000000000000000' ? 
-        `House Hash: ${gameState.houseHash}` : 'House hash not posted yet'}${cardInfo}
-    `;
-    
-    document.getElementById("game_state").textContent = stateText;
   } catch (error) {
     console.error("Error updating game state:", error);
   }
@@ -497,42 +476,6 @@ async function checkLocalWalletBalance() {
     
     // Update the top-right balance display
     document.getElementById("balance-display").textContent = `Balance: ${parseFloat(ethBalance).toFixed(4)} ETH`;
-    
-    // Update the detailed wallet info (in the collapsible section)
-    document.getElementById("local_wallet_address").textContent = 
-      `Local Wallet Address: ${wallet.address}`;
-    document.getElementById("local_wallet_private_key").textContent = 
-      `Local Wallet Private Key: ${wallet.privateKey}`;
-    document.getElementById("local_wallet_balance").textContent = 
-      `Local Wallet Balance: ${ethBalance} ETH`;
-  }
-}
-
-async function depositEth(amount) {
-  if (!accounts || accounts.length === 0) {
-    alert("Please connect MetaMask first!");
-    return;
-  }
-
-  const wallet = getLocalWallet();
-  if (!wallet) {
-    alert("No local wallet found!");
-    return;
-  }
-
-  const amountWei = web3.utils.toWei(amount.toString(), 'ether');
-  
-  try {
-    await web3.eth.sendTransaction({
-      from: accounts[0],
-      to: wallet.address,
-      value: amountWei
-    });
-    alert("Deposit successful!");
-    checkLocalWalletBalance();
-  } catch (error) {
-    console.error("Deposit failed:", error);
-    alert("Deposit failed!");
   }
 }
 
@@ -613,5 +556,81 @@ async function performReveal(wallet, secret) {
     } catch (error) {
         console.error("Error in reveal:", error);
         document.getElementById("web3_message").textContent = "Error in reveal!";
+    }
+}
+
+// Add the withdraw function with ethLeftForGas
+async function withdrawFunds() {
+    const wallet = getLocalWallet();
+    if (!wallet) {
+        alert("No local wallet found!");
+        return;
+    }
+
+    try {
+        const balance = await web3.eth.getBalance(wallet.address);
+        if (balance <= 0) {
+            alert("No funds to withdraw!");
+            return;
+        }
+
+        // Amount to leave in the wallet for future gas fees (in wei)
+        const ethLeftForGas = web3.utils.toWei("0.000000001", "ether"); // 0.005 ETH for future transactions
+        
+        if (BigInt(balance) <= BigInt(ethLeftForGas)) {
+            alert("Balance too low! Leaving funds for gas fees.");
+            return;
+        }
+
+        const destinationAddress = prompt("Enter the wallet address to withdraw funds to:");
+        
+        // Validate the address
+        if (!destinationAddress || !web3.utils.isAddress(destinationAddress)) {
+            alert("Invalid Ethereum address!");
+            return;
+        }
+
+        // Calculate gas cost for the transaction
+        const gasPrice = await web3.eth.getGasPrice();
+        const gasLimit = 21000; // Standard ETH transfer gas
+        const gasCost = BigInt(gasPrice) * BigInt(gasLimit);
+        
+        // Calculate amount to send (balance - gas cost - ethLeftForGas)
+        const amountToSend = BigInt(balance) - gasCost - BigInt(ethLeftForGas);
+        
+        if (amountToSend <= 0) {
+            alert("Balance too low to withdraw after reserving gas fees!");
+            return;
+        }
+
+        const tx = {
+            from: wallet.address,
+            to: destinationAddress,
+            value: amountToSend.toString(),
+            gas: gasLimit,
+            gasPrice: gasPrice,
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+        };
+
+        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
+        document.getElementById("game-status").textContent = "Withdrawing...";
+        
+        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        
+        if (receipt.status) {
+            const ethAmount = web3.utils.fromWei(amountToSend.toString(), 'ether');
+            const leftAmount = web3.utils.fromWei(ethLeftForGas, 'ether');
+            alert(`Successfully withdrew ${ethAmount} ETH to ${destinationAddress}\nLeft ${leftAmount} ETH for future gas fees`);
+            document.getElementById("game-status").textContent = "";
+            // Update balance display
+            checkLocalWalletBalance();
+        } else {
+            alert("Withdrawal failed!");
+            document.getElementById("game-status").textContent = "";
+        }
+    } catch (error) {
+        console.error("Error withdrawing funds:", error);
+        alert("Error withdrawing funds: " + error.message);
+        document.getElementById("game-status").textContent = "";
     }
 }
