@@ -144,7 +144,8 @@ contract TwoPartyWarGame {
         
         // Transfer stakes to house
         uint256 totalStake = STAKE_AMOUNT * 2;
-        payable(house).transfer(totalStake);
+        // AI: keep it commented out for now
+        //payable(house).transfer(totalStake);
         
         // Emit events
         emit GameForfeited(msg.sender, house);
