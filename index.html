@@ -3,10 +3,25 @@
 <head>
   <meta charset="utf-8">
   <title>War Card Game</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
 </head>
 <body>
+  <!-- Left pane with game history - larger size -->
+  <div style="position: fixed; top: 20px; left: 20px; width: 200px; text-align: left; z-index: 10;">
+    <div style="font-weight: bold; margin-bottom: 10px; font-size: 18px;">Your games:</div>
+    <ul id="personal-games-list" style="list-style-type: none; padding-left: 0; margin-top: 8px; font-size: 16px;">
+      <!-- Games will be listed here -->
+    </ul>
+  </div>
+
   <!-- Top right balance and deposit section -->
-  <div style="position: absolute; top: 10px; right: 10px; text-align: right;">
+  <div style="position: fixed; top: 10px; right: 10px; text-align: right; z-index: 10;">
     <div id="balance-display" style="font-size: 14px; margin-bottom: 5px;">Balance: 0 ETH</div>
     <div>
       <button onclick="showDepositAlert()" style="font-size: 12px; padding: 5px 10px; margin-right: 5px;">Deposit</button>
@@ -14,37 +29,34 @@
     </div>
   </div>
 
-  <!-- Card Display Section -->
-  <div style="text-align: center; margin: 20px 0;">
-    <div style="font-size: 12px;">house</div>
-    <div id="house-card" style="font-size: 48px; font-weight: bold;">0</div>
-    <div style="font-size: 24px; margin: 10px 0;">--</div>
-    <div id="player-card" style="font-size: 48px; font-weight: bold;">0</div>
-    <div style="font-size: 12px;">you</div>
-    <div id="game-status" style="font-size: 16px; margin-top: 10px; font-weight: bold; color: #333;"></div>
+  <!-- Main content expanded to fill most of the screen -->
+  <div style="display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw;">
+    <!-- Card Display Section - much larger -->
+    <div style="text-align: center;">
+      <div style="font-size: 24px;">house</div>
+      <div id="house-card" style="font-size: 120px; font-weight: bold; line-height: 1.2;">0</div>
+      <div style="font-size: 60px; margin: 20px 0;">--</div>
+      <div id="player-card" style="font-size: 120px; font-weight: bold; line-height: 1.2;">0</div>
+      <div style="font-size: 24px;">you</div>
+      <div id="game-status" style="font-size: 36px; margin-top: 20px; font-weight: bold; color: #333;"></div>
+      
+      <!-- Big Play Button -->
+      <div style="margin: 30px 0;">
+        <input type="button" value="Play War!" onclick="_commit()" style="font-size: 32px; padding: 20px 60px; cursor: pointer;">
+      </div>
+    </div>
   </div>
   
-  <!-- Big Play Button -->
-  <div style="text-align: center; margin: 20px 0;">
-    <input type="button" value="Play War!" onclick="_commit()" style="font-size: 18px; padding: 15px 30px;">
+  <!-- Toggle details button - moved to bottom left -->
+  <div style="position: fixed; bottom: 10px; left: 10px; z-index: 10;">
+    <input type="button" value="Show Details" id="main-toggle-button" onclick="toggleDetails()" style="font-size: 14px; padding: 8px 12px; cursor: pointer;">
   </div>
   
-  <input id="connect_button" type="button" value="Connect MetaMask" onclick="connectWallet()" style="display: none"></input>
-  <p id="account_address" style="display: block"></p>
-  <hr>
-  <input type="button" value="Show Details" id="main-toggle-button" onclick="toggleDetails()">
-  <!-- Single collapsible content section -->
-  <div id="details-content" style="display: none;">
-    <p id="web3_message"></p>
-    <hr>
-    <h2>Game State and Control</h2>
-    <input type="button" value="Reveal Cards" onclick="_reveal()"></input>
-    <input type="button" value="Forfeit Game" onclick="_forfeit()"></input>
-    <input type="button" value="Clear Secret" onclick="_clearSecret()"></input>
-    
-    <hr>
-    <h2>Game History</h2>
-    <div id="event_log"></div>
+  <!-- Single collapsible content section - adjusted for controls only, no logs -->
+  <div id="details-content" style="display: none; position: fixed; bottom: 50px; left: 10px; z-index: 10;">
+    <input type="button" value="Reveal Cards" onclick="_reveal()" style="font-size: 14px; margin-bottom: 5px; display: block; width: 120px; cursor: pointer;"></input>
+    <input type="button" value="Forfeit Game" onclick="_forfeit()" style="font-size: 14px; margin-bottom: 5px; display: block; width: 120px; cursor: pointer;"></input>
+    <input type="button" value="Clear Secret" onclick="_clearSecret()" style="font-size: 14px; margin-bottom: 5px; display: block; width: 120px; cursor: pointer;"></input>
   </div>
   
   <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.3.5/web3.min.js"></script>
@@ -58,7 +70,6 @@
   }
 
   function _reveal() {
-    // Manual reveal function - normally handled by game loop
     const wallet = getLocalWallet();
     const secretData = getStoredSecret();
     if (wallet && secretData) {

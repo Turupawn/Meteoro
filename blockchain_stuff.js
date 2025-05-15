@@ -4,44 +4,15 @@ const MY_CONTRACT_ADDRESS = "0x862A40C84E1A092363C3b87d492B8fCee3f9292E"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
-var accounts
 var web3
 
-function metamaskReloadCallback() {
-  window.ethereum.on('accountsChanged', (accounts) => {
-    document.getElementById("web3_message").textContent="Se cambió el account, refrescando...";
-    window.location.reload()
-  })
-  window.ethereum.on('networkChanged', (accounts) => {
-    document.getElementById("web3_message").textContent="Se el network, refrescando...";
-    window.location.reload()
-  })
-}
-
+// Simplify web3 initialization without MetaMask
 const getWeb3 = async () => {
   return new Promise((resolve, reject) => {
-    if(document.readyState=="complete")
-    {
-      if (window.ethereum) {
-        const web3 = new Web3(window.ethereum)
-        window.location.reload()
-        resolve(web3)
-      } else {
-        reject("must install MetaMask")
-        document.getElementById("web3_message").textContent="Error: Porfavor conéctate a Metamask";
-      }
-    }else
-    {
-      window.addEventListener("load", async () => {
-        if (window.ethereum) {
-          const web3 = new Web3(window.ethereum)
-          resolve(web3)
-        } else {
-          reject("must install MetaMask")
-          document.getElementById("web3_message").textContent="Error: Please install Metamask";
-        }
-      });
-    }
+    // Use an RPC provider directly instead of MetaMask
+    const provider = new Web3.providers.HttpProvider("https://carrot.megaeth.com/rpc"); // Using a public RPC endpoint
+    const web3 = new Web3(provider);
+    resolve(web3);
   });
 };
 
@@ -49,7 +20,6 @@ const getContract = async (web3, address, abi_path) => {
   const response = await fetch(abi_path);
   const data = await response.json();
   
-  const netId = await web3.eth.net.getId();
   contract = new web3.eth.Contract(
     data,
     address
@@ -58,52 +28,29 @@ const getContract = async (web3, address, abi_path) => {
 }
 
 async function loadDapp() {
-  metamaskReloadCallback()
-  document.getElementById("web3_message").textContent="Please connect to Metamask"
   var awaitWeb3 = async function () {
     web3 = await getWeb3()
-    web3.eth.net.getId((err, netId) => {
-      console.log("netId: " + netId)
-      if (netId == NETWORK_ID) {
         var awaitContract = async function () {
+      try {
           my_contract = await getContract(web3, MY_CONTRACT_ADDRESS, MY_CONTRACT_ABI_PATH)
-          document.getElementById("web3_message").textContent="You are connected to Metamask"
-          
-          // Check for local wallet
-          let wallet = getLocalWallet();
-          if (!wallet) {
-            wallet = generateWallet();
-            checkLocalWalletBalance();
-          } else {
-            checkLocalWalletBalance();
-          }
-          
-          onContractInitCallback()
-          web3.eth.getAccounts(function(err, _accounts){
-            accounts = _accounts
-            if (err != null) {
-              console.error("An error occurred: "+err)
-            } else if (accounts.length > 0) {
-              onWalletConnectedCallback()
-              document.getElementById("account_address").style.display = "block"
-            } else {
-              document.getElementById("connect_button").style.display = "block"
-            }
-          });
-        };
-        awaitContract();
-      } else {
-        document.getElementById("web3_message").textContent="Please connect to Holesky";
+        
+        // Check for local wallet
+        let wallet = getLocalWallet();
+        if (!wallet) {
+          wallet = generateWallet();
+        }
+        
+        checkLocalWalletBalance();
+        onContractInitCallback();
+        
+      } catch (error) {
+        console.error("Error initializing contract:", error);
+        document.getElementById("game-status").textContent = "Error connecting to blockchain";
       }
-    });
+    };
+    awaitContract();
   };
   awaitWeb3();
-}
-
-async function connectWallet() {
-  await window.ethereum.request({ method: "eth_requestAccounts" })
-  accounts = await web3.eth.getAccounts()
-  onWalletConnectedCallback()
 }
 
 loadDapp()
@@ -114,6 +61,7 @@ const onContractInitCallback = async () => {
   console.log("Latest block:", latestBlock);
 
   try {
+    const wallet = getLocalWallet();
     // Get events from the last 1000 blocks only
     const pastEvents = await my_contract.getPastEvents('GameResult', {
       fromBlock: latestBlock - 1000,
@@ -125,16 +73,32 @@ const onContractInitCallback = async () => {
       .sort((a, b) => b.blockNumber - a.blockNumber)
       .slice(0, 10);
 
-    // Display past events
-    const logElement = document.getElementById("event_log");
-    logElement.innerHTML = "<h3>Recent Game Results:</h3>";
+    // We no longer need to display events in the removed event_log element
+    // Instead, just use the events for the personal games list
     
-    sortedEvents.forEach(event => {
-      const timestamp = new Date().toLocaleTimeString();
-      const playerCard = event.returnValues.playerCard;
-      const houseCard = event.returnValues.houseCard;
-      logElement.innerHTML += `<br>[${timestamp}] War Game: Player: ${playerCard} (${getCardName(playerCard)}), House: ${houseCard} (${getCardName(houseCard)}), Winner: ${event.returnValues.winner}`;
-    });
+    // Filter for user's games
+    if (wallet) {
+      const personalGamesList = document.getElementById("personal-games-list");
+      personalGamesList.innerHTML = ""; // Clear the list
+      
+      // Get games that match the user's address
+      const userGames = sortedEvents.filter(event => 
+        event.returnValues.player && 
+        event.returnValues.player.toLowerCase() === wallet.address.toLowerCase()
+      );
+      
+      if (userGames.length === 0) {
+        personalGamesList.innerHTML = "<li>No games yet</li>";
+      } else {
+        userGames.forEach(event => {
+          const playerCard = getCardDisplay(parseInt(event.returnValues.playerCard));
+          const houseCard = getCardDisplay(parseInt(event.returnValues.houseCard));
+          const isWin = event.returnValues.winner.toLowerCase() === wallet.address.toLowerCase();
+          
+          addGameToPersonalList(playerCard, houseCard, isWin);
+        });
+      }
+    }
 
     // Subscribe to new events
     my_contract.events.GameResult({}, function(error, event) {
@@ -142,28 +106,60 @@ const onContractInitCallback = async () => {
         console.error("Error in event subscription:", error);
         return;
       }
-      const logElement = document.getElementById("event_log");
-      const timestamp = new Date().toLocaleTimeString();
-      const playerCard = event.returnValues.playerCard;
-      const houseCard = event.returnValues.houseCard;
-      // Add new event at the top
-      logElement.innerHTML = `<br>[${timestamp}] War Game: Player: ${playerCard} (${getCardName(playerCard)}), House: ${houseCard} (${getCardName(houseCard)}), Winner: ${event.returnValues.winner}` + logElement.innerHTML;
+      
+      // We don't need to update the event_log anymore
+      // Only update the personal games list if it's the user's game
+      const wallet = getLocalWallet();
+      if (wallet && 
+          event.returnValues.player && 
+          event.returnValues.player.toLowerCase() === wallet.address.toLowerCase()) {
+        
+        const playerCardDisplay = getCardDisplay(parseInt(event.returnValues.playerCard));
+        const houseCardDisplay = getCardDisplay(parseInt(event.returnValues.houseCard));
+        const isWin = event.returnValues.winner.toLowerCase() === wallet.address.toLowerCase();
+        
+        // Remove "No games yet" message if present
+        const noGamesElement = document.querySelector("#personal-games-list li");
+        if (noGamesElement && noGamesElement.textContent === "No games yet") {
+          noGamesElement.remove();
+        }
+        
+        addGameToPersonalList(playerCardDisplay, houseCardDisplay, isWin);
+      }
     });
 
-    // Subscribe to GameForfeited events
+    // Similar handling for GameForfeited events
     my_contract.events.GameForfeited({}, function(error, event) {
-        if (error) {
-            console.error("Error in event subscription:", error);
-            return;
+      if (error) {
+        console.error("Error in event subscription:", error);
+        return;
+      }
+      
+      const wallet = getLocalWallet();
+      if (wallet && 
+          event.returnValues.player && 
+          event.returnValues.player.toLowerCase() === wallet.address.toLowerCase()) {
+        
+        const gamesList = document.getElementById("personal-games-list");
+        const listItem = document.createElement("li");
+        listItem.style.marginBottom = "8px"; // Add margin for better spacing
+        listItem.innerHTML = `<span style="color: #dc3545;">• Game forfeited</span>`;
+        
+        if (gamesList.firstChild) {
+          gamesList.insertBefore(listItem, gamesList.firstChild);
+        } else {
+          gamesList.appendChild(listItem);
         }
-        const logElement = document.getElementById("event_log");
-        const timestamp = new Date().toLocaleTimeString();
-        logElement.innerHTML = `<br>[${timestamp}] Game Forfeited: Player ${event.returnValues.player} forfeited to House ${event.returnValues.house}` + logElement.innerHTML;
+      }
     });
   } catch (error) {
     console.error("Error fetching past events:", error);
-    const logElement = document.getElementById("event_log");
-    logElement.innerHTML = "<h3>Error loading past events. New events will still be shown.</h3>";
+    const personalGamesList = document.getElementById("personal-games-list");
+    if (personalGamesList) {
+      personalGamesList.innerHTML = "<li>Error loading games</li>";
+    } else {
+      console.error("Cannot find personal-games-list element");
+    }
   }
 
   // Get and display game state
@@ -336,11 +332,7 @@ async function commit() {
 
         const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        
-        if (receipt.status) {
-            document.getElementById("web3_message").textContent = "Commit successful! Waiting for house to post hash...";
-        }
-        
+
         console.log("Commit Transaction Receipt:", {
             transactionHash: receipt.transactionHash,
             blockNumber: receipt.blockNumber,
@@ -351,7 +343,6 @@ async function commit() {
         updateGameState();
     } catch (error) {
         console.error("Error in commit:", error);
-        document.getElementById("web3_message").textContent = "Error in commit!";
         document.getElementById("game-status").textContent = "";
     }
 }
@@ -509,12 +500,9 @@ async function forfeit() {
             status: receipt.status ? "Confirmed" : "Failed",
             gasUsed: receipt.gasUsed
         });
-        
-        document.getElementById("web3_message").textContent = "Game forfeited!";
         updateGameState();
     } catch (error) {
         console.error("Error in forfeit:", error);
-        document.getElementById("web3_message").textContent = "Error in forfeit!";
     }
 }
 
@@ -545,17 +533,16 @@ async function performReveal(wallet, secret) {
         });
         
         if (receipt.status) {
-            document.getElementById("web3_message").textContent = "Reveal successful!";
-            // Clear the secret after successful reveal
+            console.log("Reveal successful, clearing secret");
             clearStoredSecret();
-        } else {
-            document.getElementById("web3_message").textContent = "Reveal failed!";
+          } else {
+            console.log("Reveal failed");
+            console.log(receipt);
         }
         
         updateGameState();
     } catch (error) {
         console.error("Error in reveal:", error);
-        document.getElementById("web3_message").textContent = "Error in reveal!";
     }
 }
 
@@ -633,4 +620,24 @@ async function withdrawFunds() {
         alert("Error withdrawing funds: " + error.message);
         document.getElementById("game-status").textContent = "";
     }
+}
+
+// Add this function to manage the personal games list
+function addGameToPersonalList(playerCard, houseCard, isWin) {
+  const gamesList = document.getElementById("personal-games-list");
+  const listItem = document.createElement("li");
+  listItem.style.marginBottom = "8px"; // Increased space between items
+  
+  if (isWin) {
+    listItem.innerHTML = `<span style="color: #28a745;">• You won [${playerCard}-${houseCard}]</span>`;
+  } else {
+    listItem.innerHTML = `<span style="color: #dc3545;">• House wins [${playerCard}-${houseCard}]</span>`;
+  }
+  
+  // Add to the top of the list
+  if (gamesList.firstChild) {
+    gamesList.insertBefore(listItem, gamesList.firstChild);
+  } else {
+    gamesList.appendChild(listItem);
+  }
 }
