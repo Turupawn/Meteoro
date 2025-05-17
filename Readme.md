@@ -1,4 +1,9 @@
-A fast-paced war game built 100% on-chain and deployed on MegaETH Testnet. By using MegaETH’s fast block times and mini blocks API, we aim to deliver a sub 500ms experience. Each round, you and the house draw a card, the higher card wins.
+A fast-paced war game built 100% on-chain and deployed on MegaETH Testnet. By using MegaETH’s fast block times and mini blocks API, we aim to deliver a sub 500ms experience. Each round, you and the house draw a card, the higher card wins. You can play the game now at [realtimeplay.xyz](https://realtimeplay.xyz/).
+
+![FastWeb3Casino](img/readme/gameplay.png)
+_Play the demo now at [realtimeplay.xyz](https://realtimeplay.xyz/)_
+
+Now let's disccuss the gameplay, fair 100% on-chain randomness generation and overall architecture. 
 
 ![FastWeb3Casino](img/readme/1.png)
 _Each round, the player and the house each draw a card, the higher card wins._
@@ -29,7 +34,7 @@ const playerCard =   (combined & 0xFFF) % 13;
 const houseCard  = ((combined >> 16) % 13);
 ```
 
-XOR’ing the numbers yields a fair random seed for both cards.
+XOR’ing the numbers generates a fair random seed for both cards.
 
 
 ![FastWeb3Casino](img/readme/3.png)
@@ -57,8 +62,9 @@ To eliminate wallet‑extension delays, we generate a keypair in local storage o
 State reads default to the house API for speed, but players can point to any RPC provider for a completely trustless flow.
 
 We’ve also added two UX optimizations:
-* Optimistic rendering: As soon as the house’s randomness posts, the result displays immediately—no need to wait for the on‑chain resolution.
+* Optimistic rendering: As soon as the house’s randomness posts, the result displays immediately ao no need to wait for the on‑chain resolution.
 * Parallel commits: While a reveal is pending confirmation, the next round’s commit can be sent right away, keeping the gameplay loop fluid.
+* Gameloop rendering: Whe chose to render the frontend with a master loop (like in clasical game development) instead of a query-callback strucuture to keep the real time aspects of this and future games.
 
 ![FastWeb3Casino](img/readme/6.png)
 _With all the frontend optimizations we should be able to deliver a seamless, sub‑500 ms experience._
