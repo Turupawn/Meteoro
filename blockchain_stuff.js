@@ -1,21 +1,17 @@
 const NETWORK_ID = 6342
 
-const POLL_INTERVAL = 150
+const POLL_INTERVAL = 700 // 150
 
-const MY_CONTRACT_ADDRESS = "0xcf96BBf8932689C98940cb3e8D4750E6632f4005"
+const MY_CONTRACT_ADDRESS = "0x9590F386eC21A221646A19ac03984683713366d7"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
 var web3
 
-// Add at the top with other global variables
-const DEBUG_LOGS = false; // Controls general debug logging
-const PROFILE_LOGS = true; // Controls performance profiling logs
-const processingGameIds = new Set(); // Track games being processed
-const MIN_BALANCE = "0.00000001"; // Minimum balance required in ETH
+const MIN_BALANCE = "0.00001";
 let commitStartTime = null;
 
-const PRINT_LEVELS = ['debug', 'profile', 'error'];
+const PRINT_LEVELS = ['profile', 'error', 'debug']; //['debug', 'profile', 'error'];
 
 const getWeb3 = async () => {
   return new Promise((resolve, reject) => {
@@ -79,19 +75,6 @@ function generateRandomBytes32() {
     return web3.utils.randomHex(32);
 }
 
-function storeSecret(secret) {
-    printLog(['debug'], "=== STORE SECRET ===");
-    printLog(['debug'], "Previous secret:", getStoredSecret());
-    printLog(['debug'], "New secret:", secret);
-    printLog(['debug'], "Commitment:", web3.utils.soliditySha3(secret));
-    localStorage.setItem('playerSecret', JSON.stringify({
-        secret: secret,
-        timestamp: Date.now()
-    }));
-    printLog(['debug'], "Stored secret:", getStoredSecret());
-    printLog(['debug'], "===================");
-}
-
 function getStoredSecret() {
     const secretData = localStorage.getItem('playerSecret');
     return secretData ? JSON.parse(secretData) : null;
@@ -102,6 +85,8 @@ function clearStoredSecret() {
     printLog(['debug'], "Secret before clearing:", getStoredSecret());
     printLog(['debug'], "===================");
     localStorage.removeItem('playerSecret');
+    clearStoredCommit()
+    clearPendingReveal()
 }
 
 function getCardDisplay(cardValue) {
@@ -146,40 +131,11 @@ async function gameLoop() {
         const gameState = await checkGameState();
         printLog(['debug'], "Current game state:", gameState);
         
-        const secretData = getStoredSecret();
-        printLog(['debug'], "Secret in storage:", secretData);
+        const pendingCommit = getStoredCommit();
+        const pendingReveal = getPendingReveal();
         
-        if (gameState.gameState === "2" && !secretData) {
-            printLog(['error'], "=== CRITICAL STATE DETECTED ===");
-            printLog(['error'], "Game is in HashPosted state but no secret found!");
-            printLog(['error'], "Game state:", gameState);
-            printLog(['error'], "Local storage state:", {
-                secret: getStoredSecret(),
-                wallet: getLocalWallet()
-            });
-            printLog(['error'], "========================");
-        }
-        
-        if(secretData) {
-            printLog(['debug'], "Secret:",{secret: secretData.secret, commitment: web3.utils.soliditySha3(secretData.secret)})
-        } else {
-            printLog(['debug'], "No secret data found")
-        }
-
-        if(wallet) {
-            const balance = await web3.eth.getBalance(wallet.address);
-            const ethBalance = web3.utils.fromWei(balance, 'ether');
-            printLog(['debug'], "Wallet:",{address: wallet.address, privateKey: wallet.privateKey, balance: ethBalance})
-        } else {
-            printLog(['debug'], "No wallet found")
-        }
-        
-        if (gameState.gameState === "2" &&
-            secretData &&
-            !processingGameIds.has(gameState.gameId)) {
-            const result = calculateCards(secretData.secret, gameState.houseHash);
-            
-            updateCardDisplay(result.playerCard, result.houseCard);
+        if (gameState.gameState === "2" && pendingCommit) {
+            const result = calculateCards(pendingCommit.secret, gameState.houseHash);
             
             if (commitStartTime) {
                 const endTime = Date.now();
@@ -192,8 +148,15 @@ async function gameLoop() {
                 commitStartTime = null;
             }
 
+            storePendingReveal(pendingCommit.secret);
+            clearStoredCommit();
+            updateCardDisplay(result.playerCard, result.houseCard);
             printLog(['debug'], "Conditions met for reveal, attempting...");
-            await performReveal(wallet, secretData.secret);
+            await performReveal(wallet, pendingCommit.secret);
+        }
+        // If we have a pending reveal, check if it's completed
+        if (pendingReveal && gameState.gameState === "0") {
+            clearPendingReveal();
         }
         
         printLog(['debug'], "=== GAME LOOP END ===");
@@ -210,12 +173,20 @@ async function commit() {
     }
 
     try {
+        // Check if there's a pending commit
+        const pendingCommit = getStoredCommit();
+        if (pendingCommit) {
+            printLog(['debug'], "Found pending commit from previous game:", pendingCommit);
+            alert("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
+            return;
+        }
+
         commitStartTime = Date.now();
         printLog(['profile'], "=== COMMIT STARTED ===");
         printLog(['profile'], "Start time:", new Date(commitStartTime).toISOString());
 
         const balance = await web3.eth.getBalance(wallet.address);
-        const stakeAmount = await my_contract.methods.STAKE_AMOUNT().call();
+        const stakeAmount = await my_contract.methods.STAKE_AMOUNT().call({}, 'pending');
 
         if (BigInt(balance) < BigInt(web3.utils.toWei(MIN_BALANCE, 'ether'))) {
             const currentEth = web3.utils.fromWei(balance, 'ether');
@@ -223,26 +194,14 @@ async function commit() {
             return;
         }
         
-        const storedSecret = getStoredSecret();
-        if (storedSecret) {
-            printLog(['debug'], "Found stored secret from previous game:", storedSecret);
-            alert("Cannot start new game while previous game's secret is still stored. Please wait for the current game to complete.");
-            return;
-        }
-
-        const gameState = await my_contract.methods.getGameState(wallet.address).call();
+        const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
         printLog(['debug'], "Game state:", gameState);
-
-        if (gameState.gameState !== "0") { // NotStarted
-            alert("You have already committed to this game!");
-            return;
-        }
 
         resetCardDisplay();
         document.getElementById("game-status").textContent = "Please wait...";
 
         const secret = generateRandomBytes32();
-        storeSecret(secret);
+        storeCommit(secret); // Store the commit instead of the secret
         const commitHash = web3.utils.soliditySha3(secret);
         
         const data = my_contract.methods.commit(commitHash).encodeABI();
@@ -275,6 +234,7 @@ async function commit() {
         printLog(['error'], "Error in commit:", error);
         document.getElementById("game-status").textContent = "";
         commitStartTime = null;
+        clearStoredCommit(); // Clear the commit on error
     }
 }
 
@@ -315,22 +275,15 @@ async function updateGameState() {
     try {
         const wallet = getLocalWallet();
         if (!wallet) return;
-
-        // Use 'pending' block tag to get latest state including mini blocks
         const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
-        
-        // Update current game state display
         const gameStateElement = document.getElementById("game-state");
         if (gameStateElement) {
             let stateText = `Game State: ${gameState.gameState}`;
-            // Add warning if we're in HashPosted state but have no secret
             if (gameState.gameState === "2" && !getStoredSecret()) {
                 stateText += " (Secret lost - can forfeit)";
             }
             gameStateElement.textContent = stateText;
         }
-
-        // Update personal games list with history
         const personalGamesList = document.getElementById("personal-games-list");
         if (personalGamesList) {
             personalGamesList.innerHTML = ""; // Clear the list
@@ -338,7 +291,6 @@ async function updateGameState() {
             if (gameState.recentHistory.length === 0) {
                 personalGamesList.innerHTML = "<li>No games yet</li>";
             } else {
-                // Display games in reverse chronological order (newest first)
                 for (let i = gameState.recentHistory.length - 1; i >= 0; i--) {
                     const result = gameState.recentHistory[i];
                     const isForfeit = result.playerCard === 0 && result.houseCard === 0;
@@ -355,18 +307,12 @@ async function updateGameState() {
     }
 }
 
-// Start the game loop
 function startGameLoop() {
-    // Run immediately
     gameLoop();
-    // Then run every 500ms instead of 2000ms since we're using pending block tag
     setInterval(gameLoop, POLL_INTERVAL);
 }
-
 const onWalletConnectedCallback = async () => {
 }
-
-//// Functions ////
 
 function generateWallet() {
   const account = web3.eth.accounts.create();
@@ -385,7 +331,6 @@ function getLocalWallet() {
   return null;
 }
 
-// Update the checkLocalWalletBalance function to be simpler
 async function checkLocalWalletBalance() {
     const wallet = getLocalWallet();
     if (wallet) {
@@ -404,12 +349,10 @@ async function forfeit() {
         alert("No local wallet found!");
         return;
     }
-
     try {
         const data = my_contract.methods.forfeit().encodeABI();
         const nonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
         const gasPrice = await web3.eth.getGasPrice();
-        
         const tx = {
             from: wallet.address,
             to: MY_CONTRACT_ADDRESS,
@@ -418,10 +361,8 @@ async function forfeit() {
             gas: 300000,
             data: data
         };
-
         const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        
         printLog(['debug'], "Forfeit Transaction Receipt:", {
             transactionHash: receipt.transactionHash,
             blockNumber: receipt.blockNumber,
@@ -443,8 +384,6 @@ async function forfeit() {
 async function performReveal(wallet, secret) {
     try {
         printLog(['debug'], "=== PERFORM REVEAL START ===");
-        printLog(['debug'], "Current secret in storage:", getStoredSecret());
-        
         const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
         const gameId = gameState.gameId;
         printLog(['debug'], "Game state at reveal start:", {
@@ -453,19 +392,10 @@ async function performReveal(wallet, secret) {
             playerCommit: gameState.playerCommit,
             houseHash: gameState.houseHash
         });
-
-        if (processingGameIds.has(gameId)) {
-            printLog(['debug'], `Already processing game ${gameId}, skipping reveal`);
-            return;
-        }
-
-        processingGameIds.add(gameId);
         printLog(['debug'], `Started processing reveal for game ${gameId}`);
-
         const data = my_contract.methods.reveal(secret).encodeABI();
         const nonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
         const gasPrice = await web3.eth.getGasPrice();
-        
         const tx = {
             from: wallet.address,
             to: MY_CONTRACT_ADDRESS,
@@ -474,22 +404,17 @@ async function performReveal(wallet, secret) {
             gas: 300000,
             data: data
         };
-
         printLog(['debug'], "Sending reveal transaction...");
         const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        
         printLog(['debug'], "Reveal Transaction Receipt:", {
             transactionHash: receipt.transactionHash,
             blockNumber: receipt.blockNumber,
             status: receipt.status ? "Confirmed" : "Failed",
             gasUsed: receipt.gasUsed
         });
-
         if (receipt.status) {
             printLog(['debug'], "=== REVEAL SUCCESSFUL ===");
-            printLog(['debug'], "Secret in storage before state check:", getStoredSecret());
-            
             const currentGameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
             printLog(['debug'], "Game state after reveal:", {
                 gameId: currentGameState.gameId,
@@ -497,26 +422,19 @@ async function performReveal(wallet, secret) {
                 playerCommit: currentGameState.playerCommit,
                 houseHash: currentGameState.houseHash
             });
-            
             if (currentGameState.gameId === gameId && 
                 currentGameState.gameState === "0" && 
                 currentGameState.playerCommit === "0x0000000000000000000000000000000000000000000000000000000000000000") {
                 printLog(['debug'], "Same game ID, completed state, and zero commit - clearing secret");
-                clearStoredSecret();
+                //clearStoredSecret();
             } else {
                 printLog(['debug'], "Game state changed or new game started, keeping secret");
             }
-        } else {
-            printLog(['debug'], "Reveal failed");
-            processingGameIds.delete(gameId);
         }
-        
         printLog(['debug'], "=== PERFORM REVEAL END ===");
         updateGameState();
     } catch (error) {
         printLog(['error'], "Error in reveal:", error);
-        const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
-        processingGameIds.delete(gameState.gameId);
     }
 }
 
@@ -526,23 +444,18 @@ async function withdrawFunds() {
         alert("No local wallet found!");
         return;
     }
-
     try {
         const balance = await web3.eth.getBalance(wallet.address);
         if (balance <= 0) {
             alert("No funds to withdraw!");
             return;
         }
-
         const ethLeftForGas = web3.utils.toWei("0.000000001", "ether");
-        
         if (BigInt(balance) <= BigInt(ethLeftForGas)) {
             alert("Balance too low! Leaving funds for gas fees.");
             return;
         }
-
         const destinationAddress = prompt("Enter the wallet address to withdraw funds to:");
-        
         if (!destinationAddress || !web3.utils.isAddress(destinationAddress)) {
             alert("Invalid Ethereum address!");
             return;
@@ -595,7 +508,6 @@ function addGameToPersonalList(playerCard, houseCard, isWin, isForfeit = false) 
   } else {
     listItem.innerHTML = `<span style="color: #dc3545;">• House wins [${playerCard}-${houseCard}]</span>`;
   }
-  
   if (gamesList.firstChild) {
     gamesList.insertBefore(listItem, gamesList.firstChild);
   } else {
@@ -612,4 +524,53 @@ function printLog(levels, ...args) {
     } else {
         console.log(...args);
     }
+}
+
+function storeCommit(secret) {
+    printLog(['debug'], "=== STORE COMMIT ===");
+    printLog(['debug'], "Previous commit:", getStoredCommit());
+    printLog(['debug'], "New commit:", secret);
+    printLog(['debug'], "Commitment:", web3.utils.soliditySha3(secret));
+    localStorage.setItem('pendingCommit', JSON.stringify({
+        secret: secret,
+        timestamp: Date.now()
+    }));
+    printLog(['debug'], "Stored commit:", getStoredCommit());
+    printLog(['debug'], "===================");
+}
+
+function getStoredCommit() {
+    const commitData = localStorage.getItem('pendingCommit');
+    return commitData ? JSON.parse(commitData) : null;
+}
+
+function clearStoredCommit() {
+    printLog(['debug'], "=== CLEAR COMMIT ===");
+    printLog(['debug'], "Commit before clearing:", getStoredCommit());
+    printLog(['debug'], "===================");
+    localStorage.removeItem('pendingCommit');
+}
+
+function storePendingReveal(secret) {
+    printLog(['debug'], "=== STORE PENDING REVEAL ===");
+    printLog(['debug'], "Previous pending reveal:", getPendingReveal());
+    printLog(['debug'], "New pending reveal:", secret);
+    localStorage.setItem('pendingReveal', JSON.stringify({
+        secret: secret,
+        timestamp: Date.now()
+    }));
+    printLog(['debug'], "Stored pending reveal:", getPendingReveal());
+    printLog(['debug'], "===================");
+}
+
+function getPendingReveal() {
+    const revealData = localStorage.getItem('pendingReveal');
+    return revealData ? JSON.parse(revealData) : null;
+}
+
+function clearPendingReveal() {
+    printLog(['debug'], "=== CLEAR PENDING REVEAL ===");
+    printLog(['debug'], "Pending reveal before clearing:", getPendingReveal());
+    printLog(['debug'], "===================");
+    localStorage.removeItem('pendingReveal');
 }
