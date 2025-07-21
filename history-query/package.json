@@ -1,7 +1,7 @@
 {
-  "name": "slot-game-backend",
+  "name": "fast-casino-history-query",
   "version": "1.0.0",
-  "description": "Backend for slot game",
+  "description": "Query the state of fast casino",
   "main": "start.js",
   "scripts": {
     "start": "node start.js"

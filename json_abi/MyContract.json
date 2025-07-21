@@ -103,18 +103,48 @@
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			},
-			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "gameId",
 				"type": "uint256"
 			}
 		],
-		"name": "gameHistory",
+		"name": "games",
 		"outputs": [
+			{
+				"internalType": "enum TwoPartyWarGame.State",
+				"name": "gameState",
+				"type": "uint8"
+			},
+			{
+				"internalType": "address",
+				"name": "playerAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "playerCommit",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "commitTimestamp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "houseHash",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "houseHashTimestamp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "playerSecret",
+				"type": "bytes32"
+			},
 			{
 				"internalType": "uint256",
 				"name": "playerCard",
@@ -132,7 +162,7 @@
 			},
 			{
 				"internalType": "uint256",
-				"name": "timestamp",
+				"name": "revealTimestamp",
 				"type": "uint256"
 			}
 		],
@@ -143,30 +173,15 @@
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "player",
 				"type": "address"
 			}
 		],
-		"name": "games",
+		"name": "getCurrentGameId",
 		"outputs": [
 			{
-				"internalType": "bytes32",
-				"name": "playerCommit",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "bytes32",
-				"name": "houseHash",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "enum TwoPartyWarGame.State",
-				"name": "gameState",
-				"type": "uint8"
-			},
-			{
 				"internalType": "uint256",
-				"name": "gameId",
+				"name": "",
 				"type": "uint256"
 			}
 		],
@@ -211,6 +226,41 @@
 			{
 				"components": [
 					{
+						"internalType": "enum TwoPartyWarGame.State",
+						"name": "gameState",
+						"type": "uint8"
+					},
+					{
+						"internalType": "address",
+						"name": "playerAddress",
+						"type": "address"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "playerCommit",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "uint256",
+						"name": "commitTimestamp",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "houseHash",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "uint256",
+						"name": "houseHashTimestamp",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "playerSecret",
+						"type": "bytes32"
+					},
+					{
 						"internalType": "uint256",
 						"name": "playerCard",
 						"type": "uint256"
@@ -227,11 +277,11 @@
 					},
 					{
 						"internalType": "uint256",
-						"name": "timestamp",
+						"name": "revealTimestamp",
 						"type": "uint256"
 					}
 				],
-				"internalType": "struct TwoPartyWarGame.GameResult[]",
+				"internalType": "struct TwoPartyWarGame.Game[]",
 				"name": "recentHistory",
 				"type": "tuple[]"
 			}

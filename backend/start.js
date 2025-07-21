@@ -43,8 +43,9 @@ async function postHashForPlayer(playerAddress, gameId) {
         console.log(`Started processing game ${gameId}`);
 
         // Check if game is still in committed state
-        const gameState = await contract.methods.getGameState(playerAddress).call();
-        if (gameState.gameState !== "1") { // Not in Committed state
+        const game = await contract.methods.games(gameId).call();
+        console.log(game)
+        if (game.gameState !== "1") { // Not in Committed state
             console.log(`Game ${gameId} is no longer in committed state, skipping`);
             processingGameIds.delete(gameId);
             return;

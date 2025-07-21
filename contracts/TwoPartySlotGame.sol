@@ -22,7 +22,7 @@ contract TwoPartyWarGame {
     mapping(address => Game) public games;
     
     // Map player address to their game history
-    mapping(address => GameResult[]) public gameHistory;
+    mapping(address => GameResult[]) public playerGameHistory;
     
     // Maximum number of games to return in getGameState
     uint256 public constant MAX_RETURN_HISTORY = 10;
@@ -104,7 +104,7 @@ contract TwoPartyWarGame {
         });
         
         // Add to history (no size limit)
-        gameHistory[msg.sender].push(result);
+        playerGameHistory[msg.sender].push(result);
         
         // Reset game state BEFORE transfer
         _resetGame(msg.sender);
@@ -137,7 +137,7 @@ contract TwoPartyWarGame {
         });
         
         // Add to history (no size limit)
-        gameHistory[msg.sender].push(result);
+        playerGameHistory[msg.sender].push(result);
         
         // Reset game state BEFORE transfer
         _resetGame(msg.sender);
@@ -168,7 +168,7 @@ contract TwoPartyWarGame {
         GameResult[] memory recentHistory
     ) {
         Game storage playerGame = games[player];
-        GameResult[] storage fullHistory = gameHistory[player];
+        GameResult[] storage fullHistory = playerGameHistory[player];
         
         // Create a new array for the last 10 games
         uint256 historyLength = fullHistory.length;
