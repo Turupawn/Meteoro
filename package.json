@@ -1,0 +1,11 @@
+{
+    "name": "fast-casino-web",
+    "version": "1.0.0",
+    "description": "Fast casino frontend",
+    "scripts": {
+      "start": "lite-server"
+    },
+    "devDependencies": {
+      "lite-server": "^2.6.1"
+    }
+  }
