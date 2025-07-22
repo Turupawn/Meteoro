@@ -2,7 +2,7 @@ const NETWORK_ID = 6342
 
 const POLL_INTERVAL = 150 // 150
 
-const MY_CONTRACT_ADDRESS = "0xF957376105987D25EFe7D403eA63929e0dAc9E0c"
+const MY_CONTRACT_ADDRESS = "0x3067e0D32616bA5e76bB3c0C31A4eA3306A0eF64"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
@@ -170,9 +170,15 @@ async function gameLoop() {
             printLog(['debug'], "Conditions met for reveal, attempting...");
             await performReveal(wallet, pendingCommit.secret);
         }
-
-        if (globalGameState.gameState === "0" && shouldProcessCommit) {
+        console.log(globalGameState);
+        if (
+            (
+                globalGameState.gameState === "0" /* NotStarted */ ||
+                globalGameState.gameState === "3" /* Revealed */   ||
+                globalGameState.gameState === "4" /* Forfeited */)
+            && shouldProcessCommit) {
             shouldProcessCommit = false;
+            console.log("shouldProcessCommit");
             const storedCommit = getStoredCommit();
             if (storedCommit) {
                 printLog(['debug'], "Found pending commit from previous game:", storedCommit);
@@ -185,7 +191,9 @@ async function gameLoop() {
                 const currentEth = web3.utils.fromWei(globalGameState.playerBalance, 'ether');
                 alert(`Insufficient balance! You need at least ${MIN_BALANCE} ETH to play.\nCurrent balance: ${parseFloat(currentEth).toFixed(6)} ETH`);
                 shouldProcessCommit = false;
-            } else if (globalGameState.gameState === "0") {
+            } else if ( globalGameState.gameState === "0" /* NotStarted */ ||
+                        globalGameState.gameState === "3" /* Revealed */   ||
+                        globalGameState.gameState === "4" /* Forfeited */) {
                 console.log("globalGameState.gameState === 0");
                 resetCardDisplay();
                 document.getElementById("game-status").textContent = "Please wait...";

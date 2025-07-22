@@ -59,7 +59,7 @@ async function postHashForPlayer(playerAddress, gameId) {
             to: contractAddress,
             value: stakeAmount,
             gas: 300000,
-            data: contract.methods.postHash(playerAddress, hash).encodeABI()
+            data: contract.methods.postHash(gameId, hash).encodeABI()
         };
 
         const signedTx = await web3.eth.accounts.signTransaction(tx, houseAccount.privateKey);

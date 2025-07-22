@@ -2,39 +2,36 @@
 pragma solidity ^0.8.20;
 
 contract TwoPartyWarGame {
-    enum State { NotStarted, Committed, HashPosted }
+    enum State { NotStarted, Committed, HashPosted, Revealed, Forfeited }
 
     struct Game {
-        bytes32 playerCommit;
-        bytes32 houseHash;
         State gameState;
-        uint256 gameId;
-    }
 
-    struct GameResult {
-        uint256 playerCard;
-        uint256 houseCard;
+        address playerAddress;
+        bytes32 playerCommit;
+        uint commitTimestamp;
+
+        bytes32 houseHash;
+        uint houseHashTimestamp;
+
+        bytes32 playerSecret;
+        uint playerCard;
+        uint houseCard;
         address winner;
-        uint256 timestamp;
+        uint revealTimestamp;
     }
 
-    // Map player address to their current game
-    mapping(address => Game) public games;
+    mapping(uint gameId => Game) public games;
+    mapping(address player => uint[] gameIds) playerGames;
     
-    // Map player address to their game history
-    mapping(address => GameResult[]) public playerGameHistory;
-    
-    // Maximum number of games to return in getGameState
-    uint256 public constant MAX_RETURN_HISTORY = 10;
+    uint public constant MAX_RETURN_HISTORY = 10;
     
     address public immutable house;
-    uint256 public constant STAKE_AMOUNT = 0.000001 ether;
-
-    // Add gameId to track individual games
-    uint256 public nextGameId;
+    uint public constant STAKE_AMOUNT = 0.000001 ether;
+    uint public nextGameId;
 
     event GameForfeited(address indexed player, address house);
-    event GameCreated(address indexed player, bytes32 commitHash, uint256 gameId);
+    event GameCreated(address indexed player, bytes32 commitHash, uint gameId);
 
     modifier onlyHouse() {
         require(msg.sender == house, "Not house");
@@ -50,100 +47,85 @@ contract TwoPartyWarGame {
         house = _house;
     }
 
-    /// @dev Player commits to the game by sending ETH and a hash of their secret
     function commit(bytes32 _commitHash) external payable hasStaked {
-        Game storage playerGame = games[msg.sender];
-        require(playerGame.gameState == State.NotStarted, "Player already committed");
-        
-        playerGame.playerCommit = _commitHash;
-        playerGame.gameState = State.Committed;
-        playerGame.gameId = nextGameId;
-        
-        emit GameCreated(msg.sender, _commitHash, nextGameId);
-        
+        Game memory playerGame = games[playerGames[msg.sender].length];
+        require(playerGame.gameState == State.NotStarted ||
+                    playerGame.gameState == State.Revealed ||
+                    playerGame.gameState == State.Forfeited,
+                "Player already committed");
+
+        Game memory newGame = Game({
+            gameState: State.Committed,
+            playerAddress: msg.sender,
+            playerCommit: _commitHash,
+            commitTimestamp: block.timestamp,
+            
+            houseHash: bytes32(0),
+            houseHashTimestamp: 0,
+            playerSecret: bytes32(0),
+            playerCard: 0,
+            houseCard: 0,
+            winner: address(0),
+            revealTimestamp: 0
+        });
+
         nextGameId++;
+        games[nextGameId] = newGame;
+        playerGames[msg.sender].push(nextGameId);
+        emit GameCreated(msg.sender, _commitHash, nextGameId);
     }
 
-    /// @dev House posts their hash and stake for a specific player's game
-    function postHash(address player, bytes32 _hash) external payable hasStaked {
-        require(msg.sender == house, "Only house can post hash");
-        Game storage playerGame = games[player];
+    function postHash(uint32 gameId, bytes32 _hash) external payable hasStaked onlyHouse {
+        Game storage playerGame = games[gameId];
         require(playerGame.gameState == State.Committed, "Player must commit first");
-        
-        playerGame.houseHash = _hash;
         playerGame.gameState = State.HashPosted;
+        playerGame.houseHash = _hash;
+        playerGame.houseHashTimestamp = block.timestamp;
     }
 
-    /// @dev Player reveals their secret and the result is computed
     function reveal(bytes32 _secret) external {
-        Game storage playerGame = games[msg.sender];
+        Game storage playerGame = games[playerGames[msg.sender].length];
         require(playerGame.gameState == State.HashPosted, "Game not ready for reveal");
         require(keccak256(abi.encode(_secret)) == playerGame.playerCommit, "Player secret invalid");
         
-        // Generate result using house's hash and player's secret
-        uint256 xorResult = uint256(_secret) ^ uint256(playerGame.houseHash);
-        
-        // Extract two card values (1-13) from the XOR result
-        uint256 playerCard = ((xorResult >> 128) % 13) + 1;
-        uint256 houseCard = ((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) % 13) + 1;
-        
-        // Determine winner: highest card wins, ties go to house
+        (uint playerCard, uint houseCard) = calculateGameCards(_secret, playerGame.houseHash);
+
         address winner;
         if (playerCard > houseCard) {
             winner = msg.sender;
         } else {
             winner = house;
         }
-        
-        // Store game result in history
-        GameResult memory result = GameResult({
-            playerCard: playerCard,
-            houseCard: houseCard,
-            winner: winner,
-            timestamp: block.timestamp
-        });
-        
-        // Add to history (no size limit)
-        playerGameHistory[msg.sender].push(result);
-        
-        // Reset game state BEFORE transfer
-        _resetGame(msg.sender);
-        
-        // Transfer stakes to winner
-        uint256 totalStake = STAKE_AMOUNT * 2;
+
+        playerGame.gameState = State.Revealed;
+
+        playerGame.playerSecret = _secret;
+        playerGame.playerCard = playerCard;
+        playerGame.houseCard = houseCard;
+        playerGame.winner = winner;
+        playerGame.revealTimestamp = block.timestamp;
+
+        uint totalStake = STAKE_AMOUNT * 2;
         payable(winner).transfer(totalStake);
     }
 
-    /// @dev Internal function to reset the game
-    function _resetGame(address player) internal {
-        Game storage playerGame = games[player];
-        playerGame.playerCommit = bytes32(0);
-        playerGame.houseHash = bytes32(0);
-        playerGame.gameState = State.NotStarted;
+    function calculateGameCards(bytes32 secret, bytes32 houseHash) public pure returns (uint, uint) {
+        uint xorResult = uint(secret) ^ uint(houseHash);
+        uint playerCard = ((xorResult >> 128) % 13) + 1;
+        uint houseCard = ((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) % 13) + 1;
+        return (playerCard, houseCard);
     }
 
-    /// @dev Player can forfeit the game if they lost their secret
     function forfeit() external {
-        Game storage playerGame = games[msg.sender];
+        Game storage playerGame = games[playerGames[msg.sender].length];
         // AI: keep it commented out for now
         //require(playerGame.gameState == State.HashPosted, "Game not in correct state to forfeit");
         
-        // Store forfeit result in history
-        GameResult memory result = GameResult({
-            playerCard: 0,
-            houseCard: 0,
-            winner: house,
-            timestamp: block.timestamp
-        });
         
-        // Add to history (no size limit)
-        playerGameHistory[msg.sender].push(result);
-        
-        // Reset game state BEFORE transfer
-        _resetGame(msg.sender);
+        playerGame.gameState = State.Forfeited;
         
         // Transfer stakes to house
-        uint256 totalStake = STAKE_AMOUNT * 2;
+        uint totalStake = STAKE_AMOUNT * 2;
         // AI: keep it commented out for now
         //payable(house).transfer(totalStake);
         
@@ -164,20 +146,21 @@ contract TwoPartyWarGame {
         State gameState,
         bytes32 playerCommit,
         bytes32 houseHash,
-        uint256 gameId,
-        GameResult[] memory recentHistory
+        uint gameId,
+        Game[] memory recentHistory
     ) {
-        Game storage playerGame = games[player];
-        GameResult[] storage fullHistory = playerGameHistory[player];
+        uint currentGameId = getCurrentGameId(player);
+        Game storage playerGame = games[currentGameId];
         
         // Create a new array for the last 10 games
-        uint256 historyLength = fullHistory.length;
-        uint256 returnLength = historyLength > MAX_RETURN_HISTORY ? MAX_RETURN_HISTORY : historyLength;
-        recentHistory = new GameResult[](returnLength);
+        uint historyLength = playerGames[player].length;
+        uint returnLength = historyLength > MAX_RETURN_HISTORY ? MAX_RETURN_HISTORY : historyLength;
+        recentHistory = new Game[](returnLength);
         
         // Copy the last 10 games (or all if less than 10)
-        for (uint256 i = 0; i < returnLength; i++) {
-            recentHistory[i] = fullHistory[historyLength - returnLength + i];
+        for (uint i = 0; i < returnLength; i++) {
+            uint gameIdToAdd = playerGames[player][historyLength - returnLength + i];
+            recentHistory[i] = games[gameIdToAdd];
         }
         
         return (
@@ -185,8 +168,15 @@ contract TwoPartyWarGame {
             playerGame.gameState,
             playerGame.playerCommit,
             playerGame.houseHash,
-            playerGame.gameId,
+            currentGameId,
             recentHistory
         );
+    }
+
+    function getCurrentGameId(address player) public view returns(uint) {
+        uint gameAmount = playerGames[player].length;
+        if (gameAmount == 0)
+            return 0;
+        return playerGames[player][gameAmount-1];
     }
 }
