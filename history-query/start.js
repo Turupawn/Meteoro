@@ -1,7 +1,7 @@
 require('dotenv').config();
 const Web3 = require('web3');
 const web3 = new Web3(process.env.RPC_URL);
-const contractABI = require('../json_abi/MyContract.json');
+const contractABI = require('./json_abi/MyContract.json');
 const contractAddress = process.env.CONTRACT_ADDRESS;
 const contract = new web3.eth.Contract(contractABI, contractAddress);
 
