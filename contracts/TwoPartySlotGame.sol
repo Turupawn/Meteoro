@@ -48,7 +48,7 @@ contract TwoPartyWarGame {
     }
 
     function commit(bytes32 _commitHash) external payable hasStaked {
-        Game memory playerGame = games[playerGames[msg.sender].length];
+        Game memory playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.NotStarted ||
                     playerGame.gameState == State.Revealed ||
                     playerGame.gameState == State.Forfeited,
@@ -84,7 +84,7 @@ contract TwoPartyWarGame {
     }
 
     function reveal(bytes32 _secret) external {
-        Game storage playerGame = games[playerGames[msg.sender].length];
+        Game storage playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.HashPosted, "Game not ready for reveal");
         require(keccak256(abi.encode(_secret)) == playerGame.playerCommit, "Player secret invalid");
         
@@ -117,7 +117,7 @@ contract TwoPartyWarGame {
     }
 
     function forfeit() external {
-        Game storage playerGame = games[playerGames[msg.sender].length];
+        Game storage playerGame = games[getCurrentGameId(msg.sender)];
         // AI: keep it commented out for now
         //require(playerGame.gameState == State.HashPosted, "Game not in correct state to forfeit");
         
