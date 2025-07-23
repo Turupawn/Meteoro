@@ -8,7 +8,7 @@ const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL) || 500;
 // Initialize Web3
 const web3 = new Web3(process.env.RPC_URL);
 const contractAddress = process.env.CONTRACT_ADDRESS;
-const contractABI = require('../json_abi/MyContract.json');
+const contractABI = require('./json_abi/MyContract.json');
 
 // Create contract instance
 const contract = new web3.eth.Contract(contractABI, contractAddress);
