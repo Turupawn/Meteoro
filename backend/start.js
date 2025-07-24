@@ -25,113 +25,48 @@ function generateRandomHash() {
     return web3.utils.randomHex(32);
 }
 
-async function multiPostHashForGames(gameIdPlayerPairs) {
+async function multiPostRandomnessForGames(randomness) {
     try {
-        if (gameIdPlayerPairs.length === 0) return;
-
-        const filtered = gameIdPlayerPairs.filter(({ gameId }) => !processingGameIds.has(gameId));
-        if (filtered.length === 0) return;
-
-        filtered.forEach(({ gameId }) => processingGameIds.add(gameId));
-
-        const validGameIds = [];
-        const hashes = [];
-        const playerMap = {};
+        if (!randomness || randomness.length === 0) return;
         const stakeAmount = STAKE_AMOUNT;
-
-        for (const { gameId, playerAddress } of filtered) {
-            const hash = generateRandomHash();
-            validGameIds.push(gameId);
-            hashes.push(hash);
-            playerMap[gameId] = playerAddress;
-        }
-
-        if (validGameIds.length === 0) return;
-
         const tx = {
             from: houseAccount.address,
             to: contractAddress,
-            value: web3.utils.toBN(stakeAmount).mul(web3.utils.toBN(validGameIds.length)).toString(),
-            gas: 500000 + 200000 * validGameIds.length,
-            data: contract.methods.multiPostHash(validGameIds, hashes).encodeABI()
+            value: web3.utils.toBN(stakeAmount).mul(web3.utils.toBN(randomness.length)).toString(),
+            gas: 500000 + 200000 * randomness.length,
+            data: contract.methods.multiPostRandomness(randomness).encodeABI()
         };
-
         const signedTx = await web3.eth.accounts.signTransaction(tx, houseAccount.privateKey);
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-
         if (receipt.status) {
-            validGameIds.forEach((gameId, idx) => {
-                console.log(`Posted hash for game ${gameId} (player ${playerMap[gameId]}):`, {
-                    hash: hashes[idx],
+            randomness.forEach((hash, idx) => {
+                console.log(`Posted hash #${idx + 1}:`, {
+                    hash: hash,
                     txHash: receipt.transactionHash
                 });
             });
         } else {
-            console.error(`multiPostHash transaction failed:`, receipt);
-            validGameIds.forEach(gameId => processingGameIds.delete(gameId));
+            console.error(`multiPostRandomness transaction failed:`, receipt);
         }
     } catch (error) {
-        console.error('Error in multiPostHashForGames:', error);
-        gameIdPlayerPairs.forEach(({ gameId }) => processingGameIds.delete(gameId));
+        console.error('Error in multiPostRandomnessForGames:', error);
     }
 }
 
 // Function to check for new games
 async function checkForNewGames() {
     try {
-        const currentBlock = await web3.eth.getBlockNumber();
-        if (lastProcessedBlock === 0) {
-            lastProcessedBlock = currentBlock;
-            return;
-        }
-        if (lastProcessedBlock >= currentBlock) {
-            return;
-        }
-        const toBlock = Math.min(currentBlock, lastProcessedBlock + 5);
-        try {
-            const [createdEvents, forfeitedEvents] = await Promise.all([
-                contract.getPastEvents('GameCreated', {
-                    fromBlock: lastProcessedBlock + 1,
-                    toBlock: toBlock
-                }),
-                contract.getPastEvents('GameForfeited', {
-                    fromBlock: lastProcessedBlock + 1,
-                    toBlock: toBlock
-                })
-            ]);
-            const newGames = [];
-            for (const event of createdEvents) {
-                try {
-                    const playerAddress = event.returnValues.player;
-                    const gameId = event.returnValues.gameId;
-                    console.log('New game created:', { player: playerAddress, gameId: gameId });
-                    newGames.push({ gameId, playerAddress });
-                } catch (error) {
-                    console.error('Error processing game created event:', error);
-                }
-            }
-            await multiPostHashForGames(newGames);
-            for (const event of forfeitedEvents) {
-                try {
-                    const playerAddress = event.returnValues.player;
-                    console.log('Game forfeited:', { player: playerAddress });
-                    // Remove from processing set if it was being processed
-                    processingGameIds.delete(playerAddress);
-                } catch (error) {
-                    console.error('Error processing forfeit event:', error);
-                }
-            }
-            lastProcessedBlock = toBlock;
-        } catch (error) {
-            if (error.message.includes('block meta not found') || 
-                error.message.includes('invalid block range params') ||
-                error.message.includes('data out-of-bounds')) {
-                lastProcessedBlock = Math.max(lastProcessedBlock, currentBlock - 5);
-                console.log('Block range error, adjusting lastProcessedBlock to:', lastProcessedBlock);
-            } else {
-                throw error;
-            }
-        }
+        // Get backend state: last responded gameId and pending count
+        const backendState = await contract.methods.getBackendGameState().call();
+        const lastRandomnessPostedGameIdStr = backendState[0];
+        const pendingGameCountStr = backendState[1];
+        const lastRandomnessPostedGameId = parseInt(lastRandomnessPostedGameIdStr);
+        const pendingGameCount = parseInt(pendingGameCountStr);
+        if (pendingGameCount === 0) return;
+
+        // Generate randomness array
+        const randomness = Array.from({ length: pendingGameCount }, () => generateRandomHash());
+        await multiPostRandomnessForGames(randomness);
     } catch (error) {
         console.error('Error checking for new games:', error);
     }

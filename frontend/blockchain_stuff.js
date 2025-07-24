@@ -2,7 +2,7 @@ const NETWORK_ID = 6342
 
 const POLL_INTERVAL = 150 // 150
 
-const MY_CONTRACT_ADDRESS = "0xfE175b058155c621D149B77c7f2564d6e1e35dEb"
+const MY_CONTRACT_ADDRESS = "0x6b828700Ff98b20033361905dE1c168Cef6AF5ec"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 

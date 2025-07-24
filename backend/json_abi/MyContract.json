@@ -156,6 +156,24 @@
   },
   {
     "type": "function",
+    "name": "getBackendGameState",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getCurrentGameId",
     "inputs": [
       {
@@ -289,13 +307,21 @@
   },
   {
     "type": "function",
-    "name": "multiPostHash",
-    "inputs": [
+    "name": "lastRandomnessPostedGameId",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "gameIds",
-        "type": "uint32[]",
-        "internalType": "uint32[]"
-      },
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "multiPostRandomness",
+    "inputs": [
       {
         "name": "randomness",
         "type": "bytes32[]",
@@ -308,6 +334,19 @@
   {
     "type": "function",
     "name": "nextGameId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingGameCount",
     "inputs": [],
     "outputs": [
       {

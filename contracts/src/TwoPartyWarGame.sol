@@ -29,6 +29,8 @@ contract TwoPartyWarGame {
     address public immutable house;
     uint public constant STAKE_AMOUNT = 0.000001 ether;
     uint public nextGameId;
+    uint public lastRandomnessPostedGameId;
+    uint public pendingGameCount;
 
     event GameForfeited(address indexed player, address house);
     event GameCreated(address indexed player, bytes32 commitHash, uint gameId);
@@ -70,19 +72,25 @@ contract TwoPartyWarGame {
         });
 
         nextGameId++;
+        pendingGameCount++;
         games[nextGameId] = newGame;
         playerGames[msg.sender].push(nextGameId);
         emit GameCreated(msg.sender, _commitHash, nextGameId);
     }
 
-    function multiPostHash(uint32[] memory gameIds, bytes32[] memory randomness) external payable hasStaked onlyHouse {
-        for (uint i = 0; i < gameIds.length; i++) {
-            Game storage playerGame = games[gameIds[i]];
+    function multiPostRandomness(bytes32[] memory randomness) external payable hasStaked onlyHouse {
+        require(randomness.length > 0, "Should not be 0");
+        require(randomness.length <= pendingGameCount, "Too many randomness values");
+        for (uint i = 0; i < randomness.length; i++) {
+            uint gameId = lastRandomnessPostedGameId + i + 1;
+            Game storage playerGame = games[gameId];
             require(playerGame.gameState == State.Committed, "Game has to be commited");
             playerGame.gameState = State.HashPosted;
             playerGame.houseHash = randomness[i];
             playerGame.houseHashTimestamp = block.timestamp;
         }
+        lastRandomnessPostedGameId += randomness.length;
+        pendingGameCount -= randomness.length;
     }
 
     function reveal(bytes32 _secret) external {
@@ -172,6 +180,14 @@ contract TwoPartyWarGame {
             playerGame.houseHash,
             currentGameId,
             recentHistory
+        );
+    }
+
+    // Function to get game state and last 10 games for a specific player
+    function getBackendGameState() external view returns (uint,uint) {
+        return (
+            lastRandomnessPostedGameId,
+            pendingGameCount
         );
     }
 
