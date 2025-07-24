@@ -75,12 +75,14 @@ contract TwoPartyWarGame {
         emit GameCreated(msg.sender, _commitHash, nextGameId);
     }
 
-    function postHash(uint32 gameId, bytes32 _hash) external payable hasStaked onlyHouse {
-        Game storage playerGame = games[gameId];
-        require(playerGame.gameState == State.Committed, "Player must commit first");
-        playerGame.gameState = State.HashPosted;
-        playerGame.houseHash = _hash;
-        playerGame.houseHashTimestamp = block.timestamp;
+    function multiPostHash(uint32[] memory gameIds, bytes32[] memory randomness) external payable hasStaked onlyHouse {
+        for (uint i = 0; i < gameIds.length; i++) {
+            Game storage playerGame = games[gameIds[i]];
+            require(playerGame.gameState == State.Committed, "Game has to be commited");
+            playerGame.gameState = State.HashPosted;
+            playerGame.houseHash = randomness[i];
+            playerGame.houseHashTimestamp = block.timestamp;
+        }
     }
 
     function reveal(bytes32 _secret) external {
