@@ -1,8 +1,12 @@
+import Web3 from 'web3';
+
 const NETWORK_ID = 6342
 
 const POLL_INTERVAL = 150 // 150
 
-const MY_CONTRACT_ADDRESS = "0x2E94602dcd1FF9994E667D7B1D005D7384b35a97"
+const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
+console.log(MY_CONTRACT_ADDRESS);
+console.log(MY_CONTRACT_ADDRESS);
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
@@ -22,6 +26,14 @@ const GAS_PRICE_UPDATE_INTERVAL = 60000;
 const GAS_LIMIT = 600000;
 let shouldProcessCommit = false;
 
+function getLocalWallet() {
+    const walletData = localStorage.getItem('localWallet');
+    if (walletData) {
+      return JSON.parse(walletData);
+    }
+    return null;
+  }
+
 const getWeb3 = async () => {
   return new Promise((resolve, reject) => {
     const provider = new Web3.providers.HttpProvider("https://carrot.megaeth.com/rpc");
@@ -33,7 +45,7 @@ const getWeb3 = async () => {
 const getContract = async (web3, address, abi_path) => {
   const response = await fetch(abi_path);
   const data = await response.json();
-  contract = new web3.eth.Contract(
+  const contract = new web3.eth.Contract(
     data,
     address
     );
@@ -150,7 +162,7 @@ async function gameLoop() {
         printLog(['debug'], "Pending commit:", pendingCommit);
         printLog(['debug'], "Pending reveal:", pendingReveal);
 
-        if (globalGameState.gameState === "2" && pendingCommit) {
+        if (globalGameState.gameState === 2n && pendingCommit) {
             const result = calculateCards(pendingCommit.secret, globalGameState.houseHash);
             
             if (commitStartTime) {
@@ -173,12 +185,11 @@ async function gameLoop() {
         console.log(globalGameState);
         if (
             (
-                globalGameState.gameState === "0" /* NotStarted */ ||
-                globalGameState.gameState === "3" /* Revealed */   ||
-                globalGameState.gameState === "4" /* Forfeited */)
+                globalGameState.gameState === 0n /* NotStarted */ ||
+                globalGameState.gameState === 3n /* Revealed */   ||
+                globalGameState.gameState === 4n /* Forfeited */)
             && shouldProcessCommit) {
             shouldProcessCommit = false;
-            console.log("shouldProcessCommit");
             const storedCommit = getStoredCommit();
             if (storedCommit) {
                 printLog(['debug'], "Found pending commit from previous game:", storedCommit);
@@ -191,10 +202,9 @@ async function gameLoop() {
                 const currentEth = web3.utils.fromWei(globalGameState.playerBalance, 'ether');
                 alert(`Insufficient balance! You need at least ${MIN_BALANCE} ETH to play.\nCurrent balance: ${parseFloat(currentEth).toFixed(6)} ETH`);
                 shouldProcessCommit = false;
-            } else if ( globalGameState.gameState === "0" /* NotStarted */ ||
-                        globalGameState.gameState === "3" /* Revealed */   ||
-                        globalGameState.gameState === "4" /* Forfeited */) {
-                console.log("globalGameState.gameState === 0");
+            } else if ( globalGameState.gameState === 0n /* NotStarted */ ||
+                        globalGameState.gameState === 3n /* Revealed */   ||
+                        globalGameState.gameState === 4n /* Forfeited */) {
                 resetCardDisplay();
                 document.getElementById("game-status").textContent = "Please wait...";
 
@@ -300,7 +310,7 @@ async function updateGameState() {
         const gameStateElement = document.getElementById("game-state");
         if (gameStateElement) {
             let stateText = `Game State: ${globalGameState.gameState}`;
-            if (globalGameState.gameState === "2" && !getStoredSecret()) {
+            if (globalGameState.gameState === 2n && !getStoredSecret()) {
                 stateText += " (Secret lost - can forfeit)";
             }
             gameStateElement.textContent = stateText;
@@ -342,14 +352,6 @@ function generateWallet() {
     privateKey: account.privateKey
   }));
   return account;
-}
-
-function getLocalWallet() {
-  const walletData = localStorage.getItem('localWallet');
-  if (walletData) {
-    return JSON.parse(walletData);
-  }
-  return null;
 }
 
 async function checkLocalWalletBalance() {
@@ -448,7 +450,7 @@ async function performReveal(wallet, secret) {
         if (receipt.status) {
             printLog(['debug'], "=== REVEAL SUCCESSFUL ===");
             if (globalGameState.gameId === gameId &&
-                globalGameState.gameState === "0" &&
+                globalGameState.gameState === 0n &&
                 globalGameState.playerCommit === "0x0000000000000000000000000000000000000000000000000000000000000000") {
                 printLog(['debug'], "Same game ID, completed state, and zero commit - clearing secret");
             } else {
@@ -618,7 +620,7 @@ async function getCurrentGasPrice() {
     if (!globalGasPrice || (now - lastGasPriceUpdate) > GAS_PRICE_UPDATE_INTERVAL) {
         await updateGasPrice();
     }
-    return globalGasPrice*2;
+    return globalGasPrice*2n;
 }
 
 async function initializeNonce() {
@@ -644,3 +646,11 @@ function getAndIncrementNonce() {
     }
     return globalNonce++;
 }
+
+// Make functions globally available for inline script access
+window.getLocalWallet = getLocalWallet;
+window.commit = commit;
+window.performReveal = performReveal;
+window.clearStoredSecret = clearStoredSecret;
+window.forfeit = forfeit;
+window.withdrawFunds = withdrawFunds;
