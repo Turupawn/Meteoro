@@ -5,9 +5,7 @@ const NETWORK_ID = 6342
 const POLL_INTERVAL = 150 // 150
 
 const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
-console.log(MY_CONTRACT_ADDRESS);
-console.log(MY_CONTRACT_ADDRESS);
-const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
+const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json"
 var my_contract
 
 var web3
