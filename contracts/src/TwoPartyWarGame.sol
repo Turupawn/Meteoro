@@ -29,6 +29,8 @@ contract TwoPartyWarGame {
     address public immutable house;
     uint public constant STAKE_AMOUNT = 0.000001 ether;
     uint public nextGameId;
+    uint public lastRandomnessPostedGameId;
+    uint public pendingGameCount;
 
     event GameForfeited(address indexed player, address house);
     event GameCreated(address indexed player, bytes32 commitHash, uint gameId);
@@ -48,7 +50,7 @@ contract TwoPartyWarGame {
     }
 
     function commit(bytes32 _commitHash) external payable hasStaked {
-        Game memory playerGame = games[playerGames[msg.sender].length];
+        Game memory playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.NotStarted ||
                     playerGame.gameState == State.Revealed ||
                     playerGame.gameState == State.Forfeited,
@@ -70,21 +72,29 @@ contract TwoPartyWarGame {
         });
 
         nextGameId++;
+        pendingGameCount++;
         games[nextGameId] = newGame;
         playerGames[msg.sender].push(nextGameId);
         emit GameCreated(msg.sender, _commitHash, nextGameId);
     }
 
-    function postHash(uint32 gameId, bytes32 _hash) external payable hasStaked onlyHouse {
-        Game storage playerGame = games[gameId];
-        require(playerGame.gameState == State.Committed, "Player must commit first");
-        playerGame.gameState = State.HashPosted;
-        playerGame.houseHash = _hash;
-        playerGame.houseHashTimestamp = block.timestamp;
+    function multiPostRandomness(bytes32[] memory randomness) external payable hasStaked onlyHouse {
+        require(randomness.length > 0, "Should not be 0");
+        require(randomness.length <= pendingGameCount, "Too many randomness values");
+        for (uint i = 0; i < randomness.length; i++) {
+            uint gameId = lastRandomnessPostedGameId + i + 1;
+            Game storage playerGame = games[gameId];
+            require(playerGame.gameState == State.Committed, "Game has to be commited");
+            playerGame.gameState = State.HashPosted;
+            playerGame.houseHash = randomness[i];
+            playerGame.houseHashTimestamp = block.timestamp;
+        }
+        lastRandomnessPostedGameId += randomness.length;
+        pendingGameCount -= randomness.length;
     }
 
     function reveal(bytes32 _secret) external {
-        Game storage playerGame = games[playerGames[msg.sender].length];
+        Game storage playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.HashPosted, "Game not ready for reveal");
         require(keccak256(abi.encode(_secret)) == playerGame.playerCommit, "Player secret invalid");
         
@@ -117,7 +127,7 @@ contract TwoPartyWarGame {
     }
 
     function forfeit() external {
-        Game storage playerGame = games[playerGames[msg.sender].length];
+        Game storage playerGame = games[getCurrentGameId(msg.sender)];
         // AI: keep it commented out for now
         //require(playerGame.gameState == State.HashPosted, "Game not in correct state to forfeit");
         
@@ -170,6 +180,14 @@ contract TwoPartyWarGame {
             playerGame.houseHash,
             currentGameId,
             recentHistory
+        );
+    }
+
+    // Function to get game state and last 10 games for a specific player
+    function getBackendGameState() external view returns (uint,uint) {
+        return (
+            lastRandomnessPostedGameId,
+            pendingGameCount
         );
     }
 
