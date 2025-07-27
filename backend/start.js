@@ -57,7 +57,7 @@ async function multiPostRandomnessForGames(randomness) {
 async function checkForNewGames() {
     try {
         // Get backend state: last responded gameId and pending count
-        const backendState = await contract.methods.getBackendGameState().call();
+        const backendState = await contract.methods.getBackendGameState().call({}, 'pending');
         const lastRandomnessPostedGameIdStr = backendState[0];
         const pendingGameCountStr = backendState[1];
         const lastRandomnessPostedGameId = parseInt(lastRandomnessPostedGameIdStr);
@@ -73,7 +73,7 @@ async function checkForNewGames() {
 }
 
 async function initialize() {
-    STAKE_AMOUNT = await contract.methods.STAKE_AMOUNT().call();
+    STAKE_AMOUNT = await contract.methods.STAKE_AMOUNT().call({}, 'pending');
     console.log('Stake amount loaded:', STAKE_AMOUNT);
     setInterval(checkForNewGames, POLL_INTERVAL);
     console.log('Initialization complete. Polling for new games.');

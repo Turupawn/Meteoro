@@ -1,11 +1,20 @@
 {
-    "name": "fast-casino-web",
-    "version": "1.0.0",
-    "description": "Fast casino frontend",
-    "scripts": {
-      "start": "lite-server"
-    },
-    "devDependencies": {
-      "lite-server": "^2.6.1"
-    }
+  "name": "fast-casino-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "npx http-server ./dist"
+  },
+  "devDependencies": {
+    "vite": "^4.5.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "phaser": "^3.90.0",
+    "web3": "^4.16.0"
   }
+}

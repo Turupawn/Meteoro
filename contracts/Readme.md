@@ -7,5 +7,5 @@ source .env && forge script TwoPartyWarGameScript --rpc-url $RPC_URL --broadcast
 ## Update ABIs
 
 ```bash
-forge inspect src/TwoPartyWarGame.sol abi --json | tee ../frontend/json_abi/MyContract.json > ../backend/json_abi/MyContract.json
+forge inspect src/TwoPartyWarGame.sol abi --json | tee ../frontend/public/json_abi/MyContract.json > ../backend/json_abi/MyContract.json
 ```
