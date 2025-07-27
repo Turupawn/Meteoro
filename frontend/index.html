@@ -12,38 +12,12 @@
   </style>
 </head>
 <body>
-  <!-- Left pane with game history - larger size -->
-  <div style="position: fixed; top: 20px; left: 20px; width: 200px; text-align: left; z-index: 10;">
-    <div style="font-weight: bold; margin-bottom: 10px; font-size: 18px;">Your games:</div>
-    <ul id="personal-games-list" style="list-style-type: none; padding-left: 0; margin-top: 8px; font-size: 16px;">
-      <!-- Games will be listed here -->
-    </ul>
-  </div>
-
-  <!-- Top right balance and deposit section -->
-  <div style="position: fixed; top: 10px; right: 10px; text-align: right; z-index: 10;">
-    <div id="balance-display" style="font-size: 14px; margin-bottom: 5px;">Balance: 0 ETH</div>
-    <div>
-      <button onclick="showDepositAlert()" style="font-size: 12px; padding: 5px 10px; margin-right: 5px;">Deposit</button>
-      <button onclick="showWithdrawFundsPrompt()" style="font-size: 12px; padding: 5px 10px;">Withdraw</button>
-    </div>
-  </div>
-
+  <div class="container"></div>
   <!-- Main content expanded to fill most of the screen -->
   <div style="display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw;">
     <!-- Card Display Section - much larger -->
     <div style="text-align: center;">
-      <div style="font-size: 24px;">house</div>
-      <div id="house-card" style="font-size: 120px; font-weight: bold; line-height: 1.2;">0</div>
-      <div style="font-size: 60px; margin: 20px 0;">--</div>
-      <div id="player-card" style="font-size: 120px; font-weight: bold; line-height: 1.2;">0</div>
-      <div style="font-size: 24px;">you</div>
       <div id="game-status" style="font-size: 36px; margin-top: 20px; font-weight: bold; color: #333;"></div>
-      
-      <!-- Big Play Button -->
-      <div style="margin: 30px 0;">
-        <input type="button" value="Play War!" onclick="_commit()" style="font-size: 32px; padding: 20px 60px; cursor: pointer;">
-      </div>
     </div>
   </div>
   
@@ -59,15 +33,11 @@
     <input type="button" value="Clear Secret" onclick="_clearSecret()" style="font-size: 14px; margin-bottom: 5px; display: block; width: 120px; cursor: pointer;"></input>
   </div>
   
-  <script type="module" src="/main.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
 
 <script>
-  function _commit() {
-    commit();
-  }
-
   function _reveal() {
     const wallet = getLocalWallet();
     const secretData = getStoredSecret();
@@ -97,18 +67,5 @@
       content.style.display = "none";
       button.value = "Show Details v0.33.42";
     }
-  }
-
-  function showDepositAlert() {
-    const wallet = getLocalWallet();
-    if (wallet) {
-      alert("Deposit ETH here: " + wallet.address);
-    } else {
-      alert("No local wallet found!");
-    }
-  }
-
-  function showWithdrawFundsPrompt() {
-    window.withdrawFunds();
   }
 </script>

@@ -1,4 +1,6 @@
 import Web3 from 'web3';
+import Phaser from "phaser";
+import { loadPhaser } from './game.js';
 
 const NETWORK_ID = 6342
 
@@ -9,6 +11,8 @@ const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json"
 var my_contract
 
 var web3
+
+var game
 
 const MIN_BALANCE = "0.00001";
 let commitStartTime = null;
@@ -52,6 +56,7 @@ const getContract = async (web3, address, abi_path) => {
 
 async function loadDapp() {
   var awaitWeb3 = async function () {
+    game = await loadPhaser()
     web3 = await getWeb3()
         var awaitContract = async function () {
       try {
@@ -82,17 +87,22 @@ const onContractInitCallback = async () => {
     await updateGasPrice(); // Initialize gas price
     await initializeNonce(); // Initialize nonce
     
-    await checkLocalWalletBalance();
+    // Initialize game state first
+    await checkGameState();
+    
     updateGameState();
     startGameLoop();
+    
+    // Signal that everything is ready
+    window.gameReady = true;
+    window.globalGameState = globalGameState;
+    window.web3 = web3;
+    
+    window.dispatchEvent(new CustomEvent('gameReady'));
+    
   } catch (error) {
     console.error("Error in contract initialization:", error);
-    const personalGamesList = document.getElementById("personal-games-list");
-    if (personalGamesList) {
-      personalGamesList.innerHTML = "<li>Error loading games</li>";
-    } else {
-      console.error("Cannot find personal-games-list element");
-    }
+
   }
 }
 
@@ -123,22 +133,9 @@ function getCardDisplay(cardValue) {
 }
 
 function updateCardDisplay(playerCard, houseCard) {
-    document.getElementById("player-card").textContent = getCardDisplay(playerCard);
-    document.getElementById("house-card").textContent = getCardDisplay(houseCard);
-    
-    if (playerCard > houseCard) {
-        document.getElementById("game-status").textContent = "You won!";
-        document.getElementById("game-status").style.color = "#28a745";
-    } else {
-        document.getElementById("game-status").textContent = "House wins";
-        document.getElementById("game-status").style.color = "#dc3545";
+    if (game) {
+        game.scene.scenes[0].updateCurrentGameDisplay(playerCard, houseCard);
     }
-}
-
-function resetCardDisplay() {
-    document.getElementById("player-card").textContent = "0";
-    document.getElementById("house-card").textContent = "0";
-    document.getElementById("game-status").textContent = "";
 }
 
 async function gameLoop() {
@@ -151,7 +148,6 @@ async function gameLoop() {
     try {
         printLog(['debug'], "=== GAME LOOP START ===");
 
-        await checkLocalWalletBalance();
         await checkGameState();
         printLog(['debug'], "Current game state:", globalGameState);
         
@@ -180,7 +176,6 @@ async function gameLoop() {
             printLog(['debug'], "Conditions met for reveal, attempting...");
             await performReveal(wallet, pendingCommit.secret);
         }
-        console.log(globalGameState);
         if (
             (
                 globalGameState.gameState === 0n /* NotStarted */ ||
@@ -203,7 +198,6 @@ async function gameLoop() {
             } else if ( globalGameState.gameState === 0n /* NotStarted */ ||
                         globalGameState.gameState === 3n /* Revealed */   ||
                         globalGameState.gameState === 4n /* Forfeited */) {
-                resetCardDisplay();
                 document.getElementById("game-status").textContent = "Please wait...";
 
                 const secret = generateRandomBytes32();
@@ -245,7 +239,6 @@ async function gameLoop() {
                 
                 if (receipt.status) {
                     shouldProcessCommit = false;
-                    await checkLocalWalletBalance();
                     updateGameState();
                 }
             }
@@ -270,8 +263,12 @@ async function commit() {
 async function checkGameState() {
     try {
         const wallet = getLocalWallet();
-        if (!wallet) return null;
+        if (!wallet) {
+            return null;
+        }
+        
         const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
+        
         globalGameState = {
             playerBalance: gameState.player_balance,
             gameState: gameState.gameState,
@@ -280,6 +277,10 @@ async function checkGameState() {
             gameId: gameState.gameId,
             recentHistory: gameState.recentHistory
         };
+        
+        // Update the global reference
+        window.globalGameState = globalGameState;
+        
         return globalGameState;
     } catch (error) {
         console.error("Error checking game state:", error);
@@ -313,24 +314,7 @@ async function updateGameState() {
             }
             gameStateElement.textContent = stateText;
         }
-        const personalGamesList = document.getElementById("personal-games-list");
-        if (personalGamesList) {
-            personalGamesList.innerHTML = "";
-            
-            if (globalGameState.recentHistory.length === 0) {
-                personalGamesList.innerHTML = "<li>No games yet</li>";
-            } else {
-                for (let i = globalGameState.recentHistory.length - 1; i >= 0; i--) {
-                    const result = globalGameState.recentHistory[i];
-                    const isForfeit = result.playerCard === 0 && result.houseCard === 0;
-                    const playerCard = getCardDisplay(parseInt(result.playerCard));
-                    const houseCard = getCardDisplay(parseInt(result.houseCard));
-                    const isWin = result.winner.toLowerCase() === getLocalWallet().address.toLowerCase();
-                    
-                    addGameToPersonalList(playerCard, houseCard, isWin, isForfeit);
-                }
-            }
-        }
+        // Removed the personal games list update since it's now handled in game.js
     } catch (error) {
         console.error("Error updating game state:", error);
     }
@@ -350,15 +334,6 @@ function generateWallet() {
     privateKey: account.privateKey
   }));
   return account;
-}
-
-async function checkLocalWalletBalance() {
-    const wallet = getLocalWallet();
-    if (wallet && globalGameState) {
-        const ethBalance = web3.utils.fromWei(globalGameState.playerBalance, 'ether');
-        document.getElementById("balance-display").textContent =
-            `Balance: ${parseFloat(ethBalance).toFixed(6)} ETH`;
-    }
 }
 
 async function forfeit() {
@@ -462,7 +437,7 @@ async function performReveal(wallet, secret) {
     }
 }
 
-async function withdrawFunds() {
+async function withdrawFunds(destinationAddress) {
     const wallet = getLocalWallet();
     if (!wallet) {
         alert("No local wallet found!");
@@ -479,7 +454,6 @@ async function withdrawFunds() {
             alert("Balance too low! Leaving funds for gas fees.");
             return;
         }
-        const destinationAddress = prompt("Enter the wallet address to withdraw funds to:");
         if (!destinationAddress || !web3.utils.isAddress(destinationAddress)) {
             alert("Invalid Ethereum address!");
             return;
@@ -508,7 +482,6 @@ async function withdrawFunds() {
             const leftAmount = web3.utils.fromWei(ethLeftForGas, 'ether');
             alert(`Successfully withdrew ${ethAmount} ETH to ${destinationAddress}\nLeft ${leftAmount} ETH for future gas fees`);
             document.getElementById("game-status").textContent = "";
-            checkLocalWalletBalance();
         } else {
             alert("Withdrawal failed!");
             document.getElementById("game-status").textContent = "";
@@ -518,25 +491,6 @@ async function withdrawFunds() {
         alert("Error withdrawing funds: " + error.message);
         document.getElementById("game-status").textContent = "";
     }
-}
-
-function addGameToPersonalList(playerCard, houseCard, isWin, isForfeit = false) {
-  const gamesList = document.getElementById("personal-games-list");
-  const listItem = document.createElement("li");
-  listItem.style.marginBottom = "8px";
-  
-  if (isForfeit) {
-    listItem.innerHTML = `<span style="color: #dc3545;">• Game forfeited</span>`;
-  } else if (isWin) {
-    listItem.innerHTML = `<span style="color: #28a745;">• You won [${playerCard}-${houseCard}]</span>`;
-  } else {
-    listItem.innerHTML = `<span style="color: #dc3545;">• House wins [${playerCard}-${houseCard}]</span>`;
-  }
-  if (gamesList.firstChild) {
-    gamesList.insertBefore(listItem, gamesList.firstChild);
-  } else {
-    gamesList.appendChild(listItem);
-  }
 }
 
 function printLog(levels, ...args) {
@@ -652,3 +606,8 @@ window.performReveal = performReveal;
 window.clearStoredSecret = clearStoredSecret;
 window.forfeit = forfeit;
 window.withdrawFunds = withdrawFunds;
+window.web3 = web3;
+window.globalGameState = globalGameState;
+window.gameReady = false;
+window.calculateCards = calculateCards;
+window.getPendingReveal = getPendingReveal;
