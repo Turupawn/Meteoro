@@ -19,7 +19,7 @@ let commitStartTime = null;
 
 const PRINT_LEVELS = ['profile', 'error']; //['debug', 'profile', 'error'];
 
-let globalGameState = null;
+let gameState = null;
 let globalStakeAmount = null;
 let globalGasPrice = null;
 let globalNonce = null;
@@ -95,7 +95,6 @@ const onContractInitCallback = async () => {
     
     // Signal that everything is ready
     window.gameReady = true;
-    window.globalGameState = globalGameState;
     window.web3 = web3;
     
     window.dispatchEvent(new CustomEvent('gameReady'));
@@ -132,12 +131,6 @@ function getCardDisplay(cardValue) {
     return cardValue.toString();
 }
 
-function updateCardDisplay(playerCard, houseCard) {
-    if (game) {
-        game.scene.scenes[0].updateCurrentGameDisplay(playerCard, houseCard);
-    }
-}
-
 async function gameLoop() {
     const wallet = getLocalWallet();
     if (!wallet) {
@@ -149,15 +142,15 @@ async function gameLoop() {
         printLog(['debug'], "=== GAME LOOP START ===");
 
         await checkGameState();
-        printLog(['debug'], "Current game state:", globalGameState);
+        printLog(['debug'], "Current game state:", gameState);
         
         const pendingCommit = getStoredCommit();
         const pendingReveal = getPendingReveal();
         printLog(['debug'], "Pending commit:", pendingCommit);
         printLog(['debug'], "Pending reveal:", pendingReveal);
 
-        if (globalGameState.gameState === 2n && pendingCommit) {
-            const result = calculateCards(pendingCommit.secret, globalGameState.houseHash);
+        if (gameState.gameState === 2n && pendingCommit) {
+            const result = calculateCards(pendingCommit.secret, gameState.houseHash);
             
             if (commitStartTime) {
                 const endTime = Date.now();
@@ -172,15 +165,15 @@ async function gameLoop() {
 
             clearStoredCommit();
             storePendingReveal(pendingCommit.secret);
-            updateCardDisplay(result.playerCard, result.houseCard);
+            game.scene.scenes[0].updateCardDisplay(result.playerCard, result.houseCard);
             printLog(['debug'], "Conditions met for reveal, attempting...");
             await performReveal(wallet, pendingCommit.secret);
         }
         if (
             (
-                globalGameState.gameState === 0n /* NotStarted */ ||
-                globalGameState.gameState === 3n /* Revealed */   ||
-                globalGameState.gameState === 4n /* Forfeited */)
+                gameState.gameState === 0n /* NotStarted */ ||
+                gameState.gameState === 3n /* Revealed */   ||
+                gameState.gameState === 4n /* Forfeited */)
             && shouldProcessCommit) {
             shouldProcessCommit = false;
             const storedCommit = getStoredCommit();
@@ -188,16 +181,16 @@ async function gameLoop() {
                 printLog(['debug'], "Found pending commit from previous game:", storedCommit);
                 alert("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
                 shouldProcessCommit = false;
-            } else if (!globalGameState) {
+            } else if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
-            } else if (BigInt(globalGameState.playerBalance) < BigInt(web3.utils.toWei(MIN_BALANCE, 'ether'))) {
-                const currentEth = web3.utils.fromWei(globalGameState.playerBalance, 'ether');
+            } else if (BigInt(gameState.playerBalance) < BigInt(web3.utils.toWei(MIN_BALANCE, 'ether'))) {
+                const currentEth = web3.utils.fromWei(gameState.playerBalance, 'ether');
                 alert(`Insufficient balance! You need at least ${MIN_BALANCE} ETH to play.\nCurrent balance: ${parseFloat(currentEth).toFixed(6)} ETH`);
                 shouldProcessCommit = false;
-            } else if ( globalGameState.gameState === 0n /* NotStarted */ ||
-                        globalGameState.gameState === 3n /* Revealed */   ||
-                        globalGameState.gameState === 4n /* Forfeited */) {
+            } else if ( gameState.gameState === 0n /* NotStarted */ ||
+                        gameState.gameState === 3n /* Revealed */   ||
+                        gameState.gameState === 4n /* Forfeited */) {
                 document.getElementById("game-status").textContent = "Please wait...";
 
                 const secret = generateRandomBytes32();
@@ -267,21 +260,18 @@ async function checkGameState() {
             return null;
         }
         
-        const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
+        const gameStateTemp = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
         
-        globalGameState = {
-            playerBalance: gameState.player_balance,
-            gameState: gameState.gameState,
-            playerCommit: gameState.playerCommit,
-            houseHash: gameState.houseHash,
-            gameId: gameState.gameId,
-            recentHistory: gameState.recentHistory
+        gameState = {
+            playerBalance: gameStateTemp.player_balance,
+            gameState: gameStateTemp.gameState,
+            playerCommit: gameStateTemp.playerCommit,
+            houseHash: gameStateTemp.houseHash,
+            gameId: gameStateTemp.gameId,
+            recentHistory: gameStateTemp.recentHistory
         };
         
-        // Update the global reference
-        window.globalGameState = globalGameState;
-        
-        return globalGameState;
+        return gameState;
     } catch (error) {
         console.error("Error checking game state:", error);
         return null;
@@ -305,15 +295,19 @@ function calculateCards(secret, houseHash) {
 
 async function updateGameState() {
     try {
-        if (!globalGameState) return;
+        if (!gameState) return;
         const gameStateElement = document.getElementById("game-state");
         if (gameStateElement) {
-            let stateText = `Game State: ${globalGameState.gameState}`;
-            if (globalGameState.gameState === 2n && !getStoredSecret()) {
+            let stateText = `Game State: ${gameState.gameState}`;
+            if (gameState.gameState === 2n && !getStoredSecret()) {
                 stateText += " (Secret lost - can forfeit)";
             }
             gameStateElement.textContent = stateText;
         }
+
+
+        const wallet = getLocalWallet()
+        game.scene.scenes[0].updateDisplay(gameState.playerBalance, gameState.recentHistory, wallet.address);
         // Removed the personal games list update since it's now handled in game.js
     } catch (error) {
         console.error("Error updating game state:", error);
@@ -382,16 +376,16 @@ async function forfeit() {
 async function performReveal(wallet, secret) {
     try {
         printLog(['debug'], "=== PERFORM REVEAL START ===");
-        if (!globalGameState) {
+        if (!gameState) {
             printLog(['error'], "Global game state not initialized");
             return;
         }
-        const gameId = globalGameState.gameId;
+        const gameId = gameState.gameId;
         printLog(['debug'], "Game state at reveal start:", {
             gameId: gameId,
-            gameState: globalGameState.gameState,
-            playerCommit: globalGameState.playerCommit,
-            houseHash: globalGameState.houseHash
+            gameState: gameState.gameState,
+            playerCommit: gameState.playerCommit,
+            houseHash: gameState.houseHash
         });
         printLog(['debug'], `Started processing reveal for game ${gameId}`);
         const data = my_contract.methods.reveal(secret).encodeABI();
@@ -422,9 +416,9 @@ async function performReveal(wallet, secret) {
         });
         if (receipt.status) {
             printLog(['debug'], "=== REVEAL SUCCESSFUL ===");
-            if (globalGameState.gameId === gameId &&
-                globalGameState.gameState === 0n &&
-                globalGameState.playerCommit === "0x0000000000000000000000000000000000000000000000000000000000000000") {
+            if (gameState.gameId === gameId &&
+                gameState.gameState === 0n &&
+                gameState.playerCommit === "0x0000000000000000000000000000000000000000000000000000000000000000") {
                 printLog(['debug'], "Same game ID, completed state, and zero commit - clearing secret");
             } else {
                 printLog(['debug'], "Game state changed or new game started, keeping secret");
@@ -607,7 +601,6 @@ window.clearStoredSecret = clearStoredSecret;
 window.forfeit = forfeit;
 window.withdrawFunds = withdrawFunds;
 window.web3 = web3;
-window.globalGameState = globalGameState;
 window.gameReady = false;
 window.calculateCards = calculateCards;
 window.getPendingReveal = getPendingReveal;
