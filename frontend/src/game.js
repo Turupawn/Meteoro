@@ -1,5 +1,6 @@
 import { DepositButton } from './game/depositButton.js';
 import { WithdrawButton } from './game/withdrawButton.js';
+import { ForfeitButton } from './game/forfeitButton.js';
 import { PlayButton } from './game/playButton.js';
 import { BalanceText } from './game/balanceText.js';
 import { GameHistory } from './game/gameHistory.js';
@@ -35,6 +36,9 @@ class Screen extends Phaser.Scene {
 
         // Create withdraw button using the new class
         this.withdrawButton = new WithdrawButton(this);
+
+        // Create forfeit button using the new class
+        this.forfeitButton = new ForfeitButton(this);
 
         // Create game history using the new class
         this.gameHistory = new GameHistory(this);

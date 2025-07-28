@@ -258,5 +258,7 @@ async function commitGame() {
 
 // Make functions globally available for inline script access
 window.getLocalWallet = getLocalWallet;
-window.commit = commitGame;
+window.commitGame = commitGame;
 window.withdrawFunds = withdrawFunds;
+window.forfeit = forfeit;
+window.performReveal = performReveal;
