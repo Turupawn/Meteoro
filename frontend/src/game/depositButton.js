@@ -34,60 +34,54 @@ export class DepositButton {
         
         const wallet = window.getLocalWallet();
         const fontSize = Math.max(12, this.scene.screenWidth / 60);
-        const addressText = this.scene.add.text(this.scene.centerX, modalY - 50, wallet ? wallet.address : 'No wallet', {
+        
+        // Title text
+        const titleText = this.scene.add.text(this.scene.centerX, modalY - 60, "DEPOSIT ADDRESS", {
             font: `${fontSize}px Arial`,
-            fill: "#FF0000"
+            fill: "#000000"
         }).setOrigin(0.5);
 
-        const copyButton = this.scene.add.text(this.scene.centerX, modalY, "COPY", {
+        // Create selectable text element for the address
+        const addressInput = document.createElement('input');
+        addressInput.type = 'text';
+        addressInput.value = wallet ? wallet.address : 'No wallet';
+        addressInput.readOnly = true;
+        addressInput.style.position = 'absolute';
+        addressInput.style.left = `${this.scene.centerX - 150}px`;
+        addressInput.style.top = `${modalY - 20}px`;
+        addressInput.style.width = '300px';
+        addressInput.style.fontSize = `${fontSize}px`;
+        addressInput.style.padding = '8px';
+        addressInput.style.textAlign = 'center';
+        addressInput.style.border = '1px solid #ccc';
+        addressInput.style.backgroundColor = '#f0f0f0';
+        addressInput.style.userSelect = 'text';
+        addressInput.style.webkitUserSelect = 'text';
+        document.body.appendChild(addressInput);
+
+        // Instructions text
+        const instructionText = this.scene.add.text(this.scene.centerX, modalY + 20, "Long press to copy address", {
+            font: `${fontSize - 2}px Arial`,
+            fill: "#666666"
+        }).setOrigin(0.5);
+
+        const closeButton = this.scene.add.text(this.scene.centerX, modalY + 60, "CLOSE", {
             font: `${fontSize}px Arial`,
             fill: "#FF0000"
         }).setOrigin(0.5).setInteractive();
 
-        const closeButton = this.scene.add.text(this.scene.centerX, modalY + 50, "CLOSE", {
-            font: `${fontSize}px Arial`,
-            fill: "#FF0000"
-        }).setOrigin(0.5).setInteractive();
-
-        // Make buttons larger for mobile touch
-        copyButton.setSize(copyButton.width + 20, copyButton.height + 10);
+        // Make button larger for mobile touch
         closeButton.setSize(closeButton.width + 20, closeButton.height + 10);
-
-        copyButton.on('pointerdown', () => {
-            if (wallet) {
-                // Visual feedback
-                copyButton.setText("COPIED!");
-                copyButton.setFill("#00FF00");
-                
-                // Try modern clipboard API first
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(wallet.address)
-                        .then(() => {
-                            console.log("Address copied to clipboard");
-                        })
-                        .catch(err => {
-                            console.error("Failed to copy to clipboard:", err);
-                            this.fallbackCopy(wallet.address);
-                        });
-                } else {
-                    // Fallback for older browsers or mobile
-                    this.fallbackCopy(wallet.address);
-                }
-                
-                // Reset button after 2 seconds
-                setTimeout(() => {
-                    copyButton.setText("COPY");
-                    copyButton.setFill("#FF0000");
-                }, 2000);
-            }
-        });
 
         const closeClickHandler = () => {
             modalBg.destroy();
             modal.destroy();
-            addressText.destroy();
-            copyButton.destroy();
+            titleText.destroy();
+            instructionText.destroy();
             closeButton.destroy();
+            if (addressInput.parentNode) {
+                addressInput.parentNode.removeChild(addressInput);
+            }
         };
 
         closeButton.on('pointerdown', closeClickHandler);
