@@ -23,9 +23,13 @@ export class PlayButton {
             if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {
                 this.scene.cardDisplay.currentGameText.setText(`Please wait...`);
             }
-            if (window.commit) {
-                window.commit();
+            
+            // Start boost animation when play button is pressed
+            if (this.scene.background && this.scene.background.startBoostAnimation) {
+                this.scene.background.startBoostAnimation();
             }
+            
+            window.commitGame();
         });
     }
 }

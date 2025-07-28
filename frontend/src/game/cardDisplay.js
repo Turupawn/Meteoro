@@ -23,6 +23,11 @@ export class CardDisplay {
             const winner = playerCard > houseCard ? "Player" : "House";
             
             this.currentGameText.setText(`Your card: ${playerCardDisplay} | House card: ${houseCardDisplay} | ${winner} wins!`);
+            
+            // End boost animation when results are displayed
+            if (this.scene.background && this.scene.background.endBoostAnimation) {
+                this.scene.background.endBoostAnimation();
+            }
         }
     }
 
