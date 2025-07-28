@@ -55,7 +55,30 @@ export class DepositButton {
 
         copyButton.on('pointerdown', () => {
             if (wallet) {
-                navigator.clipboard.writeText(wallet.address);
+                // Visual feedback
+                copyButton.setText("COPIED!");
+                copyButton.setFill("#00FF00");
+                
+                // Try modern clipboard API first
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(wallet.address)
+                        .then(() => {
+                            console.log("Address copied to clipboard");
+                        })
+                        .catch(err => {
+                            console.error("Failed to copy to clipboard:", err);
+                            this.fallbackCopy(wallet.address);
+                        });
+                } else {
+                    // Fallback for older browsers or mobile
+                    this.fallbackCopy(wallet.address);
+                }
+                
+                // Reset button after 2 seconds
+                setTimeout(() => {
+                    copyButton.setText("COPY");
+                    copyButton.setFill("#FF0000");
+                }, 2000);
             }
         });
 
@@ -68,5 +91,22 @@ export class DepositButton {
         };
 
         closeButton.on('pointerdown', closeClickHandler);
+    }
+
+    fallbackCopy(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            document.execCommand('copy');
+            console.log("Address copied to clipboard (fallback)");
+        } catch (err) {
+            console.error("Failed to copy to clipboard (fallback):", err);
+        }
+
+        document.body.removeChild(textArea);
     }
 }
