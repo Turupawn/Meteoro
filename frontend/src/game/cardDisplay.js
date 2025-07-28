@@ -5,10 +5,14 @@ export class CardDisplay {
     }
 
     createCardDisplay() {
-        // Current game display
-        this.currentGameText = this.scene.add.text(400, 400, "", {
-            font: "16px Arial",
-            fill: "#000000"
+        // Responsive current game display - positioned in center bottom
+        const x = this.scene.centerX;
+        const y = this.scene.screenHeight * 0.8; // 80% down the screen
+        const fontSize = Math.max(14, this.scene.screenWidth / 50); // Responsive font size
+        
+        this.currentGameText = this.scene.add.text(x, y, "", {
+            font: `${fontSize}px Arial`,
+            fill: "#FF0000"
         }).setOrigin(0.5);
     }
 

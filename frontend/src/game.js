@@ -4,6 +4,7 @@ import { PlayButton } from './game/playButton.js';
 import { BalanceText } from './game/balanceText.js';
 import { GameHistory } from './game/gameHistory.js';
 import { CardDisplay } from './game/cardDisplay.js';
+import { Background } from './game/background.js';
 
 class Screen extends Phaser.Scene {
     preload() {
@@ -11,17 +12,14 @@ class Screen extends Phaser.Scene {
     }
 
     create() {
-        // Simple white background
-        this.add.rectangle(400, 300, 800, 600, 0xffffff);
+        // Get screen dimensions
+        this.screenWidth = this.cameras.main.width;
+        this.screenHeight = this.cameras.main.height;
+        this.centerX = this.screenWidth / 2;
+        this.centerY = this.screenHeight / 2;
 
-        // Simple logo
-        this.add.image(400, 100, "logo").setScale(0.5);
-
-        // Simple title
-        this.add.text(400, 200, "WAR GAME", {
-            font: "24px Arial",
-            fill: "#000000"
-        }).setOrigin(0.5);
+        // Create background using the new class
+        this.background = new Background(this);
 
         // Create card display text using the new class
         this.cardDisplay = new CardDisplay(this);
@@ -60,14 +58,24 @@ class Screen extends Phaser.Scene {
 }
 
 const loadPhaser = async () => {
+    const container = document.querySelector(".container");
+    
+    // Get container dimensions or use window size
+    const width = container ? container.clientWidth : window.innerWidth;
+    const height = container ? container.clientHeight : window.innerHeight;
+    
     const config = {
         type: Phaser.AUTO,
-        parent: document.querySelector(".container"),
-        width: 800,
-        height: 600,
+        parent: container,
+        width: width,
+        height: height,
         scene: [Screen],
         title: "War Game",
         version: "1.0",
+        scale: {
+            mode: Phaser.Scale.RESIZE,
+            autoCenter: Phaser.Scale.CENTER_BOTH
+        }
     };
   
     const game = new Phaser.Game(config);

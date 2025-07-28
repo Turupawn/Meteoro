@@ -5,10 +5,14 @@ export class BalanceText {
     }
 
     createBalanceText() {
-        // Simple balance display
-        this.balanceText = this.scene.add.text(750, 20, "Loading...", {
-            font: "14px Arial",
-            fill: "#000000"
+        // Responsive balance display - positioned in top right
+        const x = this.scene.screenWidth - 20;
+        const y = 20;
+        const fontSize = Math.max(12, this.scene.screenWidth / 60); // Responsive font size
+        
+        this.balanceText = this.scene.add.text(x, y, "Loading...", {
+            font: `${fontSize}px Arial`,
+            fill: "#FF0000"
         }).setOrigin(1, 0);
     }
 

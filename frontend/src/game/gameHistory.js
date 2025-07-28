@@ -5,18 +5,25 @@ export class GameHistory {
     }
 
     createGameHistory() {
-        // Simple game history title
-        this.scene.add.text(20, 20, "Games:", {
-            font: "14px Arial",
-            fill: "#000000"
+        // Responsive game history title
+        const titleX = 20;
+        const titleY = 20;
+        const titleFontSize = Math.max(12, this.scene.screenWidth / 60);
+        
+        this.scene.add.text(titleX, titleY, "Games:", {
+            font: `${titleFontSize}px Arial`,
+            fill: "#FF0000"
         });
 
         // Pre-create text objects for game history (up to 10 games)
         this.gameHistoryTexts = [];
+        const historyFontSize = Math.max(10, this.scene.screenWidth / 70);
+        const lineHeight = Math.max(15, historyFontSize + 5);
+        
         for (let i = 0; i < 10; i++) {
-            const textObj = this.scene.add.text(20, 50 + i * 15, "", {
-                font: "12px Arial",
-                fill: "#000000"
+            const textObj = this.scene.add.text(titleX, titleY + 30 + i * lineHeight, "", {
+                font: `${historyFontSize}px Arial`,
+                fill: "#FF0000"
             });
             this.gameHistoryTexts.push(textObj);
         }

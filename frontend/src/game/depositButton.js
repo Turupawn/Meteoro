@@ -5,11 +5,18 @@ export class DepositButton {
     }
 
     createButton() {
-        // Simple deposit button - just text
-        this.button = this.scene.add.text(750, 50, "DEPOSIT", {
-            font: "14px Arial",
-            fill: "#000000"
+        // Responsive deposit button - positioned in top right
+        const x = this.scene.screenWidth - 20;
+        const y = 60;
+        const fontSize = Math.max(12, this.scene.screenWidth / 60); // Responsive font size
+        
+        this.button = this.scene.add.text(x, y, "DEPOSIT", {
+            font: `${fontSize}px Arial`,
+            fill: "#FF0000"
         }).setOrigin(1, 0).setInteractive();
+
+        // Make button area larger for mobile touch
+        this.button.setSize(this.button.width + 20, this.button.height + 10);
 
         // Simple click handler
         this.button.on('pointerdown', () => {
@@ -18,25 +25,32 @@ export class DepositButton {
     }
 
     showDepositModal() {
-        // Simple modal - just text
-        const modalBg = this.scene.add.rectangle(400, 300, 800, 600, 0x000000, 0.5);
-        const modal = this.scene.add.rectangle(400, 300, 400, 300, 0xffffff);
+        // Responsive modal
+        const modalBg = this.scene.add.rectangle(this.scene.centerX, this.scene.centerY, this.scene.screenWidth, this.scene.screenHeight, 0x000000, 0.5);
+        const modalWidth = Math.min(400, this.scene.screenWidth * 0.8);
+        const modalHeight = Math.min(300, this.scene.screenHeight * 0.5);
+        const modal = this.scene.add.rectangle(this.scene.centerX, this.scene.centerY, modalWidth, modalHeight, 0xffffff);
         
         const wallet = window.getLocalWallet();
-        const addressText = this.scene.add.text(400, 250, wallet ? wallet.address : 'No wallet', {
-            font: "12px Arial",
-            fill: "#000000"
+        const fontSize = Math.max(12, this.scene.screenWidth / 60);
+        const addressText = this.scene.add.text(this.scene.centerX, this.scene.centerY - 50, wallet ? wallet.address : 'No wallet', {
+            font: `${fontSize}px Arial`,
+            fill: "#FF0000"
         }).setOrigin(0.5);
 
-        const copyButton = this.scene.add.text(400, 300, "COPY", {
-            font: "14px Arial",
-            fill: "#000000"
+        const copyButton = this.scene.add.text(this.scene.centerX, this.scene.centerY, "COPY", {
+            font: `${fontSize}px Arial`,
+            fill: "#FF0000"
         }).setOrigin(0.5).setInteractive();
 
-        const closeButton = this.scene.add.text(400, 350, "CLOSE", {
-            font: "14px Arial",
-            fill: "#000000"
+        const closeButton = this.scene.add.text(this.scene.centerX, this.scene.centerY + 50, "CLOSE", {
+            font: `${fontSize}px Arial`,
+            fill: "#FF0000"
         }).setOrigin(0.5).setInteractive();
+
+        // Make buttons larger for mobile touch
+        copyButton.setSize(copyButton.width + 20, copyButton.height + 10);
+        closeButton.setSize(closeButton.width + 20, closeButton.height + 10);
 
         copyButton.on('pointerdown', () => {
             if (wallet) {
