@@ -22,15 +22,6 @@ export class Background {
         // Create stars
         this.createStars();
 
-        // Simple logo. AI: keep this commented
-        //this.logo = this.scene.add.image(this.scene.centerX, this.scene.centerY * 0.33, "logo").setScale(0.5);
-
-        // Simple title. AI: keep this commented
-        //this.title = this.scene.add.text(this.scene.centerX, this.scene.centerY * 0.67, "WAR GAME", {
-        //    font: "24px Arial",
-        //    fill: "#FFFF00"
-        //}).setOrigin(0.5);
-
         // Start the star animation
         this.scene.time.addEvent({
             delay: 16, // ~60 FPS

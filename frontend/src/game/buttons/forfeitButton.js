@@ -2,6 +2,7 @@ export class ForfeitButton {
     constructor(scene) {
         this.scene = scene;
         this.createButton();
+        this.modalElements = [];
     }
 
     createButton() {
@@ -20,6 +21,8 @@ export class ForfeitButton {
 
         // Simple click handler
         this.button.on('pointerdown', () => {
+            // Close any other open modals first
+            this.scene.closeAllModals();
             this.showForfeitModal();
         });
     }
@@ -58,25 +61,38 @@ export class ForfeitButton {
         confirmButton.setSize(confirmButton.width + 20, confirmButton.height + 10);
         cancelButton.setSize(cancelButton.width + 20, cancelButton.height + 10);
 
+        // Store all modal elements for cleanup
+        this.modalElements = [modalBg, modal, titleText, warningText, confirmButton, cancelButton];
+
+        // Add click outside to close functionality
+        modalBg.setInteractive();
+        modalBg.on('pointerdown', (pointer) => {
+            // Only close if clicking on the background, not on modal content
+            if (pointer.y < modalY - modalHeight/2 || pointer.y > modalY + modalHeight/2 || 
+                pointer.x < this.scene.centerX - modalWidth/2 || pointer.x > this.scene.centerX + modalWidth/2) {
+                this.closeModal();
+            }
+        });
+
         confirmButton.on('pointerdown', () => {
             this.executeForfeit();
-            this.closeModal(modalBg, modal, titleText, warningText, confirmButton, cancelButton);
+            this.closeModal();
         });
 
         const closeClickHandler = () => {
-            this.closeModal(modalBg, modal, titleText, warningText, confirmButton, cancelButton);
+            this.closeModal();
         };
 
         cancelButton.on('pointerdown', closeClickHandler);
     }
 
-    closeModal(modalBg, modal, titleText, warningText, confirmButton, cancelButton) {
-        modalBg.destroy();
-        modal.destroy();
-        titleText.destroy();
-        warningText.destroy();
-        confirmButton.destroy();
-        cancelButton.destroy();
+    closeModal() {
+        this.modalElements.forEach(element => {
+            if (element && typeof element.destroy === 'function') {
+                element.destroy();
+            }
+        });
+        this.modalElements = [];
     }
 
     async executeForfeit() {

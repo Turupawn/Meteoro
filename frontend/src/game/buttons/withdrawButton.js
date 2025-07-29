@@ -2,6 +2,7 @@ export class WithdrawButton {
     constructor(scene) {
         this.scene = scene;
         this.createButton();
+        this.modalElements = [];
     }
 
     createButton() {
@@ -20,6 +21,8 @@ export class WithdrawButton {
 
         // Simple click handler
         this.button.on('pointerdown', () => {
+            // Close any other open modals first
+            this.scene.closeAllModals();
             // Get balance from the scene's current balance
             const currentBalance = this.scene.currentBalance || null;
             this.showWithdrawModal(currentBalance);
@@ -79,6 +82,19 @@ export class WithdrawButton {
         withdrawButton.setSize(withdrawButton.width + 20, withdrawButton.height + 10);
         closeButton.setSize(closeButton.width + 20, closeButton.height + 10);
 
+        // Store all modal elements for cleanup
+        this.modalElements = [modalBg, modal, balanceText, withdrawButton, closeButton, inputField];
+
+        // Add click outside to close functionality
+        modalBg.setInteractive();
+        modalBg.on('pointerdown', (pointer) => {
+            // Only close if clicking on the background, not on modal content
+            if (pointer.y < modalY - modalHeight/2 || pointer.y > modalY + modalHeight/2 || 
+                pointer.x < this.scene.centerX - modalWidth/2 || pointer.x > this.scene.centerX + modalWidth/2) {
+                this.closeModal();
+            }
+        });
+
         withdrawButton.on('pointerdown', () => {
             const address = inputField.value.trim();
             if (address && address.startsWith('0x') && address.length === 42) {
@@ -87,16 +103,20 @@ export class WithdrawButton {
         });
 
         const closeClickHandler = () => {
-            modalBg.destroy();
-            modal.destroy();
-            balanceText.destroy();
-            withdrawButton.destroy();
-            closeButton.destroy();
-            if (inputField.parentNode) {
-                inputField.parentNode.removeChild(inputField);
-            }
+            this.closeModal();
         };
 
         closeButton.on('pointerdown', closeClickHandler);
+    }
+
+    closeModal() {
+        this.modalElements.forEach(element => {
+            if (element && typeof element.destroy === 'function') {
+                element.destroy();
+            } else if (element && element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
+        });
+        this.modalElements = [];
     }
 }
