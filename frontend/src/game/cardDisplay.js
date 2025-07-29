@@ -12,14 +12,16 @@ export class CardDisplay {
     }
 
     createCardDisplay() {
-        // Responsive current game display - positioned in center bottom
+        // Responsive current game display - positioned in top center
         const x = this.scene.centerX;
-        const y = this.scene.screenHeight * 0.8; // 80% down the screen
-        const fontSize = Math.max(14, this.scene.screenWidth / 50); // Responsive font size
+        const y = this.scene.screenHeight * 0.15; // 15% down from top
+        const fontSize = Math.max(18, this.scene.screenWidth / 40); // Larger font for readability
         
         this.currentGameText = this.scene.add.text(x, y, "", {
             font: `${fontSize}px Arial`,
-            fill: "#FF0000"
+            fill: "#FF0000",
+            stroke: "#000000",
+            strokeThickness: 2
         }).setOrigin(0.5);
     }
 
@@ -44,7 +46,7 @@ export class CardDisplay {
 
             // If player wins, trigger particle animation
             if (playerCard > houseCard) {
-                this.scene.time.delayedCall(2500, () => { // Wait for card animation to complete
+                this.scene.time.delayedCall(1000, () => { // Wait for card animation to complete
                     this.triggerWinParticleAnimation();
                 });
             }
@@ -68,14 +70,16 @@ export class CardDisplay {
         const startY2 = (Math.random() - 0.5) * this.scene.screenHeight * 2;
         
         // Create player card (left) - start from space
-        this.playerCardSprite = this.scene.add.image(leftCardX, cardY, "card")
-            .setScale(cardScale)
-            .setOrigin(0.5);
+        this.playerCardSprite = this.scene.add.image(startX1, startY1, "card")
+            .setScale(cardScale * 0.1) // Start very small
+            .setOrigin(0.5)
+            .setAlpha(0); // Start invisible
         
         // Create house card (right) - start from space
-        this.houseCardSprite = this.scene.add.image(rightCardX, cardY, "card")
-            .setScale(cardScale)
-            .setOrigin(0.5);
+        this.houseCardSprite = this.scene.add.image(startX2, startY2, "card")
+            .setScale(cardScale * 0.1) // Start very small
+            .setOrigin(0.5)
+            .setAlpha(0); // Start invisible
         
         // Add card numbers/text
         const fontSize = Math.max(24, this.scene.screenWidth / 30);
@@ -122,8 +126,8 @@ export class CardDisplay {
     }
 
     animateCardsFromSpace() {
-        const animationDuration = 1200; // Faster: 1.2 seconds instead of 2
-        const steps = 40; // Fewer steps for faster animation
+        const animationDuration = 600; // Much faster: 0.6 seconds
+        const steps = 20; // Fewer steps for faster animation
         const stepDuration = animationDuration / steps;
         
         let currentStep = 0;
@@ -199,26 +203,29 @@ export class CardDisplay {
     triggerWinParticleAnimation() {
         if (!this.houseCardSprite) return;
 
-        // Create MEGA FIREWORK effect that flows toward player POV
-        this.createFireworkToPlayerPOV();
-        
         // Add screen flash effect
         this.createScreenFlash();
         
         // Add card shake effect
         this.shakeHouseCard();
+        
+        // Create gold particles that flow toward player POV (ETH transfer)
+        const targetX = this.scene.centerX;
+        const targetY = this.scene.screenHeight + 100; // Below screen (approaching player)
+        this.createGoldFlowToPlayerPOV(this.houseCardSprite.x, this.houseCardSprite.y, targetX, targetY);
     }
 
     createFireworkToPlayerPOV() {
-        const houseX = this.houseCardSprite.x;
-        const houseY = this.houseCardSprite.y;
+        // Use center position instead of house card position
+        const explosionX = this.scene.centerX;
+        const explosionY = this.scene.centerY;
         
         // Target is center bottom (player POV - spaceship moving forward)
         const targetX = this.scene.centerX;
         const targetY = this.scene.screenHeight + 100; // Below screen (approaching player)
         
-        // MEGA FIREWORK explosion from house card
-        this.particleEmitter = this.scene.add.particles(houseX, houseY, 'card', {
+        // MEGA FIREWORK explosion from center
+        this.particleEmitter = this.scene.add.particles(explosionX, explosionY, 'card', {
             frame: 'card',
             lifespan: 2000,
             speed: { min: 300, max: 800 },
@@ -233,7 +240,7 @@ export class CardDisplay {
         });
 
         // Secondary sparkle explosion
-        const sparkleEmitter = this.scene.add.particles(houseX, houseY, 'card', {
+        const sparkleEmitter = this.scene.add.particles(explosionX, explosionY, 'card', {
             frame: 'card',
             lifespan: 1500,
             speed: { min: 200, max: 600 },
@@ -248,11 +255,11 @@ export class CardDisplay {
         });
 
         // Start the firework explosions
-        this.particleEmitter.explode(80, houseX, houseY);
-        sparkleEmitter.explode(60, houseX, houseY);
+        this.particleEmitter.explode(80, explosionX, explosionY);
+        sparkleEmitter.explode(60, explosionX, explosionY);
 
         // Create gold particles that flow toward player POV (ETH transfer)
-        this.createGoldFlowToPlayerPOV(houseX, houseY, targetX, targetY);
+        this.createGoldFlowToPlayerPOV(explosionX, explosionY, targetX, targetY);
 
         // Clean up emitters
         this.scene.time.delayedCall(4000, () => {
@@ -265,31 +272,55 @@ export class CardDisplay {
     }
 
     createGoldFlowToPlayerPOV(startX, startY, targetX, targetY) {
-        // Create MASSIVE amount of gold particles flowing toward player POV
-        for (let i = 0; i < 100; i++) { // 100 particles!
-            const delay = Math.random() * 1000; // Stagger the particles
+        // Create FIREWORK effect: particles explode outward first, then flow to player
+        for (let i = 0; i < 40; i++) { // Fewer particles for cleaner effect
+            const delay = Math.random() * 50; // Much faster initial explosion
             
             this.scene.time.delayedCall(delay, () => {
                 // Create 3D-looking rotating gold cube
-                const cubeSize = 6 + Math.random() * 10; // Bigger cubes 6-16
+                const cubeSize = 8 + Math.random() * 12; // Bigger cubes 8-20
                 const cubeFaces = this.create3DCube(startX, startY, cubeSize);
                 
-                // Calculate path toward player POV with some randomness
-                const pathX = startX + (targetX - startX) * (0.3 + Math.random() * 0.7);
-                const pathY = startY + (targetY - startY) * (0.3 + Math.random() * 0.7);
+                // Calculate random explosion direction (360 degrees)
+                const explosionAngle = Math.random() * Math.PI * 2;
+                const explosionDistance = 150 + Math.random() * 200; // Explode 150-350 pixels away
+                const explosionX = startX + Math.cos(explosionAngle) * explosionDistance;
+                const explosionY = startY + Math.sin(explosionAngle) * explosionDistance;
                 
-                // Animate each face toward player POV with growing size and rotation
+                // PHASE 1: Explode outward to random positions
                 cubeFaces.forEach((face, index) => {
-                    this.scene.tweens.add({
-                        targets: face,
-                        x: targetX + (Math.random() - 0.5) * 100,
-                        y: targetY + (Math.random() - 0.5) * 50,
-                        scale: 3 + Math.random() * 4, // Cubes get MUCH bigger as they approach player
-                        alpha: 0,
-                        duration: 2500 + Math.random() * 1500,
-                        ease: 'Power2',
+                    // Add slight randomness to explosion position
+                    const randomOffsetX = (Math.random() - 0.5) * 60;
+                    const randomOffsetY = (Math.random() - 0.5) * 60;
+                    
+                                    this.scene.tweens.add({
+                    targets: face,
+                    x: explosionX + randomOffsetX,
+                    y: explosionY + randomOffsetY,
+                    scale: 1.5 + Math.random() * 2, // Grow during explosion
+                    alpha: 1,
+                    duration: 400 + Math.random() * 200, // Much faster explosion
+                    ease: 'Power2',
                         onComplete: () => {
-                            face.destroy();
+                            // PHASE 2: Stay in place for a moment (0.2-0.4 seconds)
+                            this.scene.time.delayedCall(200 + Math.random() * 200, () => {
+                                // PHASE 3: Flow toward player POV
+                                const finalTargetX = targetX + (Math.random() - 0.5) * 120;
+                                const finalTargetY = targetY + (Math.random() - 0.5) * 60;
+                                
+                                this.scene.tweens.add({
+                                    targets: face,
+                                    x: finalTargetX,
+                                    y: finalTargetY,
+                                    scale: 4 + Math.random() * 6, // Much bigger as they approach player
+                                    alpha: 0,
+                                    duration: 1000 + Math.random() * 500,
+                                    ease: 'Power2',
+                                    onComplete: () => {
+                                        face.destroy();
+                                    }
+                                });
+                            });
                         }
                     });
                     
@@ -297,7 +328,7 @@ export class CardDisplay {
                     this.scene.tweens.add({
                         targets: face,
                         angle: 360,
-                        duration: 800 + Math.random() * 600,
+                        duration: 600 + Math.random() * 400,
                         ease: 'Linear',
                         repeat: -1 // Infinite rotation
                     });
@@ -306,24 +337,46 @@ export class CardDisplay {
         }
 
         // Create additional sparkle trail effect with 3D cubes
-        for (let i = 0; i < 50; i++) {
-            const delay = 500 + Math.random() * 1500;
+        for (let i = 0; i < 25; i++) {
+            const delay = 25 + Math.random() * 75;
             
             this.scene.time.delayedCall(delay, () => {
-                const sparkleFaces = this.create3DCube(startX, startY, 4);
-                sparkleFaces.forEach(face => face.setAlpha(0.8));
+                const sparkleFaces = this.create3DCube(startX, startY, 5);
+                sparkleFaces.forEach(face => face.setAlpha(0.9));
+                
+                // Calculate sparkle explosion direction
+                const sparkleAngle = Math.random() * Math.PI * 2;
+                const sparkleDistance = 100 + Math.random() * 150;
+                const sparkleX = startX + Math.cos(sparkleAngle) * sparkleDistance;
+                const sparkleY = startY + Math.sin(sparkleAngle) * sparkleDistance;
                 
                 sparkleFaces.forEach((face, index) => {
+                    // PHASE 1: Explode outward
                     this.scene.tweens.add({
                         targets: face,
-                        x: targetX + (Math.random() - 0.5) * 80,
-                        y: targetY + (Math.random() - 0.5) * 40,
-                        scale: 2.5, // Sparkles also get bigger
-                        alpha: 0,
-                        duration: 2000 + Math.random() * 1000,
+                        x: sparkleX + (Math.random() - 0.5) * 40,
+                        y: sparkleY + (Math.random() - 0.5) * 40,
+                        scale: 1.2 + Math.random() * 1.5,
+                        alpha: 0.8,
+                        duration: 300 + Math.random() * 150,
                         ease: 'Power2',
                         onComplete: () => {
-                            face.destroy();
+                            // PHASE 2: Stay in place briefly
+                            this.scene.time.delayedCall(150 + Math.random() * 150, () => {
+                                // PHASE 3: Flow to player
+                                this.scene.tweens.add({
+                                    targets: face,
+                                    x: targetX + (Math.random() - 0.5) * 100,
+                                    y: targetY + (Math.random() - 0.5) * 50,
+                                    scale: 3.5, // Sparkles also get bigger
+                                    alpha: 0,
+                                    duration: 900 + Math.random() * 400,
+                                    ease: 'Power2',
+                                    onComplete: () => {
+                                        face.destroy();
+                                    }
+                                });
+                            });
                         }
                     });
                     
@@ -331,7 +384,7 @@ export class CardDisplay {
                     this.scene.tweens.add({
                         targets: face,
                         angle: 720, // Double rotation
-                        duration: 1200 + Math.random() * 600,
+                        duration: 1000 + Math.random() * 500,
                         ease: 'Linear'
                     });
                 });

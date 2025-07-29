@@ -5,18 +5,20 @@ export class PlayButton {
     }
 
     createButton() {
-        // Responsive play button - positioned in center
+        // Responsive play button - positioned in bottom center
         const x = this.scene.centerX;
-        const y = this.scene.centerY;
-        const fontSize = Math.max(18, this.scene.screenWidth / 40); // Responsive font size
+        const y = this.scene.screenHeight * 0.85; // 85% down the screen
+        const fontSize = Math.max(28, this.scene.screenWidth / 25); // Much larger font
         
         this.button = this.scene.add.text(x, y, "PLAY", {
             font: `${fontSize}px Arial`,
-            fill: "#FF0000"
+            fill: "#FF0000",
+            stroke: "#000000",
+            strokeThickness: 3
         }).setOrigin(0.5).setInteractive();
 
-        // Make button area larger for mobile touch
-        this.button.setSize(this.button.width + 40, this.button.height + 20);
+        // Make button area much larger for mobile touch
+        this.button.setSize(this.button.width + 120, this.button.height + 60);
 
         // Simple click handler
         this.button.on('pointerdown', () => {
