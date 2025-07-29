@@ -1,7 +1,7 @@
-import { DepositButton } from './game/depositButton.js';
-import { WithdrawButton } from './game/withdrawButton.js';
-import { ForfeitButton } from './game/forfeitButton.js';
-import { PlayButton } from './game/playButton.js';
+import { DepositButton } from './game/buttons/depositButton.js';
+import { WithdrawButton } from './game/buttons/withdrawButton.js';
+import { ForfeitButton } from './game/buttons/forfeitButton.js';
+import { PlayButton } from './game/buttons/playButton.js';
 import { BalanceText } from './game/balanceText.js';
 import { GameHistory } from './game/gameHistory.js';
 import { CardDisplay } from './game/cardDisplay.js';
@@ -9,7 +9,20 @@ import { Background } from './game/background.js';
 
 class Screen extends Phaser.Scene {
     preload() {
-        this.load.image("logo", "/g20.png");
+        this.load.image("card", "/g20.png");
+    }
+
+    closeAllModals() {
+        // Close all button modals
+        if (this.depositButton) {
+            this.depositButton.closeModal();
+        }
+        if (this.withdrawButton) {
+            this.withdrawButton.closeModal();
+        }
+        if (this.forfeitButton) {
+            this.forfeitButton.closeModal();
+        }
     }
 
     create() {

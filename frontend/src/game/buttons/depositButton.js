@@ -2,6 +2,7 @@ export class DepositButton {
     constructor(scene) {
         this.scene = scene;
         this.createButton();
+        this.modalElements = [];
     }
 
     createButton() {
@@ -20,6 +21,8 @@ export class DepositButton {
 
         // Simple click handler
         this.button.on('pointerdown', () => {
+            // Close any other open modals first
+            this.scene.closeAllModals();
             this.showDepositModal();
         });
     }
@@ -28,7 +31,7 @@ export class DepositButton {
         // Responsive modal - positioned at top center
         const modalBg = this.scene.add.rectangle(this.scene.centerX, this.scene.centerY, this.scene.screenWidth, this.scene.screenHeight, 0x000000, 0.5);
         const modalWidth = Math.min(400, this.scene.screenWidth * 0.8);
-        const modalHeight = Math.min(300, this.scene.screenHeight * 0.5);
+        const modalHeight = Math.min(350, this.scene.screenHeight * 0.6); // Increased height for faucet link
         const modalY = this.scene.screenHeight * 0.2; // Position at 20% from top
         const modal = this.scene.add.rectangle(this.scene.centerX, modalY, modalWidth, modalHeight, 0xffffff);
         
@@ -36,7 +39,7 @@ export class DepositButton {
         const fontSize = Math.max(12, this.scene.screenWidth / 60);
         
         // Title text
-        const titleText = this.scene.add.text(this.scene.centerX, modalY - 60, "DEPOSIT ADDRESS", {
+        const titleText = this.scene.add.text(this.scene.centerX, modalY - 80, "DEPOSIT ADDRESS", {
             font: `${fontSize}px Arial`,
             fill: "#000000"
         }).setOrigin(0.5);
@@ -48,7 +51,7 @@ export class DepositButton {
         addressInput.readOnly = true;
         addressInput.style.position = 'absolute';
         addressInput.style.left = `${this.scene.centerX - 150}px`;
-        addressInput.style.top = `${modalY - 20}px`;
+        addressInput.style.top = `${modalY - 40}px`;
         addressInput.style.width = '300px';
         addressInput.style.fontSize = `${fontSize}px`;
         addressInput.style.padding = '8px';
@@ -60,12 +63,29 @@ export class DepositButton {
         document.body.appendChild(addressInput);
 
         // Instructions text
-        const instructionText = this.scene.add.text(this.scene.centerX, modalY + 20, "Long press to copy address", {
+        const instructionText = this.scene.add.text(this.scene.centerX, modalY + 10, "Long press to copy address", {
             font: `${fontSize - 2}px Arial`,
             fill: "#666666"
         }).setOrigin(0.5);
 
-        const closeButton = this.scene.add.text(this.scene.centerX, modalY + 60, "CLOSE", {
+        // Faucet link
+        const faucetText = this.scene.add.text(this.scene.centerX, modalY + 50, "Get test tokens from faucet:", {
+            font: `${fontSize - 2}px Arial`,
+            fill: "#666666"
+        }).setOrigin(0.5);
+
+        const faucetLink = this.scene.add.text(this.scene.centerX, modalY + 80, "https://testnet.megaeth.com/", {
+            font: `${fontSize - 2}px Arial`,
+            fill: "#0066CC"
+        }).setOrigin(0.5).setInteractive();
+
+        // Make faucet link clickable
+        faucetLink.setSize(faucetLink.width + 20, faucetLink.height + 10);
+        faucetLink.on('pointerdown', () => {
+            window.open('https://testnet.megaeth.com/', '_blank');
+        });
+
+        const closeButton = this.scene.add.text(this.scene.centerX, modalY + 120, "CLOSE", {
             font: `${fontSize}px Arial`,
             fill: "#FF0000"
         }).setOrigin(0.5).setInteractive();
@@ -73,18 +93,35 @@ export class DepositButton {
         // Make button larger for mobile touch
         closeButton.setSize(closeButton.width + 20, closeButton.height + 10);
 
-        const closeClickHandler = () => {
-            modalBg.destroy();
-            modal.destroy();
-            titleText.destroy();
-            instructionText.destroy();
-            closeButton.destroy();
-            if (addressInput.parentNode) {
-                addressInput.parentNode.removeChild(addressInput);
+        // Store all modal elements for cleanup
+        this.modalElements = [modalBg, modal, titleText, instructionText, faucetText, faucetLink, closeButton, addressInput];
+
+        // Add click outside to close functionality
+        modalBg.setInteractive();
+        modalBg.on('pointerdown', (pointer) => {
+            // Only close if clicking on the background, not on modal content
+            if (pointer.y < modalY - modalHeight/2 || pointer.y > modalY + modalHeight/2 || 
+                pointer.x < this.scene.centerX - modalWidth/2 || pointer.x > this.scene.centerX + modalWidth/2) {
+                this.closeModal();
             }
+        });
+
+        const closeClickHandler = () => {
+            this.closeModal();
         };
 
         closeButton.on('pointerdown', closeClickHandler);
+    }
+
+    closeModal() {
+        this.modalElements.forEach(element => {
+            if (element && typeof element.destroy === 'function') {
+                element.destroy();
+            } else if (element && element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
+        });
+        this.modalElements = [];
     }
 
     fallbackCopy(text) {
