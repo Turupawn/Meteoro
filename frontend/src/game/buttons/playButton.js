@@ -17,6 +17,9 @@ export class PlayButton {
             strokeThickness: 3
         }).setOrigin(0.5).setInteractive();
 
+        // Set high depth to ensure it's on top
+        this.button.setDepth(200);
+
         // Make button area much larger for mobile touch
         this.button.setSize(this.button.width + 120, this.button.height + 60);
 
