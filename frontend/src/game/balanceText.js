@@ -5,32 +5,75 @@ export class BalanceText {
     }
 
     createBalanceText() {
-        // Responsive balance display - positioned in top right
-        const x = this.scene.screenWidth - 20;
-        const y = 20;
-        const fontSize = Math.max(12, this.scene.screenWidth / 60); // Responsive font size
+        // Create a render texture for the balance display - much bigger
+        this.renderTexture = this.scene.add.renderTexture(0, 0, 600, 220);
         
-        this.balanceText = this.scene.add.text(x, y, "Loading...", {
-            font: `${fontSize}px Arial`,
-            fill: "#FF0000"
-        }).setOrigin(1, 0);
+        // Create the text content first - much bigger font
+        const balanceText = this.scene.add.text(0, 0, 'Balance: 0 ETH', {
+            font: 'bold 36px Courier New',
+            fill: '#00FFFF',
+            stroke: '#000000',
+            strokeThickness: 4
+        });
+        balanceText.setVisible(false);
+
+        // Draw text to render texture
+        this.renderTexture.draw(balanceText, 20, 30);
+        balanceText.destroy();
+
+        // Save the texture
+        this.renderTexture.saveTexture('balanceTexture');
+
+        // Create quad image with the texture - positioned in top right, much bigger
+        this.quadImage = this.scene.add.rexQuadImage(this.scene.screenWidth - 150, 200, 'balanceTexture');
+        
+        // Make sure it's visible and has proper size
+        this.quadImage.setVisible(true);
+        this.quadImage.setAlpha(1);
+        
+        // Apply perspective effect like game history - more pronounced
+        this.quadImage.topRight.x -= 100;
+        this.quadImage.topRight.y -= 100;
+        this.quadImage.bottomRight.x -= 100;
+        this.quadImage.bottomRight.y -= 100;
     }
 
     updateBalance(balance = null) {
-        // Update balance using passed parameter
+        if (!this.renderTexture) {
+            return;
+        }
+
+        // Clear the render texture
+        this.renderTexture.clear();
+
+        // Create balance text - much bigger font
+        let balanceString = "Balance: 0 ETH";
         if (balance !== null) {
             try {
                 if (window.web3 && window.web3.utils) {
                     const balanceInEth = window.web3.utils.fromWei(balance, 'ether');
-                    this.balanceText.setText(`Balance: ${parseFloat(balanceInEth).toFixed(6)} ETH`);
+                    balanceString = `Balance: ${parseFloat(balanceInEth).toFixed(6)} ETH`;
                 } else {
-                    this.balanceText.setText(`Balance: ${balance} wei`);
+                    balanceString = `Balance: ${balance} wei`;
                 }
             } catch (error) {
-                this.balanceText.setText(`Balance: ${balance} wei`);
+                balanceString = `Balance: ${balance} wei`;
             }
-        } else {
-            this.balanceText.setText("Balance: 0 ETH");
+        }
+
+        const balanceText = this.scene.add.text(0, 0, balanceString, {
+            font: 'bold 36px Courier New',
+            fill: '#00FFFF',
+            stroke: '#000000',
+            strokeThickness: 4
+        });
+        balanceText.setVisible(false);
+        this.renderTexture.draw(balanceText, 20, 30);
+        balanceText.destroy();
+
+        // Update the quad image texture
+        if (this.quadImage) {
+            this.quadImage.setTexture('balanceTexture');
         }
     }
 }

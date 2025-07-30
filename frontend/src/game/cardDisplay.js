@@ -209,9 +209,9 @@ export class CardDisplay {
         // Add card shake effect
         this.shakeHouseCard();
         
-        // Create gold particles that flow toward player POV (ETH transfer)
-        const targetX = this.scene.centerX;
-        const targetY = this.scene.screenHeight + 100; // Below screen (approaching player)
+        // Create gold particles that flow toward balance text (ETH transfer)
+        const targetX = this.scene.screenWidth - 150; // Balance text X position
+        const targetY = 200; // Balance text Y position
         this.createGoldFlowToPlayerPOV(this.houseCardSprite.x, this.houseCardSprite.y, targetX, targetY);
     }
 
@@ -220,9 +220,9 @@ export class CardDisplay {
         const explosionX = this.scene.centerX;
         const explosionY = this.scene.centerY;
         
-        // Target is center bottom (player POV - spaceship moving forward)
-        const targetX = this.scene.centerX;
-        const targetY = this.scene.screenHeight + 100; // Below screen (approaching player)
+        // Target is balance text position
+        const targetX = this.scene.screenWidth - 150;
+        const targetY = 200;
         
         // MEGA FIREWORK explosion from center
         this.particleEmitter = this.scene.add.particles(explosionX, explosionY, 'card', {
@@ -258,7 +258,7 @@ export class CardDisplay {
         this.particleEmitter.explode(80, explosionX, explosionY);
         sparkleEmitter.explode(60, explosionX, explosionY);
 
-        // Create gold particles that flow toward player POV (ETH transfer)
+        // Create gold particles that flow toward balance text (ETH transfer)
         this.createGoldFlowToPlayerPOV(explosionX, explosionY, targetX, targetY);
 
         // Clean up emitters
@@ -272,7 +272,7 @@ export class CardDisplay {
     }
 
     createGoldFlowToPlayerPOV(startX, startY, targetX, targetY) {
-        // Create FIREWORK effect: particles explode outward first, then flow to player
+        // Create FIREWORK effect: particles explode outward first, then flow to balance text
         for (let i = 0; i < 40; i++) { // Fewer particles for cleaner effect
             const delay = Math.random() * 50; // Much faster initial explosion
             
@@ -293,18 +293,18 @@ export class CardDisplay {
                     const randomOffsetX = (Math.random() - 0.5) * 60;
                     const randomOffsetY = (Math.random() - 0.5) * 60;
                     
-                                    this.scene.tweens.add({
-                    targets: face,
-                    x: explosionX + randomOffsetX,
-                    y: explosionY + randomOffsetY,
-                    scale: 1.5 + Math.random() * 2, // Grow during explosion
-                    alpha: 1,
-                    duration: 400 + Math.random() * 200, // Much faster explosion
-                    ease: 'Power2',
+                    this.scene.tweens.add({
+                        targets: face,
+                        x: explosionX + randomOffsetX,
+                        y: explosionY + randomOffsetY,
+                        scale: 1.5 + Math.random() * 2, // Grow during explosion
+                        alpha: 1,
+                        duration: 400 + Math.random() * 200, // Much faster explosion
+                        ease: 'Power2',
                         onComplete: () => {
                             // PHASE 2: Stay in place for a moment (0.2-0.4 seconds)
                             this.scene.time.delayedCall(200 + Math.random() * 200, () => {
-                                // PHASE 3: Flow toward player POV
+                                // PHASE 3: Flow toward balance text
                                 const finalTargetX = targetX + (Math.random() - 0.5) * 120;
                                 const finalTargetY = targetY + (Math.random() - 0.5) * 60;
                                 
@@ -312,7 +312,7 @@ export class CardDisplay {
                                     targets: face,
                                     x: finalTargetX,
                                     y: finalTargetY,
-                                    scale: 4 + Math.random() * 6, // Much bigger as they approach player
+                                    scale: 4 + Math.random() * 6, // Much bigger as they approach balance text
                                     alpha: 0,
                                     duration: 1000 + Math.random() * 500,
                                     ease: 'Power2',
@@ -363,7 +363,7 @@ export class CardDisplay {
                         onComplete: () => {
                             // PHASE 2: Stay in place briefly
                             this.scene.time.delayedCall(150 + Math.random() * 150, () => {
-                                // PHASE 3: Flow to player
+                                // PHASE 3: Flow to balance text
                                 this.scene.tweens.add({
                                     targets: face,
                                     x: targetX + (Math.random() - 0.5) * 100,
