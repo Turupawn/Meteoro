@@ -30,4 +30,4 @@ export function printLog(levels, ...args) {
     } else {
         console.log(...args);
     }
-} 
+}

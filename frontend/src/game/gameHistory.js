@@ -36,16 +36,30 @@ export class GameHistory {
         this.renderTexture.saveTexture('gameHistoryTexture');
 
         // Create quad image with the texture - moved to the left
-        this.quadImage = this.scene.add.rexQuadImage(200, 300, 'gameHistoryTexture');
+        this.quadImage = this.scene.add.rexQuadImage({
+                x: 200,
+                y: 200,
+                texture: 'gameHistoryTexture',
+                ninePointMode: true
+            
+        });
+
+        this.quadImage.setScale(10,10);
+
+        let perspectiveX = this.quadImage.topLeft.x + 1300;
+        let perspectiveY = this.quadImage.topLeft.y + 300;
         
-        // Make sure it's visible and has proper size
-        this.quadImage.setVisible(true);
-        this.quadImage.setAlpha(1);
-        
-        this.quadImage.topRight.x -= 100;
-        this.quadImage.topRight.y += 100;
-        this.quadImage.bottomRight.x -= 100;
-        this.quadImage.bottomRight.y += 100;
+        this.quadImage.topCenter.y = this.applyPerspective(this.quadImage.topLeft.x, this.quadImage.topLeft.y, perspectiveX, perspectiveY, this.quadImage.topCenter.x);
+        this.quadImage.topRight.y = this.applyPerspective(this.quadImage.topLeft.x, this.quadImage.topLeft.y, perspectiveX, perspectiveY, this.quadImage.topRight.x);
+        this.quadImage.center.y = this.applyPerspective(this.quadImage.centerLeft.x, this.quadImage.centerLeft.y, perspectiveX, perspectiveY, this.quadImage.center.x);
+        this.quadImage.centerRight.y = this.applyPerspective(this.quadImage.centerLeft.x, this.quadImage.centerLeft.y, perspectiveX, perspectiveY, this.quadImage.centerRight.x);
+        this.quadImage.bottomCenter.y = this.applyPerspective(this.quadImage.bottomLeft.x, this.quadImage.bottomLeft.y, perspectiveX, perspectiveY, this.quadImage.bottomCenter.x);
+        this.quadImage.bottomRight.y = this.applyPerspective(this.quadImage.bottomLeft.x, this.quadImage.bottomLeft.y, perspectiveX, perspectiveY, this.quadImage.bottomRight.x);
+    }
+
+    applyPerspective(fixedPointAX, fixedPointAY, fixedPointBX, fixedPointBY, calculatedPointX) {
+        let m = (fixedPointBY - fixedPointAY) / (fixedPointBX - fixedPointAX);
+        return m * (calculatedPointX - fixedPointAX) + fixedPointAY;
     }
 
     updateGameHistory(recentHistory = null, playerAddress = null) {
