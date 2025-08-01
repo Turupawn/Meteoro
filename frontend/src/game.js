@@ -65,6 +65,8 @@ class Screen extends Phaser.Scene {
 
         // Create generic menu (LAST, so it's on top)
         this.genericMenu = new GenericMenu(this);
+
+        console.log("finished screen");
     }
 
     updateDisplay(balance = null, recentHistory = null, playerAddress = null) {

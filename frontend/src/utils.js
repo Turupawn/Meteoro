@@ -73,9 +73,6 @@ export function applyPerspectiveToQuadImageToDown(quadImage, perspectiveX, persp
     let deltaCenter = quadImage.bottomCenter.x - oldCenter;
     let deltaRight = quadImage.bottomRight.x - oldRight;
 
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.log(deltaLeft, deltaCenter, deltaRight);
-
     //quadImage.center.y += deltaLeft;
 
 }
