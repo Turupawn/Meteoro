@@ -1,3 +1,5 @@
+import { applyPerspectiveToQuadImageToRight } from '../utils.js';
+
 export class GameHistory {
     constructor(scene) {
         this.scene = scene;
@@ -6,14 +8,24 @@ export class GameHistory {
 
     createGameHistory() {
         // Create a render texture for the game history - made it bigger
+        console.log("starting game history");
+
         this.renderTexture = this.scene.add.renderTexture(0, 0, 300, 400);
         
-        // Create the text content first
+        // Create the text content first with Orbitron font - Metroid Prime style
         const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
-            font: 'bold 24px Courier New',
-            fill: '#00FFFF',
-            stroke: '#000000',
-            strokeThickness: 2
+            font: 'bold 28px Orbitron',
+            fill: '#E0F6FF', // Same as balance text
+            stroke: '#0066CC', // Same as balance text
+            strokeThickness: 2,
+            alpha: 0.9, // Same transparency as balance text
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#003366',
+                blur: 4,
+                fill: true
+            }
         });
         titleText.setVisible(false);
 
@@ -21,12 +33,13 @@ export class GameHistory {
         this.renderTexture.draw(titleText, 10, 10);
         titleText.destroy();
 
-        // Add sample text for testing
-        const sampleText = this.scene.add.text(0, 0, 'WIN 10-5\nLOSS 3-8\nWIN Q-6', {
-            font: '18px Courier New',
-            fill: '#00FF00',
-            stroke: '#000000',
-            strokeThickness: 1
+        // Add sample text for testing with Orbitron font
+        const sampleText = this.scene.add.text(0, 0, '', {
+            font: '18px Orbitron', // Changed to Orbitron font
+            fill: '#E0F6FF', // Same as balance text
+            stroke: '#0066CC', // Same as balance text
+            strokeThickness: 1,
+            alpha: 0.9 // Same transparency as balance text
         });
         sampleText.setVisible(false);
         this.renderTexture.draw(sampleText, 10, 40);
@@ -36,16 +49,23 @@ export class GameHistory {
         this.renderTexture.saveTexture('gameHistoryTexture');
 
         // Create quad image with the texture - moved to the left
-        this.quadImage = this.scene.add.rexQuadImage(200, 300, 'gameHistoryTexture');
-        
-        // Make sure it's visible and has proper size
-        this.quadImage.setVisible(true);
-        this.quadImage.setAlpha(1);
-        
-        this.quadImage.topRight.x -= 100;
-        this.quadImage.topRight.y += 100;
-        this.quadImage.bottomRight.x -= 100;
-        this.quadImage.bottomRight.y += 100;
+        this.quadImage = this.scene.add.rexQuadImage({
+                x: 236+50,
+                y: 300,
+                texture: 'gameHistoryTexture',
+                ninePointMode: true
+            
+        });
+
+        this.quadImage.setScale(16,16);
+        this.quadImage.setAlpha(0.85); // Same transparency as balance text
+
+        let perspectiveX = this.quadImage.topLeft.x + 1200;
+        let perspectiveY = this.quadImage.topLeft.y + 300;
+
+        applyPerspectiveToQuadImageToRight(this.quadImage, perspectiveX, perspectiveY);
+        console.log("finished game history");
+
     }
 
     updateGameHistory(recentHistory = null, playerAddress = null) {
@@ -60,18 +80,26 @@ export class GameHistory {
         // Clear the render texture
         this.renderTexture.clear();
 
-        // Create title text
+        // Create title text with Orbitron font - same styling as balance text
         const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
-            font: 'bold 24px Courier New',
-            fill: '#00FFFF',
-            stroke: '#000000',
-            strokeThickness: 2
+            font: 'bold 24px Orbitron',
+            fill: '#E0F6FF', // Same as balance text
+            stroke: '#0066CC', // Same as balance text
+            strokeThickness: 2,
+            alpha: 0.9, // Same transparency as balance text
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#003366',
+                blur: 4,
+                fill: true
+            }
         });
         titleText.setVisible(false);
         this.renderTexture.draw(titleText, 10, 10);
         titleText.destroy();
 
-        // Add game entries
+        // Add game entries with Orbitron font - same styling as balance text
         let yOffset = 40;
         recentHistory.forEach((game, index) => {
             // Check for different possible result formats
@@ -92,18 +120,19 @@ export class GameHistory {
                 }
             }
             
-            const color = isWin ? '#00FF00' : '#FF4444';
-            const result = isWin ? 'WIN' : 'LOSS';
             const score = `${game.playerCard}-${game.houseCard}`;
             
-            const gameText = this.scene.add.text(0, 0, `${result} ${score}`, {
-                font: '18px Courier New',
-                fill: color,
-                stroke: '#000000',
-                strokeThickness: 1
+            // Create the game text with win/loss color styling
+            const textColor = isWin ? '#00FF00' : '#FF4444'; // Green for win, red for loss
+            const gameText = this.scene.add.text(0, 0, score, {
+                font: '18px Orbitron',
+                fill: textColor, // Color based on win/loss
+                stroke: '#0066CC', // Same as balance text
+                strokeThickness: 1,
+                alpha: 0.9 // Same transparency as balance text
             });
             gameText.setVisible(false);
-            this.renderTexture.draw(gameText, 10, yOffset);
+            this.renderTexture.draw(gameText, 10, yOffset); // Back to original position
             gameText.destroy();
             
             yOffset += 25;

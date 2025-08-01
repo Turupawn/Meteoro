@@ -3,6 +3,12 @@
 <head>
   <meta charset="utf-8">
   <title>War Card Game</title>
+  
+  <!-- Google Fonts - Orbitron -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
+  
   <style>
     body {
       margin: 0;
@@ -21,56 +27,7 @@
   <!-- Main content expanded to fill most of the screen -->
   <div style="display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw;">
     <!-- Card Display Section - much larger -->
-    <div style="text-align: center;">
-      <div id="game-status" style="font-size: 36px; margin-top: 20px; font-weight: bold; color: #333;"></div>
-    </div>
   </div>
-  
-  <!-- Toggle details button - moved to bottom left -->
-  <div style="position: fixed; bottom: 10px; left: 10px; z-index: 10;">
-    <input type="button" value="Show Details" id="main-toggle-button" onclick="toggleDetails()" style="font-size: 14px; padding: 8px 12px; cursor: pointer;">
-  </div>
-  
-  <!-- Single collapsible content section - adjusted for controls only, no logs -->
-  <div id="details-content" style="display: none; position: fixed; bottom: 50px; left: 10px; z-index: 10;">
-    <input type="button" value="Reveal Cards" onclick="_reveal()" style="font-size: 14px; margin-bottom: 5px; display: block; width: 120px; cursor: pointer;"></input>
-    <input type="button" value="Forfeit Game" onclick="_forfeit()" style="font-size: 14px; margin-bottom: 5px; display: block; width: 120px; cursor: pointer;"></input>
-    <input type="button" value="Clear Secret" onclick="_clearSecret()" style="font-size: 14px; margin-bottom: 5px; display: block; width: 120px; cursor: pointer;"></input>
-  </div>
-  
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
-
-<script>
-  function _reveal() {
-    const wallet = getLocalWallet();
-    const secretData = getStoredSecret();
-    if (wallet && secretData) {
-      performReveal(wallet, secretData.secret);
-    } else {
-      alert("No wallet or secret found!");
-    }
-  }
-
-  function _clearSecret() {
-    clearStoredSecret();
-  }
-
-  function _forfeit() {
-    window.forfeitGame();
-  }
-
-  function toggleDetails() {
-    const content = document.getElementById("details-content");
-    const button = document.getElementById("main-toggle-button");
-    
-    if (content.style.display === "none") {
-      content.style.display = "block";
-      button.value = "Hide Details";
-    } else {
-      content.style.display = "none";
-      button.value = "Show Details v0.33.42";
-    }
-  }
-</script>

@@ -37,7 +37,6 @@ async function loadDapp() {
     onContractInitCallback();
   } catch (error) {
     console.error("Error initializing contract:", error);
-    document.getElementById("game-status").textContent = "Error connecting to blockchain";
   }
 }
 
@@ -148,8 +147,6 @@ async function gameLoop() {
             } else if ( gameState.gameState === 0n /* NotStarted */ ||
                         gameState.gameState === 3n /* Revealed */   ||
                         gameState.gameState === 4n /* Forfeited */) {
-                document.getElementById("game-status").textContent = "Please wait...";
-
                 const secret = generateRandomBytes32();
                 storeCommit(secret);
                 commitStartTime = Date.now();
@@ -178,19 +175,8 @@ async function gameLoop() {
 async function updateGameState() {
     try {
         if (!gameState) return;
-        const gameStateElement = document.getElementById("game-state");
-        if (gameStateElement) {
-            let stateText = `Game State: ${gameState.gameState}`;
-            if (gameState.gameState === 2n && !getStoredSecret()) {
-                stateText += " (Secret lost - can forfeit)";
-            }
-            gameStateElement.textContent = stateText;
-        }
-
-
         const wallet = getLocalWallet()
         game.scene.scenes[0].updateDisplay(gameState.playerBalance, gameState.recentHistory, wallet.address);
-        // Removed the personal games list update since it's now handled in game.js
     } catch (error) {
         console.error("Error updating game state:", error);
     }
