@@ -1,3 +1,5 @@
+import { applyPerspectiveToQuadImageToDown } from '../../utils.js';
+
 export class GenericMenu {
     constructor(scene) {
         console.log('GenericMenu constructor called');
@@ -11,44 +13,57 @@ export class GenericMenu {
     createMenuButton() {
         console.log('Creating menu button...');
         
-        // Create a render texture for the menu button
-        this.menuRenderTexture = this.scene.add.renderTexture(0, 0, 200, 80);
+        // Wait for Orbitron font to load
+        document.fonts.ready.then(() => {
+            this.createMenuButtonTexture();
+        });
+    }
+
+    createMenuButtonTexture() {
+        // Create a render texture for the menu button - much bigger like balance text
+        this.menuRenderTexture = this.scene.add.renderTexture(0, 0, 400, 400);
         
-        // Create the menu button text - same color as balance text
+        // Create the menu button text with Orbitron font
         const menuText = this.scene.add.text(0, 0, "MENU", {
-            font: 'bold 32px Courier New',
+            font: 'bold 120px Orbitron', // Changed to Orbitron font
             fill: '#00FFFF', // Same cyan color as balance text
             stroke: '#000000',
             strokeThickness: 3
         });
-        menuText.setVisible(false);
 
-        // Draw text to render texture
-        this.menuRenderTexture.draw(menuText, 20, 20);
+        // Draw text to render texture - no positioning offset like balance text
+        this.menuRenderTexture.draw(menuText);
         menuText.destroy();
 
         // Save the texture
         this.menuRenderTexture.saveTexture('menuButtonTexture');
 
-        // Create quad image with the texture - positioned just below balance text
-        const x = this.scene.screenWidth - 150;
-        const y = 200; // Position below balance text (which is at around 200)
+        // Create quad image with the texture - positioned in center of screen for testing
+        const x = this.scene.centerX; // Center of screen
+        const y = 120; // Center of screen
         
         console.log('Creating menu button at:', x, y);
+        console.log('Screen dimensions:', this.scene.screenWidth, this.scene.screenHeight);
         
-        this.menuButton = this.scene.add.rexQuadImage(x, y, 'menuButtonTexture');
+        this.menuButton = this.scene.add.rexQuadImage({
+            x: x,
+            y: y,
+            texture: 'menuButtonTexture',
+            ninePointMode: true,
+        });
         
         // Make sure it's visible and interactive
         this.menuButton.setVisible(true);
         this.menuButton.setAlpha(1);
         this.menuButton.setInteractive();
-        this.menuButton.setDepth(100);
+        this.menuButton.setDepth(100); // Very high depth to ensure visibility
+        this.menuButton.setScale(0.5, 0.5); // Make it bigger for testing
         
-        // Apply perspective effect like game history - more pronounced
-        this.menuButton.topRight.x -= 50;
-        this.menuButton.topRight.y -= 30;
-        this.menuButton.bottomRight.x -= 50;
-        this.menuButton.bottomRight.y -= 30;
+        // Apply perspective effect pointing downward
+        let perspectiveX = this.menuButton.topCenter.x + 0;
+        let perspectiveY = this.menuButton.topCenter.y + 60; // Point downward
+        
+        applyPerspectiveToQuadImageToDown(this.menuButton, perspectiveX, perspectiveY);
         
         // Set click area
         this.menuButton.setSize(200, 80);
@@ -58,7 +73,7 @@ export class GenericMenu {
             this.toggleMenu();
         });
 
-        console.log('Menu button created:', this.menuButton);
+        this.menuButton.setTexture('menuButtonTexture');
     }
 
     toggleMenu() {
@@ -108,7 +123,7 @@ export class GenericMenu {
             this.scene.centerY - menuHeight/2 + 30, 
             "GAME MENU", 
             {
-                font: `bold ${titleFontSize}px Courier New`,
+                font: `bold ${titleFontSize}px Orbitron`, // Changed to Orbitron
                 fill: "#00FFFF",
                 stroke: "#000000",
                 strokeThickness: 3
@@ -150,8 +165,13 @@ export class GenericMenu {
 
     createMainMenuButtons() {
         const buttonFontSize = Math.max(16, this.scene.screenWidth / 45);
-        const buttonSpacing = 60;
-        const startY = this.scene.centerY - 50;
+        const buttonSpacing = 50; // Reduced from 60 to 50
+        const startY = this.scene.centerY - 30; // Moved up from -50 to -30
+        
+        console.log('Creating main menu buttons...');
+        console.log('Button spacing:', buttonSpacing);
+        console.log('Start Y:', startY);
+        console.log('Screen center Y:', this.scene.centerY);
         
         this.menuButtons = [];
 
@@ -163,6 +183,7 @@ export class GenericMenu {
             buttonFontSize,
             () => this.showDepositSubmenu()
         );
+        console.log('Deposit button created at Y:', startY);
 
         // Withdraw button
         this.withdrawButton = this.createSubmenuButton(
@@ -172,15 +193,21 @@ export class GenericMenu {
             buttonFontSize,
             () => this.showWithdrawSubmenu()
         );
+        console.log('Withdraw button created at Y:', startY + buttonSpacing);
 
         // Forfeit button
+        const forfeitY = startY + buttonSpacing * 2;
+        console.log('Creating forfeit button at Y:', forfeitY);
         this.forfeitButton = this.createSubmenuButton(
             this.scene.centerX, 
-            startY + buttonSpacing * 2, 
+            forfeitY, 
             "FORFEIT", 
             buttonFontSize,
             () => this.showForfeitSubmenu()
         );
+        console.log('Forfeit button created successfully:', this.forfeitButton);
+        console.log('Forfeit button visible:', this.forfeitButton.visible);
+        console.log('Forfeit button alpha:', this.forfeitButton.alpha);
 
         this.menuButtons = [
             this.depositButton, 
@@ -190,11 +217,27 @@ export class GenericMenu {
     }
 
     createSubmenuButton(x, y, text, fontSize, onClick) {
+        // Use different colors for different buttons to make them more visible
+        let fillColor = "#00FF00"; // Default green
+        let strokeColor = "#000000";
+        
+        if (text === "CONFIRM FORFEIT") {
+            fillColor = "#FF0000"; // Bright red color for confirm forfeit button
+            strokeColor = "#FFFFFF"; // White stroke for better visibility
+        } else if (text === "FORFEIT") {
+            fillColor = "#FF4444"; // Red color for forfeit button
+            strokeColor = "#FFFFFF"; // White stroke for better visibility
+        } else if (text === "DEPOSIT") {
+            fillColor = "#00FFFF"; // Cyan for deposit
+        } else if (text === "WITHDRAW") {
+            fillColor = "#FFFF00"; // Yellow for withdraw
+        }
+        
         const button = this.scene.add.text(x, y, text, {
-            font: `${fontSize}px Courier New`,
-            fill: "#00FF00",
-            stroke: "#000000",
-            strokeThickness: 2
+            font: `${fontSize}px Orbitron`, // Changed to Orbitron font
+            fill: fillColor,
+            stroke: strokeColor,
+            strokeThickness: 3 // Increased stroke thickness for better visibility
         }).setOrigin(0.5).setInteractive();
 
         button.setDepth(152);
@@ -240,7 +283,7 @@ export class GenericMenu {
             this.scene.centerY - submenuHeight/2 + 30, 
             "DEPOSIT ADDRESS", 
             {
-                font: `bold ${titleFontSize}px Courier New`,
+                font: `bold ${titleFontSize}px Orbitron`, // Changed to Orbitron
                 fill: "#00FFFF",
                 stroke: "#000000",
                 strokeThickness: 2
@@ -277,7 +320,7 @@ export class GenericMenu {
             this.scene.centerY, 
             "Long press to copy address", 
             {
-                font: `${titleFontSize - 4}px Courier New`,
+                font: `${titleFontSize - 4}px Orbitron`, // Changed to Orbitron
                 fill: "#00FFFF",
                 stroke: "#000000",
                 strokeThickness: 1
@@ -291,7 +334,7 @@ export class GenericMenu {
             this.scene.centerY + 50, 
             "Get test tokens from faucet:", 
             {
-                font: `${titleFontSize - 4}px Courier New`,
+                font: `${titleFontSize - 4}px Orbitron`, // Changed to Orbitron
                 fill: "#00FFFF",
                 stroke: "#000000",
                 strokeThickness: 1
@@ -304,7 +347,7 @@ export class GenericMenu {
             this.scene.centerY + 80, 
             "https://testnet.megaeth.com/", 
             {
-                font: `${titleFontSize - 4}px Courier New`,
+                font: `${titleFontSize - 4}px Orbitron`, // Changed to Orbitron
                 fill: "#0066CC",
                 stroke: "#000000",
                 strokeThickness: 1
@@ -379,7 +422,7 @@ export class GenericMenu {
             this.scene.centerY - submenuHeight/2 + 30, 
             "WITHDRAW FUNDS", 
             {
-                font: `bold ${titleFontSize}px Courier New`,
+                font: `bold ${titleFontSize}px Orbitron`, // Changed to Orbitron
                 fill: "#00FFFF",
                 stroke: "#000000",
                 strokeThickness: 2
@@ -394,7 +437,7 @@ export class GenericMenu {
             this.scene.centerY - 80, 
             `Balance: ${currentBalance}`, 
             {
-                font: `${titleFontSize - 2}px Courier New`,
+                font: `${titleFontSize - 2}px Orbitron`, // Changed to Orbitron
                 fill: "#00FF00",
                 stroke: "#000000",
                 strokeThickness: 1
@@ -408,7 +451,7 @@ export class GenericMenu {
             this.scene.centerY - 30, 
             "Enter destination address:", 
             {
-                font: `${titleFontSize - 4}px Courier New`,
+                font: `${titleFontSize - 4}px Orbitron`, // Changed to Orbitron
                 fill: "#00FFFF",
                 stroke: "#000000",
                 strokeThickness: 1
@@ -465,7 +508,10 @@ export class GenericMenu {
         this.clearMainMenu();
         
         const submenuWidth = Math.min(500, this.scene.screenWidth * 0.9);
-        const submenuHeight = Math.min(500, this.scene.screenHeight * 0.7);
+        const submenuHeight = Math.min(600, this.scene.screenHeight * 0.8); // Increased from 500 to 600
+        
+        console.log('Submenu dimensions:', submenuWidth, submenuHeight);
+        console.log('Submenu center:', this.scene.centerX, this.scene.centerY);
         
         this.submenuContainer = this.scene.add.rectangle(
             this.scene.centerX, 
@@ -487,7 +533,7 @@ export class GenericMenu {
             this.scene.centerY - submenuHeight/2 + 30, 
             "FORFEIT GAME", 
             {
-                font: `bold ${titleFontSize}px Courier New`,
+                font: `bold ${titleFontSize}px Orbitron`, // Changed to Orbitron
                 fill: "#00FFFF",
                 stroke: "#000000",
                 strokeThickness: 2
@@ -495,13 +541,13 @@ export class GenericMenu {
         ).setOrigin(0.5);
         this.submenuTitle.setDepth(154);
 
-        // Warning text
+        // Warning text - moved up slightly
         this.warningText = this.scene.add.text(
             this.scene.centerX, 
-            this.scene.centerY - 30, 
+            this.scene.centerY - 50, // Moved from -30 to -50
             "This will forfeit your current game\nand clear all cached data.", 
             {
-                font: `${titleFontSize - 4}px Courier New`,
+                font: `${titleFontSize - 4}px Orbitron`, // Changed to Orbitron
                 fill: "#FF4444",
                 stroke: "#000000",
                 strokeThickness: 1
@@ -509,14 +555,25 @@ export class GenericMenu {
         ).setOrigin(0.5);
         this.warningText.setDepth(154);
 
-        // Confirm button
+        // Confirm button - moved up and made more visible with higher depth
+        const confirmButtonY = this.scene.centerY + 30; // Moved from +50 to +30
+        console.log('Creating confirm forfeit button at Y:', confirmButtonY);
         this.confirmButton = this.createSubmenuButton(
             this.scene.centerX, 
-            this.scene.centerY + 50, 
+            confirmButtonY, 
             "CONFIRM FORFEIT", 
             titleFontSize,
             () => this.executeForfeit()
         );
+        
+        // Set higher depth for confirm button to ensure it's on top
+        this.confirmButton.setDepth(156);
+        
+        console.log('Confirm button created:', this.confirmButton);
+        console.log('Confirm button visible:', this.confirmButton.visible);
+        console.log('Confirm button alpha:', this.confirmButton.alpha);
+        console.log('Confirm button depth:', this.confirmButton.depth);
+        console.log('Confirm button position:', this.confirmButton.x, this.confirmButton.y);
 
         // Add click outside to close functionality
         this.background.on('pointerdown', (pointer) => {

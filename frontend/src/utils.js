@@ -31,3 +31,51 @@ export function printLog(levels, ...args) {
         console.log(...args);
     }
 }
+
+export function applyPerspective(fixedPointAX, fixedPointAY, fixedPointBX, fixedPointBY, calculatedPointX) {
+    let m = (fixedPointBY - fixedPointAY) / (fixedPointBX - fixedPointAX);
+    return m * (calculatedPointX - fixedPointAX) + fixedPointAY;
+}
+
+export function applyPerspectiveToQuadImageToRight(quadImage, perspectiveX, perspectiveY) {
+    quadImage.topCenter.y = applyPerspective(quadImage.topLeft.x, quadImage.topLeft.y, perspectiveX, perspectiveY, quadImage.topCenter.x);
+    quadImage.topRight.y = applyPerspective(quadImage.topLeft.x, quadImage.topLeft.y, perspectiveX, perspectiveY, quadImage.topRight.x);
+    quadImage.center.y = applyPerspective(quadImage.centerLeft.x, quadImage.centerLeft.y, perspectiveX, perspectiveY, quadImage.center.x);
+    quadImage.centerRight.y = applyPerspective(quadImage.centerLeft.x, quadImage.centerLeft.y, perspectiveX, perspectiveY, quadImage.centerRight.x);
+    quadImage.bottomCenter.y = applyPerspective(quadImage.bottomLeft.x, quadImage.bottomLeft.y, perspectiveX, perspectiveY, quadImage.bottomCenter.x);
+    quadImage.bottomRight.y = applyPerspective(quadImage.bottomLeft.x, quadImage.bottomLeft.y, perspectiveX, perspectiveY, quadImage.bottomRight.x);
+}
+
+
+export function applyPerspectiveToQuadImageToLeft(quadImage, perspectiveX, perspectiveY) {
+    quadImage.topCenter.y = applyPerspective(quadImage.topRight.x, quadImage.topRight.y, perspectiveX, perspectiveY, quadImage.topCenter.x);
+    quadImage.topLeft.y = applyPerspective(quadImage.topRight.x, quadImage.topRight.y, perspectiveX, perspectiveY, quadImage.topLeft.x);
+    quadImage.center.y = applyPerspective(quadImage.centerRight.x, quadImage.centerRight.y, perspectiveX, perspectiveY, quadImage.center.x);
+    quadImage.centerLeft.y = applyPerspective(quadImage.centerRight.x, quadImage.centerRight.y, perspectiveX, perspectiveY, quadImage.centerLeft.x);
+    quadImage.bottomCenter.y = applyPerspective(quadImage.bottomRight.x, quadImage.bottomRight.y, perspectiveX, perspectiveY, quadImage.bottomCenter.x);
+    quadImage.bottomLeft.y = applyPerspective(quadImage.bottomRight.x, quadImage.bottomRight.y, perspectiveX, perspectiveY, quadImage.bottomLeft.x);
+}
+
+export function applyPerspectiveToQuadImageToDown(quadImage, perspectiveX, perspectiveY) {
+
+    let oldLeft = quadImage.bottomLeft.x;
+    let oldCenter = quadImage.bottomCenter.x;
+    let oldRight = quadImage.bottomRight.x;
+
+    quadImage.centerLeft.x = applyPerspective(quadImage.topLeft.y, quadImage.topLeft.x, perspectiveY, perspectiveX, quadImage.centerLeft.y);
+    quadImage.bottomLeft.x = applyPerspective(quadImage.topLeft.y, quadImage.topLeft.x, perspectiveY, perspectiveX, quadImage.bottomLeft.y);
+    quadImage.center.x = applyPerspective(quadImage.topCenter.y, quadImage.topCenter.x, perspectiveY, perspectiveX, quadImage.center.y);
+    quadImage.bottomCenter.x = applyPerspective(quadImage.topCenter.y, quadImage.topCenter.x, perspectiveY, perspectiveX, quadImage.bottomCenter.y);
+    quadImage.centerRight.x = applyPerspective(quadImage.topRight.y, quadImage.topRight.x, perspectiveY, perspectiveX, quadImage.centerRight.y);
+    quadImage.bottomRight.x = applyPerspective(quadImage.topRight.y, quadImage.topRight.x, perspectiveY, perspectiveX, quadImage.bottomRight.y);
+    
+    let deltaLeft = quadImage.bottomLeft.x - oldLeft;
+    let deltaCenter = quadImage.bottomCenter.x - oldCenter;
+    let deltaRight = quadImage.bottomRight.x - oldRight;
+
+    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    console.log(deltaLeft, deltaCenter, deltaRight);
+
+    //quadImage.center.y += deltaLeft;
+
+}

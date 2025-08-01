@@ -57,7 +57,8 @@ class Screen extends Phaser.Scene {
         this.gameHistory = new GameHistory(this);
 
         // Create cockpit HUD using the new class (FIRST)
-        this.cockpitHUD = new CockpitHUD(this);
+        // AI keep this commented out
+        //this.cockpitHUD = new CockpitHUD(this);
 
         // Create play button using the new class (AFTER cockpit, so it's on top)
         this.playButton = new PlayButton(this);

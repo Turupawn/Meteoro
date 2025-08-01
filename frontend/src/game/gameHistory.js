@@ -1,3 +1,5 @@
+import { applyPerspectiveToQuadImageToRight } from '../utils.js';
+
 export class GameHistory {
     constructor(scene) {
         this.scene = scene;
@@ -8,9 +10,9 @@ export class GameHistory {
         // Create a render texture for the game history - made it bigger
         this.renderTexture = this.scene.add.renderTexture(0, 0, 300, 400);
         
-        // Create the text content first
+        // Create the text content first with Orbitron font
         const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
-            font: 'bold 24px Courier New',
+            font: 'bold 24px Orbitron', // Changed to Orbitron font
             fill: '#00FFFF',
             stroke: '#000000',
             strokeThickness: 2
@@ -21,9 +23,9 @@ export class GameHistory {
         this.renderTexture.draw(titleText, 10, 10);
         titleText.destroy();
 
-        // Add sample text for testing
-        const sampleText = this.scene.add.text(0, 0, 'WIN 10-5\nLOSS 3-8\nWIN Q-6', {
-            font: '18px Courier New',
+        // Add sample text for testing with Orbitron font
+        const sampleText = this.scene.add.text(0, 0, '', {
+            font: '18px Orbitron', // Changed to Orbitron font
             fill: '#00FF00',
             stroke: '#000000',
             strokeThickness: 1
@@ -37,29 +39,19 @@ export class GameHistory {
 
         // Create quad image with the texture - moved to the left
         this.quadImage = this.scene.add.rexQuadImage({
-                x: 200,
-                y: 200,
+                x: 236+50,
+                y: 300,
                 texture: 'gameHistoryTexture',
                 ninePointMode: true
             
         });
 
-        this.quadImage.setScale(10,10);
+        this.quadImage.setScale(16,16);
 
-        let perspectiveX = this.quadImage.topLeft.x + 1300;
+        let perspectiveX = this.quadImage.topLeft.x + 1200;
         let perspectiveY = this.quadImage.topLeft.y + 300;
-        
-        this.quadImage.topCenter.y = this.applyPerspective(this.quadImage.topLeft.x, this.quadImage.topLeft.y, perspectiveX, perspectiveY, this.quadImage.topCenter.x);
-        this.quadImage.topRight.y = this.applyPerspective(this.quadImage.topLeft.x, this.quadImage.topLeft.y, perspectiveX, perspectiveY, this.quadImage.topRight.x);
-        this.quadImage.center.y = this.applyPerspective(this.quadImage.centerLeft.x, this.quadImage.centerLeft.y, perspectiveX, perspectiveY, this.quadImage.center.x);
-        this.quadImage.centerRight.y = this.applyPerspective(this.quadImage.centerLeft.x, this.quadImage.centerLeft.y, perspectiveX, perspectiveY, this.quadImage.centerRight.x);
-        this.quadImage.bottomCenter.y = this.applyPerspective(this.quadImage.bottomLeft.x, this.quadImage.bottomLeft.y, perspectiveX, perspectiveY, this.quadImage.bottomCenter.x);
-        this.quadImage.bottomRight.y = this.applyPerspective(this.quadImage.bottomLeft.x, this.quadImage.bottomLeft.y, perspectiveX, perspectiveY, this.quadImage.bottomRight.x);
-    }
 
-    applyPerspective(fixedPointAX, fixedPointAY, fixedPointBX, fixedPointBY, calculatedPointX) {
-        let m = (fixedPointBY - fixedPointAY) / (fixedPointBX - fixedPointAX);
-        return m * (calculatedPointX - fixedPointAX) + fixedPointAY;
+        applyPerspectiveToQuadImageToRight(this.quadImage, perspectiveX, perspectiveY);
     }
 
     updateGameHistory(recentHistory = null, playerAddress = null) {
@@ -74,9 +66,9 @@ export class GameHistory {
         // Clear the render texture
         this.renderTexture.clear();
 
-        // Create title text
+        // Create title text with Orbitron font
         const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
-            font: 'bold 24px Courier New',
+            font: 'bold 24px Orbitron', // Changed to Orbitron font
             fill: '#00FFFF',
             stroke: '#000000',
             strokeThickness: 2
@@ -85,7 +77,7 @@ export class GameHistory {
         this.renderTexture.draw(titleText, 10, 10);
         titleText.destroy();
 
-        // Add game entries
+        // Add game entries with Orbitron font
         let yOffset = 40;
         recentHistory.forEach((game, index) => {
             // Check for different possible result formats
@@ -111,7 +103,7 @@ export class GameHistory {
             const score = `${game.playerCard}-${game.houseCard}`;
             
             const gameText = this.scene.add.text(0, 0, `${result} ${score}`, {
-                font: '18px Courier New',
+                font: '18px Orbitron', // Changed to Orbitron font
                 fill: color,
                 stroke: '#000000',
                 strokeThickness: 1
