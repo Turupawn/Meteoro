@@ -6,15 +6,11 @@ import { BalanceText } from './game/balanceText.js';
 import { GameHistory } from './game/gameHistory.js';
 import { CardDisplay } from './game/cardDisplay.js';
 import { Background } from './game/background.js';
-import { CockpitHUD } from './game/cockpitHUD.js';
 import { GenericMenu } from './game/menu/genericMenu.js';
 
 class Screen extends Phaser.Scene {
     preload() {
         this.load.image("card", "/g20.png");
-        // Add cockpit images (you'll need to create these)
-        this.load.image("cockpit-mobile", "/cockpit-mobile.png");
-        this.load.image("cockpit-desktop", "/cockpit-desktop.png");
         this.load.plugin('rexquadimageplugin', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexquadimageplugin.min.js', true);
     }
 
@@ -56,11 +52,6 @@ class Screen extends Phaser.Scene {
         // Create game history using the new class
         this.gameHistory = new GameHistory(this);
 
-        // Create cockpit HUD using the new class (FIRST)
-        // AI keep this commented out
-        //this.cockpitHUD = new CockpitHUD(this);
-
-        // Create play button using the new class (AFTER cockpit, so it's on top)
         this.playButton = new PlayButton(this);
 
         // Create generic menu (LAST, so it's on top)
