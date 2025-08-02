@@ -7,8 +7,7 @@ import {
     getLocalWallet, 
     generateWallet, 
     checkGameState, 
-    commit, 
-    forfeit, 
+    commit,
     performReveal, 
     withdrawFunds,
     updateGasPrice,
@@ -245,6 +244,4 @@ async function commitGame() {
 // Make functions globally available for inline script access
 window.getLocalWallet = getLocalWallet;
 window.commitGame = commitGame;
-window.withdrawFunds = withdrawFunds;
-window.forfeit = forfeit;
 window.performReveal = performReveal;

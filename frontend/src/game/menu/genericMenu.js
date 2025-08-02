@@ -1,5 +1,7 @@
 import { applyPerspectiveToQuadImageToDown } from '../../utils.js';
 
+import { forfeit, withdrawFunds } from '../../blockchain_stuff.js';
+
 export class GenericMenu {
     constructor(scene) {
         console.log('GenericMenu constructor called');
@@ -695,7 +697,7 @@ export class GenericMenu {
     executeWithdraw() {
         const address = this.addressInput.value.trim();
         if (address && address.startsWith('0x') && address.length === 42) {
-            window.withdrawFunds(address);
+            withdrawFunds(address);
             this.closeMenu();
         } else {
             console.log('Invalid address format');
@@ -705,13 +707,7 @@ export class GenericMenu {
     async executeForfeit() {
         try {
             this.clearAllCache();
-            
-            if (window.forfeit) {
-                await window.forfeit();
-            } else {
-                console.error("Forfeit function not available");
-            }
-            
+            await forfeit();
             this.closeMenu();
         } catch (error) {
             console.error("Error executing forfeit:", error);

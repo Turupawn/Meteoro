@@ -1,8 +1,6 @@
 import Web3 from 'web3';
-import { loadPhaser } from './game.js';
 import { printLog } from './utils.js';
 
-const NETWORK_ID = 6342;
 const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json";
 const GAS_LIMIT = 300000;
@@ -101,8 +99,7 @@ export async function commit(commitHash) {
     if (!wallet) {
         throw new Error("No local wallet found!");
     }
-    
-    // Ensure stake amount is initialized
+
     if (!globalStakeAmount) {
         await initializeStakeAmount();
     }
