@@ -60,7 +60,6 @@ export class BalanceText {
     }
 
     updateBalance(balance = null) {
-        console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
         if (!this.renderTexture) {
             return;
         }
