@@ -1,4 +1,5 @@
 import { applyPerspectiveToQuadImageToRight } from '../utils.js';
+import { isLandscape } from '../utils.js';
 
 export class GameHistory {
     constructor(scene) {
@@ -7,6 +8,18 @@ export class GameHistory {
     }
 
     createGameHistory() {
+        // Check if fonts are already ready
+        if (window.fontsReady) {
+            this.createGameHistoryTexture();
+        } else {
+            // Wait for fonts to be ready
+            window.onFontsReady = () => {
+                this.createGameHistoryTexture();
+            };
+        }
+    }
+
+    createGameHistoryTexture() {
         this.renderTexture = this.scene.add.renderTexture(0, 0, 300, 400);
         
         const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
