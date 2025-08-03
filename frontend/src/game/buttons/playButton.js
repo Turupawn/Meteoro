@@ -1,3 +1,5 @@
+import { commitGame } from '../../main.js';
+
 export class PlayButton {
     constructor(scene) {
         this.scene = scene;
@@ -58,7 +60,7 @@ export class PlayButton {
                 this.scene.background.startBoostAnimation();
             }
             
-            window.commitGame();
+            commitGame();
         });
     }
 }

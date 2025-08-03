@@ -1,4 +1,5 @@
 import { applyPerspectiveToQuadImageToLeft } from '../utils.js';
+import { web3 } from '../blockchain_stuff.js';
 
 export class BalanceText {
     constructor(scene) {
@@ -58,8 +59,8 @@ export class BalanceText {
         let balanceString = "0.000000 ETH";
         if (balance !== null) {
             try {
-                if (window.web3 && window.web3.utils) {
-                    const balanceInEth = window.web3.utils.fromWei(balance, 'ether');
+                if (web3 && web3.utils) {
+                    const balanceInEth = web3.utils.fromWei(balance, 'ether');
                     balanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
                 } else {
                     balanceString = `${balance} WEI`;

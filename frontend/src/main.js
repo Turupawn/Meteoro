@@ -8,7 +8,8 @@ import {
     performReveal, 
     updateGasPrice,
     initializeNonce,
-    initializeStakeAmount
+    initializeStakeAmount,
+    web3
 } from './blockchain_stuff.js';
 
 const POLL_INTERVAL = 150
@@ -24,8 +25,7 @@ let shouldProcessCommit = false;
 async function loadDapp() {
   try {
     game = await loadPhaser();
-    const { web3 } = await initWeb3();
-    window.web3 = web3;
+    await initWeb3();
     onContractInitCallback();
   } catch (error) {
     console.error("Error initializing contract:", error);
@@ -45,9 +45,7 @@ const onContractInitCallback = async () => {
     
     updateGameState();
     startGameLoop();
-    
-    window.web3 = web3;
-    
+        
     window.dispatchEvent(new CustomEvent('gameReady'));
     
   } catch (error) {
@@ -229,11 +227,6 @@ function clearPendingReveal() {
     localStorage.removeItem('pendingReveal');
 }
 
-async function commitGame() {
+export async function commitGame() {
     shouldProcessCommit = true;
 }
-
-// Make functions globally available for inline script access
-window.getLocalWallet = getLocalWallet;
-window.commitGame = commitGame;
-window.performReveal = performReveal;

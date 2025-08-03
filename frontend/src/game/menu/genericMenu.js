@@ -1,5 +1,5 @@
 import { applyPerspectiveToQuadImageToDown } from '../../utils.js';
-import { forfeit, withdrawFunds } from '../../blockchain_stuff.js';
+import { forfeit, withdrawFunds, getLocalWallet } from '../../blockchain_stuff.js';
 
 export class GenericMenu {
     constructor(scene) {
@@ -288,7 +288,7 @@ export class GenericMenu {
         ).setOrigin(0.5);
         this.submenuTitle.setDepth(254);
         
-        const wallet = window.getLocalWallet();
+        const wallet = getLocalWallet();
         const address = wallet ? wallet.address : 'No wallet';
 
         this.addressInput = document.createElement('input');
