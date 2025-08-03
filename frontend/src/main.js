@@ -1,23 +1,17 @@
-import Web3 from 'web3';
-import Phaser from "phaser";
 import { loadPhaser } from './game.js';
 import { generateRandomBytes32, calculateCards, printLog } from './utils.js';
 import { 
     initWeb3, 
     getLocalWallet, 
-    generateWallet, 
     checkGameState, 
     commit,
     performReveal, 
-    withdrawFunds,
     updateGasPrice,
-    getCurrentGasPrice,
     initializeNonce,
-    getAndIncrementNonce,
     initializeStakeAmount
 } from './blockchain_stuff.js';
 
-const POLL_INTERVAL = 150 // 150
+const POLL_INTERVAL = 150
 
 var game
 
@@ -30,9 +24,8 @@ let shouldProcessCommit = false;
 async function loadDapp() {
   try {
     game = await loadPhaser();
-    const { web3, my_contract, wallet } = await initWeb3();
+    const { web3 } = await initWeb3();
     window.web3 = web3;
-    window.my_contract = my_contract;
     onContractInitCallback();
   } catch (error) {
     console.error("Error initializing contract:", error);
@@ -45,10 +38,9 @@ const onContractInitCallback = async () => {
   try {
     await initializeStakeAmount();
     
-    await updateGasPrice(); // Initialize gas price
-    await initializeNonce(); // Initialize nonce
+    await updateGasPrice();
+    await initializeNonce();
     
-    // Initialize game state first
     await checkGameState();
     
     updateGameState();

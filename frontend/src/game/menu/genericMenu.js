@@ -1,10 +1,8 @@
 import { applyPerspectiveToQuadImageToDown } from '../../utils.js';
-
 import { forfeit, withdrawFunds } from '../../blockchain_stuff.js';
 
 export class GenericMenu {
     constructor(scene) {
-        console.log('GenericMenu constructor called');
         this.scene = scene;
         this.menuElements = [];
         this.isOpen = false;
@@ -13,8 +11,6 @@ export class GenericMenu {
     }
 
     createMenuButton() {
-        console.log('Creating menu button...');
-        
         document.fonts.ready.then(() => {
             this.createMenuButtonTexture();
         });
@@ -45,9 +41,6 @@ export class GenericMenu {
 
         const x = this.scene.centerX;
         const y = 100;
-        
-        console.log('Creating menu button at:', x, y);
-        console.log('Screen dimensions:', this.scene.screenWidth, this.scene.screenHeight);
         
         const menuButtonText = "MENU";
         const menuButtonWidth = Math.max(200, menuButtonText.length * 15);
@@ -191,7 +184,6 @@ export class GenericMenu {
         
         this.menuButtons = [];
 
-        // Deposit button
         this.depositButton = this.createSubmenuButton(
             this.scene.centerX, 
             startY, 
@@ -200,7 +192,6 @@ export class GenericMenu {
             () => this.showDepositSubmenu()
         );
 
-        // Withdraw button
         this.withdrawButton = this.createSubmenuButton(
             this.scene.centerX, 
             startY + buttonSpacing, 
@@ -254,9 +245,7 @@ export class GenericMenu {
         return button;
     }
 
-    // DEPOSIT SUBMENU
     showDepositSubmenu() {
-        console.log('Opening deposit submenu...');
         this.currentSubmenu = 'deposit';
         
         this.clearMainMenu();
@@ -326,10 +315,10 @@ export class GenericMenu {
             "Long press to copy address", 
             {
                 font: `${titleFontSize - 4}px Orbitron`,
-                fill: '#E0F6FF', // Same as balance text
-                stroke: '#0066CC', // Same as balance text
+                fill: '#E0F6FF',
+                stroke: '#0066CC',
                 strokeThickness: 1,
-                alpha: 0.9, // Same transparency as balance text
+                alpha: 0.9,
                 shadow: {
                     offsetX: 2,
                     offsetY: 2,
@@ -415,7 +404,6 @@ export class GenericMenu {
     }
 
         showWithdrawSubmenu() {
-            console.log('Opening withdraw submenu...');
             this.currentSubmenu = 'withdraw';
             
             this.clearMainMenu();
