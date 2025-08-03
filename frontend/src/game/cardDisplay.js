@@ -1,3 +1,5 @@
+import { isLandscape } from '../utils.js';
+
 export class CardDisplay {
     constructor(scene) {
         this.scene = scene;
@@ -9,15 +11,19 @@ export class CardDisplay {
         this.cardDistance = 300;
         this.particleEmitter = null;
         this.goldParticles = [];
+        this.cardSuits = ['clover', 'diamond', 'heart', 'spade'];
+        this.inforFontSize = 70;
+        const isLandscapeMode = isLandscape();
+        this.cardFontSize = isLandscapeMode ? 220 : 220;
+        this.baseScale = 0.7;
     }
 
     createCardDisplay() {
         const x = this.scene.centerX;
-        const y = this.scene.screenHeight * 0.15;
-        const fontSize = Math.max(18, this.scene.screenWidth / 40);
+        const y = this.scene.centerY + 150; // Position below the cards from the start
         
         this.currentGameText = this.scene.add.text(x, y, "", {
-            font: `${fontSize}px Arial`,
+            font: `80px Arial`, // Smaller size (was 120px)
             fill: "#FF0000",
             stroke: "#000000",
             strokeThickness: 2
@@ -28,12 +34,15 @@ export class CardDisplay {
         if (playerCard !== null && houseCard !== null) {
             this.clearCardSprites();
             
+            // Randomly select card suits for each card individually
+            this.playerCardSuit = this.cardSuits[Math.floor(Math.random() * this.cardSuits.length)];
+            this.houseCardSuit = this.cardSuits[Math.floor(Math.random() * this.cardSuits.length)];
+            
             this.createCardSprites(playerCard, houseCard);
             
-            const playerCardDisplay = this.getCardDisplay(playerCard);
-            const houseCardDisplay = this.getCardDisplay(houseCard);
             const winner = playerCard > houseCard ? "Player" : "House";
             
+            // Just update the text, no position change needed
             this.currentGameText.setText(`${winner} wins!`);
             
             if (this.scene.background && this.scene.background.endBoostAnimation) {
@@ -49,12 +58,12 @@ export class CardDisplay {
     }
 
     createCardSprites(playerCard, houseCard) {
-        const cardScale = 0.3;
-        const cardSpacing = 200;
+        const cardScale = 5; // Increased from 0.8 to 1.5 - MUCH BIGGER CARDS!
+        const cardSpacing = 400; // Increased from 300 to 400 for more spacing
         
         const leftCardX = this.scene.centerX - cardSpacing / 2;
         const rightCardX = this.scene.centerX + cardSpacing / 2;
-        const cardY = this.scene.centerY;
+        const cardY = this.scene.centerY - 100; // Move cards up by 100 pixels
         
         const startZ = -1000;
         const startX1 = (Math.random() - 0.5) * this.scene.screenWidth * 2;
@@ -62,30 +71,28 @@ export class CardDisplay {
         const startX2 = (Math.random() - 0.5) * this.scene.screenWidth * 2;
         const startY2 = (Math.random() - 0.5) * this.scene.screenHeight * 2;
         
-        this.playerCardSprite = this.scene.add.image(startX1, startY1, "card")
-            .setScale(cardScale * 0.1)
+        this.playerCardSprite = this.scene.add.image(startX1, startY1, this.playerCardSuit)
+            .setScale(cardScale)
             .setOrigin(0.5)
             .setAlpha(0);
         
-        this.houseCardSprite = this.scene.add.image(startX2, startY2, "card")
-            .setScale(cardScale * 0.1)
+        this.houseCardSprite = this.scene.add.image(startX2, startY2, this.houseCardSuit)
+            .setScale(cardScale)
             .setOrigin(0.5)
             .setAlpha(0);
-        
-        const fontSize = Math.max(24, this.scene.screenWidth / 30);
         
         this.playerCardText = this.scene.add.text(leftCardX, cardY, this.getCardDisplay(playerCard), {
-            font: `${fontSize}px Arial`,
+            font: `${this.cardFontSize}px Arial`,
             fill: "#FFFFFF",
             stroke: "#000000",
-            strokeThickness: 3
+            strokeThickness: 8 // Increased from 5 to 8 for better visibility
         }).setOrigin(0.5).setAlpha(0);
         
         this.houseCardText = this.scene.add.text(rightCardX, cardY, this.getCardDisplay(houseCard), {
-            font: `${fontSize}px Arial`,
+            font: `${this.cardFontSize}px Arial`,
             fill: "#FFFFFF",
             stroke: "#000000",
-            strokeThickness: 3
+            strokeThickness: 8 // Increased from 5 to 8 for better visibility
         }).setOrigin(0.5).setAlpha(0);
         
         this.playerCardData = {
@@ -155,7 +162,8 @@ export class CardDisplay {
         
         cardData.sprite.setPosition(x_coord, y_coord);
         
-        const scale = Math.max(0.1, perspective * 0.3);
+        // Make the cards bigger at the end of animation
+        const scale = Math.max(0.1, perspective * this.baseScale);
         cardData.sprite.setScale(scale);
         
         const alpha = Math.min(1, progress * 2);
@@ -198,8 +206,8 @@ export class CardDisplay {
         const targetX = this.scene.screenWidth - 150;
         const targetY = 200;
         
-        this.particleEmitter = this.scene.add.particles(explosionX, explosionY, 'card', {
-            frame: 'card',
+        this.particleEmitter = this.scene.add.particles(explosionX, explosionY, this.currentCardSuit, {
+            frame: this.currentCardSuit,
             lifespan: 2000,
             speed: { min: 300, max: 800 },
             scale: { start: 1.5, end: 0.1 },
@@ -212,8 +220,8 @@ export class CardDisplay {
             on: false
         });
 
-        const sparkleEmitter = this.scene.add.particles(explosionX, explosionY, 'card', {
-            frame: 'card',
+        const sparkleEmitter = this.scene.add.particles(explosionX, explosionY, this.currentCardSuit, {
+            frame: this.currentCardSuit,
             lifespan: 1500,
             speed: { min: 200, max: 600 },
             scale: { start: 1.0, end: 0.05 },

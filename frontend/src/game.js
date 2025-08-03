@@ -11,6 +11,10 @@ import { SocialLinks } from './game/socialLinks.js';
 class Screen extends Phaser.Scene {
     preload() {
         this.load.image("card", "/g20.png");
+        this.load.image("clover", "/cards/clover.png");
+        this.load.image("diamond", "/cards/diamond.png");
+        this.load.image("heart", "/cards/heart.png");
+        this.load.image("spade", "/cards/spade.png");
         this.load.image("github-icon", "/social_links/github.svg");
         this.load.image("telegram-icon", "/social_links/telegram.svg");
         this.load.plugin('rexquadimageplugin', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexquadimageplugin.min.js', true);
