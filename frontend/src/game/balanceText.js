@@ -1,5 +1,6 @@
 import { applyPerspectiveToQuadImageToLeft } from '../utils.js';
 import { web3 } from '../blockchain_stuff.js';
+import { isLandscape } from '../utils.js';
 
 export class BalanceText {
     constructor(scene) {
@@ -8,6 +9,18 @@ export class BalanceText {
     }
 
     createBalanceText() {
+        // Check if fonts are already ready
+        if (window.fontsReady) {
+            this.createBalanceTextTexture();
+        } else {
+            // Wait for fonts to be ready
+            window.onFontsReady = () => {
+                this.createBalanceTextTexture();
+            };
+        }
+    }
+
+    createBalanceTextTexture() {
         this.renderTexture = this.scene.add.renderTexture(0, 0, 1200, 1200);
 
         const balanceText = this.scene.add.text(0, 0, '0.000000 ETH', {
