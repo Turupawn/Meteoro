@@ -1,3 +1,6 @@
+import { applyPerspectiveToQuadImageToLeft } from '../utils.js';
+import { web3 } from '../blockchain_stuff.js';
+
 export class BalanceText {
     constructor(scene) {
         this.scene = scene;
@@ -5,16 +8,22 @@ export class BalanceText {
     }
 
     createBalanceText() {
-        // Create a render texture for the balance display - much bigger
-        this.renderTexture = this.scene.add.renderTexture(0, 0, 600, 220);
-        
-        // Create the text content first - much bigger font
-        const balanceText = this.scene.add.text(0, 0, 'Balance: 0 ETH', {
-            font: 'bold 36px Orbitron',
-            fill: '#00FFFF',
-            stroke: '#000000',
-            strokeThickness: 4
+        this.renderTexture = this.scene.add.renderTexture(0, 0, 1200, 1200);
+        const balanceText = this.scene.add.text(0, 0, '0.000000 ETH', {
+            font: 'bold 48px Orbitron',
+            fill: '#E0F6FF',
+            stroke: '#0066CC',
+            strokeThickness: 2,
+            alpha: 0.9,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#003366',
+                blur: 4,
+                fill: true
+            }
         });
+
         balanceText.setVisible(false);
 
         // Draw text to render texture
