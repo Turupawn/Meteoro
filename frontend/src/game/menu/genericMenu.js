@@ -1,5 +1,9 @@
 import { applyPerspectiveToQuadImageToDown } from '../../utils.js';
 import { forfeit, withdrawFunds, getLocalWallet } from '../../blockchain_stuff.js';
+import { isLandscape } from '../../utils.js';
+import { MenuButton } from './menuButton.js';
+import { MenuInput } from './menuInput.js';
+import { MenuText } from './menuText.js';
 
 export class GenericMenu {
     constructor(scene) {
@@ -42,14 +46,17 @@ export class GenericMenu {
         const x = this.scene.centerX;
         const y = 100;
         
+        const isLandscapeMode = isLandscape();
         const menuButtonText = "MENU";
-        const menuButtonWidth = Math.max(200, menuButtonText.length * 15);
+        const menuButtonWidth = isLandscapeMode
+            ? Math.max(300, menuButtonText.length * 20)
+            : Math.max(250, menuButtonText.length * 18);
         
         this.menuButtonBg = this.scene.add.rectangle(
             x,
             y - 50,
             menuButtonWidth,
-            60,
+            isLandscapeMode ? 80 : 70,
             0x0066CC,
             0.3
         );
@@ -67,14 +74,14 @@ export class GenericMenu {
         this.menuButton.setAlpha(0.85);
         this.menuButton.setInteractive();
         this.menuButton.setDepth(100);
-        this.menuButton.setScale(0.40, 0.40);
+        this.menuButton.setScale(isLandscapeMode ? 0.60 : 0.50, isLandscapeMode ? 0.60 : 0.50);
         
         let perspectiveX = this.menuButton.topCenter.x + 0;
         let perspectiveY = this.menuButton.topCenter.y + 60;
         
         applyPerspectiveToQuadImageToDown(this.menuButton, perspectiveX, perspectiveY);
         
-        this.menuButton.setSize(200, 80);
+        this.menuButton.setSize(isLandscapeMode ? 300 : 250, isLandscapeMode ? 120 : 100);
         
         this.menuButton.on('pointerdown', () => {
             this.toggleMenu();
@@ -112,8 +119,13 @@ export class GenericMenu {
             }
         });
 
-        const menuWidth = Math.min(400, this.scene.screenWidth * 0.8);
-        const menuHeight = Math.min(500, this.scene.screenHeight * 0.7);
+        const isLandscapeMode = isLandscape();
+        const menuWidth = isLandscapeMode
+            ? Math.min(600, this.scene.screenWidth * 0.85)
+            : Math.min(500, this.scene.screenWidth * 0.8);
+        const menuHeight = isLandscapeMode
+            ? Math.min(700, this.scene.screenHeight * 0.75)
+            : Math.min(600, this.scene.screenHeight * 0.7);
         
         this.menuContainer = this.scene.add.rectangle(
             this.scene.centerX, 
@@ -126,27 +138,19 @@ export class GenericMenu {
         this.menuContainer.setStrokeStyle(2, 0x00FFFF);
         this.menuContainer.setDepth(251);
 
-        const titleFontSize = Math.max(20, this.scene.screenWidth / 40);
-        this.menuTitle = this.scene.add.text(
+        const titleFontSize = isLandscapeMode
+            ? Math.max(28, this.scene.screenWidth / 35)
+            : Math.max(24, this.scene.screenWidth / 40);
+        
+        // Use MenuText for menu title
+        this.menuTitle = new MenuText(
+            this.scene,
             this.scene.centerX, 
             this.scene.centerY - menuHeight/2 + 30, 
             "GAME MENU", 
-            {
-                font: `bold ${titleFontSize}px Orbitron`,
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 2,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
-            }
-        ).setOrigin(0.5);
-        this.menuTitle.setDepth(252);
+            titleFontSize,
+            { depth: 252 }
+        );
 
         this.createXButton(menuWidth, menuHeight);
 
@@ -173,18 +177,26 @@ export class GenericMenu {
         }).setOrigin(0.5).setInteractive();
 
         this.xButton.setDepth(255);
-        this.xButton.setSize(this.xButton.width + 60, this.xButton.height + 60);
+        const isLandscapeMode = isLandscape();
+        this.xButton.setSize(
+            this.xButton.width + (isLandscapeMode ? 100 : 80), 
+            this.xButton.height + (isLandscapeMode ? 100 : 80)
+        );
         this.xButton.on('pointerdown', () => this.closeMenu());
     }
 
     createMainMenuButtons() {
-        const buttonFontSize = Math.max(16, this.scene.screenWidth / 45);
-        const buttonSpacing = 50;
-        const startY = this.scene.centerY - 30;
+        const isLandscapeMode = isLandscape();
+        const buttonFontSize = isLandscapeMode
+            ? Math.max(28, this.scene.screenWidth / 35)
+            : Math.max(24, this.scene.screenWidth / 40);
+        const buttonSpacing = isLandscapeMode ? 100 : 80;
+        const startY = this.scene.centerY - (isLandscapeMode ? 80 : 60);
         
         this.menuButtons = [];
 
-        this.depositButton = this.createSubmenuButton(
+        this.depositButton = new MenuButton(
+            this.scene,
             this.scene.centerX, 
             startY, 
             "DEPOSIT", 
@@ -192,7 +204,8 @@ export class GenericMenu {
             () => this.showDepositSubmenu()
         );
 
-        this.withdrawButton = this.createSubmenuButton(
+        this.withdrawButton = new MenuButton(
+            this.scene,
             this.scene.centerX, 
             startY + buttonSpacing, 
             "WITHDRAW", 
@@ -201,7 +214,8 @@ export class GenericMenu {
         );
 
         const forfeitY = startY + buttonSpacing * 2;
-        this.forfeitButton = this.createSubmenuButton(
+        this.forfeitButton = new MenuButton(
+            this.scene,
             this.scene.centerX, 
             forfeitY, 
             "FORFEIT", 
@@ -216,42 +230,18 @@ export class GenericMenu {
         ];
     }
 
-    createSubmenuButton(x, y, text, fontSize, onClick) {
-        const fillColor = '#E0F6FF';
-        const strokeColor = '#0066CC';
-        
-        const button = this.scene.add.text(x, y, text, {
-            font: `${fontSize}px Orbitron`,
-            fill: fillColor,
-            stroke: strokeColor,
-            strokeThickness: 2,
-            alpha: 0.9,
-            shadow: {
-                offsetX: 2,
-                offsetY: 2,
-                color: '#003366',
-                blur: 4,
-                fill: true
-            }
-        }).setOrigin(0.5).setInteractive();
-
-        button.setDepth(252);
-        button.setSize(button.width + 80, button.height + 40);
-        
-        if (onClick && typeof onClick === 'function') {
-            button.on('pointerdown', onClick);
-        }
-
-        return button;
-    }
-
     showDepositSubmenu() {
         this.currentSubmenu = 'deposit';
         
         this.clearMainMenu();
         
-        this.submenuWidth = Math.min(850, this.scene.screenWidth * 0.97);
-        this.submenuHeight = Math.min(600, this.scene.screenHeight * 0.8);
+        const isLandscapeMode = isLandscape();
+        this.submenuWidth = isLandscapeMode
+            ? Math.min(1000, this.scene.screenWidth * 0.95)
+            : Math.min(850, this.scene.screenWidth * 0.97);
+        this.submenuHeight = isLandscapeMode
+            ? Math.min(700, this.scene.screenHeight * 0.85)
+            : Math.min(600, this.scene.screenHeight * 0.8);
         
         this.submenuContainer = this.scene.add.rectangle(
             this.scene.centerX, 
@@ -266,115 +256,69 @@ export class GenericMenu {
 
         this.createSubmenuXButton(this.submenuWidth, this.submenuHeight);
 
-        const titleFontSize = Math.max(18, this.scene.screenWidth / 45);
-        this.submenuTitle = this.scene.add.text(
+        const titleFontSize = isLandscapeMode
+            ? Math.max(22, this.scene.screenWidth / 50)
+            : Math.max(18, this.scene.screenWidth / 45);
+        
+        // Use MenuText for submenu title
+        this.submenuTitle = new MenuText(
+            this.scene,
             this.scene.centerX, 
             this.scene.centerY - this.submenuHeight/2 + 30, 
             "DEPOSIT ADDRESS", 
-            {
-                font: `bold ${titleFontSize}px Orbitron`,
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 2,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
-            }
-        ).setOrigin(0.5);
-        this.submenuTitle.setDepth(254);
+            titleFontSize,
+            { depth: 254 }
+        );
         
         const wallet = getLocalWallet();
         const address = wallet ? wallet.address : 'No wallet';
 
-        this.addressInput = document.createElement('input');
-        this.addressInput.type = 'text';
-        this.addressInput.value = address;
-        this.addressInput.readOnly = true;
-        this.addressInput.style.position = 'absolute';
-        this.addressInput.style.left = `${this.scene.centerX - 150}px`;
-        this.addressInput.style.top = `${this.scene.centerY - 50}px`;
-        this.addressInput.style.width = '300px';
-        this.addressInput.style.fontSize = `${titleFontSize - 2}px`;
-        this.addressInput.style.padding = '8px';
-        this.addressInput.style.textAlign = 'center';
-        this.addressInput.style.border = '2px solid #00FFFF';
-        this.addressInput.style.backgroundColor = '#000000';
-        this.addressInput.style.color = '#00FF00';
-        this.addressInput.style.userSelect = 'text';
-        this.addressInput.style.webkitUserSelect = 'text';
-        document.body.appendChild(this.addressInput);
+        // Use MenuInput for address display
+        this.addressInput = new MenuInput(
+            this.scene,
+            this.scene.centerX,
+            this.scene.centerY - (isLandscapeMode ? 80 : 50),
+            '',
+            titleFontSize - 2,
+            {
+                readOnly: true,
+                value: address
+            }
+        );
 
-        this.instructionText = this.scene.add.text(
+        // Use MenuText for instruction text
+        this.instructionText = new MenuText(
+            this.scene,
             this.scene.centerX, 
             this.scene.centerY, 
             "Long press to copy address", 
-            {
-                font: `${titleFontSize - 4}px Orbitron`,
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 1,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
-            }
-        ).setOrigin(0.5);
-        this.instructionText.setDepth(254);
+            titleFontSize - 4,
+            { depth: 254 }
+        );
 
-        this.faucetText = this.scene.add.text(
+        // Use MenuText for faucet text
+        this.faucetText = new MenuText(
+            this.scene,
             this.scene.centerX, 
-            this.scene.centerY + 50, 
+            this.scene.centerY + (isLandscapeMode ? 80 : 50), 
             "Get test tokens from faucet:", 
-            {
-                font: `${titleFontSize - 4}px Orbitron`,
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 1,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
-            }
-        ).setOrigin(0.5);
-        this.faucetText.setDepth(254);
+            titleFontSize - 4,
+            { depth: 254 }
+        );
 
-        this.faucetLink = this.scene.add.text(
+        // Use MenuText for faucet link (interactive)
+        this.faucetLink = new MenuText(
+            this.scene,
             this.scene.centerX, 
-            this.scene.centerY + 80, 
+            this.scene.centerY + (isLandscapeMode ? 110 : 80), 
             "https://testnet.megaeth.com/", 
+            titleFontSize - 4,
             {
-                font: `${titleFontSize - 4}px Orbitron`,
-                fill: '#0066CC',
-                stroke: '#003366',
-                strokeThickness: 1,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
+                interactive: true,
+                onClick: () => window.open('https://testnet.megaeth.com/', '_blank'),
+                depth: 254
             }
-        ).setOrigin(0.5).setInteractive();
-        this.faucetLink.setDepth(254);
-        this.faucetLink.setSize(this.faucetLink.width + 20, this.faucetLink.height + 10);
-        this.faucetLink.on('pointerdown', () => {
-            window.open('https://testnet.megaeth.com/', '_blank');
-        });
+        );
 
         this.submenuElements = [
             this.submenuContainer,
@@ -399,134 +343,93 @@ export class GenericMenu {
         }).setOrigin(0.5).setInteractive();
 
         this.submenuXButton.setDepth(255);
-        this.submenuXButton.setSize(this.submenuXButton.width + 60, this.submenuXButton.height + 60);
+        const isLandscapeMode = isLandscape();
+        this.submenuXButton.setSize(
+            this.submenuXButton.width + (isLandscapeMode ? 100 : 80), 
+            this.submenuXButton.height + (isLandscapeMode ? 100 : 80)
+        );
         this.submenuXButton.on('pointerdown', () => this.closeMenu());
     }
 
-        showWithdrawSubmenu() {
-            this.currentSubmenu = 'withdraw';
-            
-            this.clearMainMenu();
-            
-            this.submenuWidth = Math.min(850, this.scene.screenWidth * 0.97);
-            this.submenuHeight = Math.min(600, this.scene.screenHeight * 0.8);
-            
-            this.submenuContainer = this.scene.add.rectangle(
-                this.scene.centerX, 
-                this.scene.centerY, 
-                this.submenuWidth, 
-                this.submenuHeight, 
-                0x000000, 
-                0.95
-            );
-            this.submenuContainer.setStrokeStyle(2, 0x00FFFF);
-            this.submenuContainer.setDepth(253);
+    showWithdrawSubmenu() {
+        this.currentSubmenu = 'withdraw';
+        
+        this.clearMainMenu();
+        
+        const isLandscapeMode = isLandscape();
+        this.submenuWidth = isLandscapeMode
+            ? Math.min(1000, this.scene.screenWidth * 0.95)
+            : Math.min(850, this.scene.screenWidth * 0.97);
+        this.submenuHeight = isLandscapeMode
+            ? Math.min(700, this.scene.screenHeight * 0.85)
+            : Math.min(600, this.scene.screenHeight * 0.8);
+        
+        this.submenuContainer = this.scene.add.rectangle(
+            this.scene.centerX, 
+            this.scene.centerY, 
+            this.submenuWidth, 
+            this.submenuHeight, 
+            0x000000, 
+            0.95
+        );
+        this.submenuContainer.setStrokeStyle(2, 0x00FFFF);
+        this.submenuContainer.setDepth(253);
 
         this.createSubmenuXButton(this.submenuWidth, this.submenuHeight);
 
-        const titleFontSize = Math.max(18, this.scene.screenWidth / 45);
-        this.submenuTitle = this.scene.add.text(
+        const titleFontSize = isLandscapeMode
+            ? Math.max(22, this.scene.screenWidth / 50)
+            : Math.max(18, this.scene.screenWidth / 45);
+        
+        // Use MenuText for submenu title
+        this.submenuTitle = new MenuText(
+            this.scene,
             this.scene.centerX, 
             this.scene.centerY - this.submenuHeight/2 + 30, 
             "WITHDRAW FUNDS", 
-            {
-                font: `bold ${titleFontSize}px Orbitron`,
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 2,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
-            }
-        ).setOrigin(0.5);
-        this.submenuTitle.setDepth(254);
+            titleFontSize,
+            { depth: 254 }
+        );
 
         const currentBalance = this.scene.currentBalance || "0 ETH";
-        this.balanceText = this.scene.add.text(
+        
+        // Use MenuText for balance text
+        this.balanceText = new MenuText(
+            this.scene,
             this.scene.centerX, 
-            this.scene.centerY - 80, 
+            this.scene.centerY - (isLandscapeMode ? 120 : 80), 
             `Balance: ${currentBalance}`, 
-            {
-                font: `${titleFontSize - 2}px Orbitron`,
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 1,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
-            }
-        ).setOrigin(0.5);
-        this.balanceText.setDepth(254);
-
-        this.addressLabel = this.scene.add.text(
-            this.scene.centerX, 
-            this.scene.centerY - 30, 
-            "Enter destination address:", 
-            {
-                font: `${titleFontSize - 4}px Orbitron`,
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 1,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
-            }
-        ).setOrigin(0.5);
-        this.addressLabel.setDepth(254);
-
-        this.addressInput = document.createElement('input');
-        this.addressInput.type = 'text';
-        this.addressInput.placeholder = 'Enter address...';
-        this.addressInput.style.position = 'absolute';
-        this.addressInput.style.left = `${this.scene.centerX - 150}px`;
-        this.addressInput.style.top = `${this.scene.centerY + 10}px`;
-        this.addressInput.style.width = '300px';
-        this.addressInput.style.fontSize = `${titleFontSize - 4}px`;
-        this.addressInput.style.padding = '8px';
-        this.addressInput.style.textAlign = 'center';
-        this.addressInput.style.border = '2px solid #00FFFF';
-        this.addressInput.style.backgroundColor = '#000000';
-        this.addressInput.style.color = '#00FF00';
-        document.body.appendChild(this.addressInput);
-        
-        const withdrawButtonText = "WITHDRAW";
-        const withdrawButtonWidth = Math.max(250, withdrawButtonText.length * 15);
-        
-        this.withdrawButtonBg = this.scene.add.rectangle(
-            this.scene.centerX,
-            this.scene.centerY + 120,
-            withdrawButtonWidth,
-            50,
-            0x0066CC,
-            0.3
+            titleFontSize - 2,
+            { depth: 254 }
         );
-        this.withdrawButtonBg.setStrokeStyle(2, 0x00FFFF);
-        this.withdrawButtonBg.setDepth(255);
-        
-        this.withdrawButton = this.createSubmenuButton(
+
+        // Use MenuText for address label
+        this.addressLabel = new MenuText(
+            this.scene,
             this.scene.centerX, 
-            this.scene.centerY + 120,
+            this.scene.centerY - (isLandscapeMode ? 50 : 30), 
+            "Enter destination address:", 
+            titleFontSize - 4,
+            { depth: 254 }
+        );
+
+        // Use MenuInput for address input
+        this.addressInput = new MenuInput(
+            this.scene,
+            this.scene.centerX,
+            this.scene.centerY + (isLandscapeMode ? 30 : 10),
+            'Enter address...',
+            titleFontSize - 4
+        );
+        
+        this.withdrawButton = new MenuButton(
+            this.scene,
+            this.scene.centerX,
+            this.scene.centerY + (isLandscapeMode ? 180 : 120),
             "WITHDRAW", 
             titleFontSize,
             () => this.executeWithdraw()
         );
-        
-        this.withdrawButton.setDepth(256);
         
         this.submenuElements = [
             this.submenuContainer,
@@ -534,109 +437,78 @@ export class GenericMenu {
             this.balanceText,
             this.addressLabel,
             this.addressInput,
-            this.withdrawButtonBg,
             this.withdrawButton,
             this.submenuXButton
         ];
     }
 
-        showForfeitSubmenu() {
-            this.currentSubmenu = 'forfeit';
-            
-            this.clearMainMenu();
-            
-            this.submenuWidth = Math.min(900, this.scene.screenWidth * 0.98);
-            this.submenuHeight = Math.min(600, this.scene.screenHeight * 0.8);
-            
-            this.submenuContainer = this.scene.add.rectangle(
-                this.scene.centerX, 
-                this.scene.centerY, 
-                this.submenuWidth, 
-                this.submenuHeight, 
-                0x000000, 
-                0.95
-            );
-            this.submenuContainer.setStrokeStyle(2, 0x00FFFF);
-            this.submenuContainer.setDepth(253);
+    showForfeitSubmenu() {
+        this.currentSubmenu = 'forfeit';
+        
+        this.clearMainMenu();
+        
+        const isLandscapeMode = isLandscape();
+        this.submenuWidth = isLandscapeMode
+            ? Math.min(1100, this.scene.screenWidth * 0.96)
+            : Math.min(900, this.scene.screenWidth * 0.98);
+        this.submenuHeight = isLandscapeMode
+            ? Math.min(700, this.scene.screenHeight * 0.85)
+            : Math.min(600, this.scene.screenHeight * 0.8);
+        
+        this.submenuContainer = this.scene.add.rectangle(
+            this.scene.centerX, 
+            this.scene.centerY, 
+            this.submenuWidth, 
+            this.submenuHeight, 
+            0x000000, 
+            0.95
+        );
+        this.submenuContainer.setStrokeStyle(2, 0x00FFFF);
+        this.submenuContainer.setDepth(253);
 
         this.createSubmenuXButton(this.submenuWidth, this.submenuHeight);
 
-        const titleFontSize = Math.max(18, this.scene.screenWidth / 45);
-        this.submenuTitle = this.scene.add.text(
+        const titleFontSize = isLandscapeMode
+            ? Math.max(22, this.scene.screenWidth / 50)
+            : Math.max(18, this.scene.screenWidth / 45);
+        
+        // Use MenuText for submenu title
+        this.submenuTitle = new MenuText(
+            this.scene,
             this.scene.centerX, 
             this.scene.centerY - this.submenuHeight/2 + 30, 
             "FORFEIT GAME", 
-            {
-                font: `bold ${titleFontSize}px Orbitron`,
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 2,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                }
-            }
-        ).setOrigin(0.5);
-        this.submenuTitle.setDepth(254);
+            titleFontSize,
+            { depth: 254 }
+        );
 
-        this.warningText = this.scene.add.text(
+        // Use MenuText for warning text with wordWrap
+        this.warningText = new MenuText(
+            this.scene,
             this.scene.centerX, 
-            this.scene.centerY - 50,
+            this.scene.centerY - (isLandscapeMode ? 80 : 50),
             "This will forfeit your current game\nand clear all cached data.", 
+            titleFontSize - 4,
             {
-                font: `${titleFontSize - 4}px Orbitron`,
-                fill: '#FF4444',
-                stroke: '#0066CC',
-                strokeThickness: 1,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
-                },
+                depth: 254,
                 wordWrap: { width: this.submenuWidth - 100 },
                 align: 'center'
             }
-        ).setOrigin(0.5);
-        this.warningText.setDepth(254);
-        
-        const confirmButtonY = this.scene.centerY + 10;
-        
-        const confirmButtonText = "CONFIRM FORFEIT";
-        const confirmButtonWidth = Math.max(400, confirmButtonText.length * 20);
-        
-        this.confirmButtonBg = this.scene.add.rectangle(
-            this.scene.centerX,
-            confirmButtonY,
-            confirmButtonWidth,
-            50,
-            0x0066CC,
-            0.3
         );
-        this.confirmButtonBg.setStrokeStyle(2, 0x00FFFF);
-        this.confirmButtonBg.setDepth(255);
         
-        this.confirmButton = this.createSubmenuButton(
-            this.scene.centerX, 
-            confirmButtonY, 
+        this.confirmButton = new MenuButton(
+            this.scene,
+            this.scene.centerX,
+            this.scene.centerY + (isLandscapeMode ? 50 : 10),
             "CONFIRM FORFEIT", 
             titleFontSize,
             () => this.executeForfeit()
         );
         
-        this.confirmButton.setDepth(256);
-        
         this.submenuElements = [
             this.submenuContainer,
             this.submenuTitle,
             this.warningText,
-            this.confirmButtonBg,
             this.confirmButton,
             this.submenuXButton
         ];
@@ -683,7 +555,7 @@ export class GenericMenu {
     }
 
     executeWithdraw() {
-        const address = this.addressInput.value.trim();
+        const address = this.addressInput.getValue().trim();
         if (address && address.startsWith('0x') && address.length === 42) {
             withdrawFunds(address);
             this.closeMenu();
