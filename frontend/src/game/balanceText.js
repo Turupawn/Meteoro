@@ -1,6 +1,5 @@
 import { applyPerspectiveToQuadImageToLeft } from '../utils.js';
 import { web3 } from '../blockchain_stuff.js';
-import { isLandscape } from '../utils.js';
 
 export class BalanceText {
     constructor(scene) {
@@ -32,28 +31,19 @@ export class BalanceText {
         
         this.renderTexture.saveTexture('balanceTexture');
 
-        const isLandscapeMode = isLandscape();
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        // Adjust position for mobile
-        const x = isMobile ? this.scene.screenWidth - 60 : this.scene.screenWidth - 40;
-        const y = isMobile ? 400 : 500;
-
         this.quadImage = this.scene.add.rexQuadImage({
-            x: x,
-            y: y,
+            x: this.scene.screenWidth - 100,
+            y: 500,
             texture: 'balanceTexture',
             ninePointMode: true,
         });
 
         
-        this.quadImage.setVisible(false); // Start invisible
+        this.quadImage.setVisible(true);
         this.quadImage.setScale(50,50);
         this.quadImage.setAlpha(0.85);
         
-        // Adjust perspective for mobile
-        const perspectiveOffset = isMobile ? 500 : 1000;
-        let perspectiveX = this.quadImage.centerLeft.x - perspectiveOffset;
+        let perspectiveX = this.quadImage.centerLeft.x - 1000;
         let perspectiveY = this.quadImage.centerLeft.y + 0;
         
         applyPerspectiveToQuadImageToLeft(this.quadImage, perspectiveX, perspectiveY);
@@ -100,7 +90,6 @@ export class BalanceText {
 
         if (this.quadImage) {
             this.quadImage.setTexture('balanceTexture');
-            this.quadImage.setVisible(true); // Show after first update
         }
     }
 }
