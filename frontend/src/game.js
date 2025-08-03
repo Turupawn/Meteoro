@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { LoadingScreen } from './game/loadingScreen.js';
 import { PlayButton } from './game/playButton.js';
 import { BalanceText } from './game/balanceText.js';
 import { GameHistory } from './game/gameHistory.js';
@@ -7,17 +8,16 @@ import { Background } from './game/background.js';
 import { Menu } from './game/menu/menu.js';
 import { OpenMenuButton } from './game/openMenuButton.js';
 import { SocialLinks } from './game/socialLinks.js';
+import { setGameScene } from './main.js';
 
-class Screen extends Phaser.Scene {
+class GameScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'GameScene' });
+    }
+
     preload() {
-        this.load.image("card", "/g20.png");
-        this.load.image("clover", "/cards/clover.png");
-        this.load.image("diamond", "/cards/diamond.png");
-        this.load.image("heart", "/cards/heart.png");
-        this.load.image("spade", "/cards/spade.png");
-        this.load.image("github-icon", "/social_links/github.svg");
-        this.load.image("telegram-icon", "/social_links/telegram.svg");
-        this.load.plugin('rexquadimageplugin', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexquadimageplugin.min.js', true);
+        // Assets are already loaded in LoadingScreen
+        // This is just for reference
     }
 
     closeAllModals() {
@@ -31,6 +31,7 @@ class Screen extends Phaser.Scene {
         this.screenHeight = this.cameras.main.height;
         this.centerX = this.screenWidth / 2;
         this.centerY = this.screenHeight / 2;
+        
         this.background = new Background(this);
         this.cardDisplay = new CardDisplay(this);
         this.balanceText = new BalanceText(this);
@@ -41,6 +42,9 @@ class Screen extends Phaser.Scene {
             this.menu.toggleMenu();
         });
         this.socialLinks = new SocialLinks(this);
+        
+        // Set the game scene reference for main.js
+        setGameScene(this);
     }
 
     updateDisplay(balance = null, recentHistory = null, playerAddress = null) {
@@ -66,7 +70,7 @@ const loadPhaser = async () => {
         parent: container,
         width: width,
         height: height,
-        scene: [Screen],
+        scene: [LoadingScreen, GameScene],
         title: "War Game",
         version: "1.0",
         dom: {

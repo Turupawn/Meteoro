@@ -49,6 +49,7 @@ export class GameHistory {
             
         });
 
+        this.quadImage.setVisible(false); // Start invisible
         this.quadImage.setScale(16,16);
         this.quadImage.setAlpha(0.85);
 
@@ -123,6 +124,7 @@ export class GameHistory {
 
         if (this.quadImage) {
             this.quadImage.setTexture('gameHistoryTexture');
+            this.quadImage.setVisible(true); // Show after first update with data
         }
     }
 }

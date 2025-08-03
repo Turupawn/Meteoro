@@ -8,9 +8,15 @@ export class OpenMenuButton {
     }
 
     createMenuButton() {
-        document.fonts.ready.then(() => {
+        // Check if fonts are already ready
+        if (window.fontsReady) {
             this.createMenuButtonTexture();
-        });
+        } else {
+            // Wait for fonts to be ready
+            window.onFontsReady = () => {
+                this.createMenuButtonTexture();
+            };
+        }
     }
 
     createMenuButtonTexture() {

@@ -32,14 +32,14 @@ export class BalanceText {
         this.renderTexture.saveTexture('balanceTexture');
 
         this.quadImage = this.scene.add.rexQuadImage({
-            x: this.scene.screenWidth - 100,
+            x: this.scene.screenWidth - 40,
             y: 500,
             texture: 'balanceTexture',
             ninePointMode: true,
         });
 
         
-        this.quadImage.setVisible(true);
+        this.quadImage.setVisible(false); // Start invisible
         this.quadImage.setScale(50,50);
         this.quadImage.setAlpha(0.85);
         
@@ -90,6 +90,7 @@ export class BalanceText {
 
         if (this.quadImage) {
             this.quadImage.setTexture('balanceTexture');
+            this.quadImage.setVisible(true); // Show after first update
         }
     }
 }

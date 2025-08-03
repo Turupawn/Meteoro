@@ -9,7 +9,7 @@ export class SocialLinks {
     createSocialLinks() {
         const isLandscapeMode = isLandscape();
         const iconSize = isLandscapeMode ? 80 : 70;
-        const bottomMargin = isLandscapeMode ? 40 : 35;
+        const bottomMargin = isLandscapeMode ? 45 : 150; // Increased from 40/35 to 120/100
         const rightMargin = isLandscapeMode ? 50 : 45;
         const spacing = isLandscapeMode ? 100 : 90;
 
