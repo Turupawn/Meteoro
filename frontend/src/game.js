@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { PlayButton } from './game/buttons/playButton.js';
+import { PlayButton } from './game/playButton.js';
 import { BalanceText } from './game/balanceText.js';
 import { GameHistory } from './game/gameHistory.js';
 import { CardDisplay } from './game/cardDisplay.js';
 import { Background } from './game/background.js';
-import { GenericMenu } from './game/menu/genericMenu.js';
+import { Menu } from './game/menu/menu.js';
+import { OpenMenuButton } from './game/openMenuButton.js';
 
 class Screen extends Phaser.Scene {
     preload() {
@@ -13,8 +14,8 @@ class Screen extends Phaser.Scene {
     }
 
     closeAllModals() {
-        if (this.genericMenu) {
-            this.genericMenu.closeMenu();
+        if (this.menu) {
+            this.menu.closeMenu();
         }
     }
 
@@ -28,7 +29,10 @@ class Screen extends Phaser.Scene {
         this.balanceText = new BalanceText(this);
         this.gameHistory = new GameHistory(this);
         this.playButton = new PlayButton(this);
-        this.genericMenu = new GenericMenu(this);
+        this.menu = new Menu(this);
+        this.openMenuButton = new OpenMenuButton(this, () => {
+            this.menu.toggleMenu();
+        });
     }
 
     updateDisplay(balance = null, recentHistory = null, playerAddress = null) {

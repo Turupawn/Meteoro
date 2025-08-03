@@ -1,4 +1,4 @@
-import { commitGame } from '../../main.js';
+import { commitGame } from '../main.js';
 
 export class PlayButton {
     constructor(scene) {

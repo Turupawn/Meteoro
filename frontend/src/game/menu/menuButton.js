@@ -16,8 +16,8 @@ export class MenuButton {
         const isLandscapeMode = isLandscape();
         const buttonWidth = isLandscapeMode
             ? Math.max(500, this.text.length * 30)
-            : Math.max(400, this.text.length * 25);
-        const buttonHeight = isLandscapeMode ? 80 : 70;
+            : Math.max(600, this.text.length * 35);
+        const buttonHeight = isLandscapeMode ? 80 : 100;
         
         this.buttonBg = this.scene.add.rectangle(
             this.x,
@@ -48,8 +48,8 @@ export class MenuButton {
         this.button.setDepth(256);
         
         this.button.setSize(
-            this.button.width + (isLandscapeMode ? 200 : 160), 
-            this.button.height + (isLandscapeMode ? 100 : 80)
+            this.button.width + (isLandscapeMode ? 200 : 200), 
+            this.button.height + (isLandscapeMode ? 100 : 120)
         );
         
         if (this.onClick && typeof this.onClick === 'function') {

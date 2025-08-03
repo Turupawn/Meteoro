@@ -5,89 +5,12 @@ import { MenuButton } from './menuButton.js';
 import { MenuInput } from './menuInput.js';
 import { MenuText } from './menuText.js';
 
-export class GenericMenu {
+export class Menu {
     constructor(scene) {
         this.scene = scene;
         this.menuElements = [];
         this.isOpen = false;
         this.currentSubmenu = null;
-        this.createMenuButton();
-    }
-
-    createMenuButton() {
-        document.fonts.ready.then(() => {
-            this.createMenuButtonTexture();
-        });
-    }
-
-    createMenuButtonTexture() {
-        this.menuRenderTexture = this.scene.add.renderTexture(0, 0, 400, 400);
-        
-        const menuText = this.scene.add.text(0, 0, "MENU", {
-            font: 'bold 120px Orbitron',
-            fill: '#E0F6FF',
-            stroke: '#0066CC',
-            strokeThickness: 2,
-            alpha: 0.9,
-            shadow: {
-                offsetX: 2,
-                offsetY: 2,
-                color: '#003366',
-                blur: 4,
-                fill: true
-            }
-        });
-
-        this.menuRenderTexture.draw(menuText);
-        menuText.destroy();
-
-        this.menuRenderTexture.saveTexture('menuButtonTexture');
-
-        const x = this.scene.centerX;
-        const y = 100;
-        
-        const isLandscapeMode = isLandscape();
-        const menuButtonText = "MENU";
-        const menuButtonWidth = isLandscapeMode
-            ? Math.max(300, menuButtonText.length * 20)
-            : Math.max(250, menuButtonText.length * 18);
-        
-        this.menuButtonBg = this.scene.add.rectangle(
-            x,
-            y - 50,
-            menuButtonWidth,
-            isLandscapeMode ? 80 : 70,
-            0x0066CC,
-            0.3
-        );
-        this.menuButtonBg.setStrokeStyle(2, 0x00FFFF);
-        this.menuButtonBg.setDepth(99);
-        
-        this.menuButton = this.scene.add.rexQuadImage({
-            x: x,
-            y: y,
-            texture: 'menuButtonTexture',
-            ninePointMode: true,
-        });
-        
-        this.menuButton.setVisible(true);
-        this.menuButton.setAlpha(0.85);
-        this.menuButton.setInteractive();
-        this.menuButton.setDepth(100);
-        this.menuButton.setScale(isLandscapeMode ? 0.60 : 0.50, isLandscapeMode ? 0.60 : 0.50);
-        
-        let perspectiveX = this.menuButton.topCenter.x + 0;
-        let perspectiveY = this.menuButton.topCenter.y + 60;
-        
-        applyPerspectiveToQuadImageToDown(this.menuButton, perspectiveX, perspectiveY);
-        
-        this.menuButton.setSize(isLandscapeMode ? 300 : 250, isLandscapeMode ? 120 : 100);
-        
-        this.menuButton.on('pointerdown', () => {
-            this.toggleMenu();
-        });
-
-        this.menuButton.setTexture('menuButtonTexture');
     }
 
     toggleMenu() {
@@ -121,11 +44,11 @@ export class GenericMenu {
 
         const isLandscapeMode = isLandscape();
         const menuWidth = isLandscapeMode
-            ? Math.min(600, this.scene.screenWidth * 0.85)
-            : Math.min(500, this.scene.screenWidth * 0.8);
+            ? Math.min(1200, this.scene.screenWidth * 0.95)
+            : Math.min(950, this.scene.screenWidth * 0.98);
         const menuHeight = isLandscapeMode
-            ? Math.min(700, this.scene.screenHeight * 0.75)
-            : Math.min(600, this.scene.screenHeight * 0.7);
+            ? Math.min(900, this.scene.screenHeight * 0.85)
+            : Math.min(1000, this.scene.screenHeight * 0.95);
         
         this.menuContainer = this.scene.add.rectangle(
             this.scene.centerX, 
@@ -139,14 +62,14 @@ export class GenericMenu {
         this.menuContainer.setDepth(251);
 
         const titleFontSize = isLandscapeMode
-            ? Math.max(28, this.scene.screenWidth / 35)
-            : Math.max(24, this.scene.screenWidth / 40);
+            ? Math.max(36, this.scene.screenWidth / 30)
+            : Math.max(40, this.scene.screenWidth / 20);
         
         // Use MenuText for menu title
         this.menuTitle = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY - menuHeight/2 + 30, 
+            this.scene.centerY - menuHeight/2 + 60, 
             "GAME MENU", 
             titleFontSize,
             { depth: 252 }
@@ -188,10 +111,10 @@ export class GenericMenu {
     createMainMenuButtons() {
         const isLandscapeMode = isLandscape();
         const buttonFontSize = isLandscapeMode
-            ? Math.max(28, this.scene.screenWidth / 35)
-            : Math.max(24, this.scene.screenWidth / 40);
-        const buttonSpacing = isLandscapeMode ? 100 : 80;
-        const startY = this.scene.centerY - (isLandscapeMode ? 80 : 60);
+            ? Math.max(32, this.scene.screenWidth / 30)
+            : Math.max(48, this.scene.screenWidth / 15);
+        const buttonSpacing = isLandscapeMode ? 150 : 160;
+        const startY = this.scene.centerY - (isLandscapeMode ? 120 : 120);
         
         this.menuButtons = [];
 
@@ -258,7 +181,7 @@ export class GenericMenu {
 
         const titleFontSize = isLandscapeMode
             ? Math.max(22, this.scene.screenWidth / 50)
-            : Math.max(18, this.scene.screenWidth / 45);
+            : Math.max(32, this.scene.screenWidth / 25);
         
         // Use MenuText for submenu title
         this.submenuTitle = new MenuText(
@@ -379,7 +302,7 @@ export class GenericMenu {
 
         const titleFontSize = isLandscapeMode
             ? Math.max(22, this.scene.screenWidth / 50)
-            : Math.max(18, this.scene.screenWidth / 45);
+            : Math.max(32, this.scene.screenWidth / 25);
         
         // Use MenuText for submenu title
         this.submenuTitle = new MenuText(
@@ -470,7 +393,7 @@ export class GenericMenu {
 
         const titleFontSize = isLandscapeMode
             ? Math.max(22, this.scene.screenWidth / 50)
-            : Math.max(18, this.scene.screenWidth / 45);
+            : Math.max(32, this.scene.screenWidth / 25);
         
         // Use MenuText for submenu title
         this.submenuTitle = new MenuText(
