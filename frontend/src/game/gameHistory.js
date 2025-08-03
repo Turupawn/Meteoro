@@ -1,5 +1,4 @@
 import { applyPerspectiveToQuadImageToRight } from '../utils.js';
-import { isLandscape } from '../utils.js';
 
 export class GameHistory {
     constructor(scene) {
@@ -42,28 +41,18 @@ export class GameHistory {
 
         this.renderTexture.saveTexture('gameHistoryTexture');
 
-        const isLandscapeMode = isLandscape();
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        // Adjust position for mobile
-        const x = isMobile ? 50 : 236+50;
-        const y = isMobile ? 200 : 300;
-
         this.quadImage = this.scene.add.rexQuadImage({
-                x: x,
-                y: y,
+                x: 236+50,
+                y: 300,
                 texture: 'gameHistoryTexture',
                 ninePointMode: true
             
         });
 
-        this.quadImage.setVisible(false); // Start invisible
         this.quadImage.setScale(16,16);
         this.quadImage.setAlpha(0.85);
 
-        // Adjust perspective for mobile
-        const perspectiveOffset = isMobile ? 600 : 1200;
-        let perspectiveX = this.quadImage.topLeft.x + perspectiveOffset;
+        let perspectiveX = this.quadImage.topLeft.x + 1200;
         let perspectiveY = this.quadImage.topLeft.y + 300;
 
         applyPerspectiveToQuadImageToRight(this.quadImage, perspectiveX, perspectiveY);
@@ -134,7 +123,6 @@ export class GameHistory {
 
         if (this.quadImage) {
             this.quadImage.setTexture('gameHistoryTexture');
-            this.quadImage.setVisible(true); // Show after first update with data
         }
     }
 }
