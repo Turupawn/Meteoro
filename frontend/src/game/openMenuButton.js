@@ -37,7 +37,7 @@ export class OpenMenuButton {
         this.menuRenderTexture.saveTexture('menuButtonTexture');
 
         const x = this.scene.centerX;
-        const y = 100;
+        const y = 120;
         
         const isLandscapeMode = isLandscape();
         const menuButtonText = "MENU";
@@ -47,7 +47,7 @@ export class OpenMenuButton {
         
         this.menuButtonBg = this.scene.add.rectangle(
             x,
-            y - 50,
+            y - (isLandscapeMode ? 70 : 60),
             menuButtonWidth,
             isLandscapeMode ? 80 : 70,
             0x0066CC,

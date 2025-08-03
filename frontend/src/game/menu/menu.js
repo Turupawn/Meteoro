@@ -1,5 +1,5 @@
-import { applyPerspectiveToQuadImageToDown } from '../../utils.js';
 import { forfeit, withdrawFunds, getLocalWallet } from '../../blockchain_stuff.js';
+import { web3 } from '../../blockchain_stuff.js';
 import { isLandscape } from '../../utils.js';
 import { MenuButton } from './menuButton.js';
 import { MenuInput } from './menuInput.js';
@@ -65,7 +65,6 @@ export class Menu {
             ? Math.max(36, this.scene.screenWidth / 30)
             : Math.max(40, this.scene.screenWidth / 20);
         
-        // Use MenuText for menu title
         this.menuTitle = new MenuText(
             this.scene,
             this.scene.centerX, 
@@ -183,11 +182,17 @@ export class Menu {
             ? Math.max(22, this.scene.screenWidth / 50)
             : Math.max(32, this.scene.screenWidth / 25);
         
-        // Use MenuText for submenu title
+        const titleY = this.scene.centerY - this.submenuHeight/2 + 40;
+        const addressY = this.scene.centerY - (isLandscapeMode ? this.submenuHeight/4 : this.submenuHeight/3);
+        const instructionY = this.scene.centerY;
+        const warningY = this.scene.centerY + (isLandscapeMode ? 60 : 40);
+        const faucetTextY = this.scene.centerY + (isLandscapeMode ? 140 : 100);
+        const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 180 : 140);
+        
         this.submenuTitle = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY - this.submenuHeight/2 + 30, 
+            titleY, 
             "DEPOSIT ADDRESS", 
             titleFontSize,
             { depth: 254 }
@@ -196,11 +201,10 @@ export class Menu {
         const wallet = getLocalWallet();
         const address = wallet ? wallet.address : 'No wallet';
 
-        // Use MenuInput for address display
         this.addressInput = new MenuInput(
             this.scene,
             this.scene.centerX,
-            this.scene.centerY - (isLandscapeMode ? 80 : 50),
+            addressY,
             '',
             titleFontSize - 2,
             {
@@ -209,31 +213,43 @@ export class Menu {
             }
         );
 
-        // Use MenuText for instruction text
         this.instructionText = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY, 
-            "Long press to copy address", 
+            instructionY, 
+            "Deposit to this address to play.", 
             titleFontSize - 4,
             { depth: 254 }
         );
 
-        // Use MenuText for faucet text
+        this.warningText = new MenuText(
+            this.scene,
+            this.scene.centerX,
+            warningY, 
+            "This is your local storage wallet, do not clear browser data nor deposit large amounts.\nClick to learn more.", 
+            titleFontSize - 25,
+            { 
+                depth: 254,
+                wordWrap: { width: this.submenuWidth - 100 },
+                align: 'center',
+                interactive: true,
+                onClick: () => window.open('https://placeholder.com/#TODO', '_blank')
+            }
+        );
+
         this.faucetText = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY + (isLandscapeMode ? 80 : 50), 
+            faucetTextY, 
             "Get test tokens from faucet:", 
             titleFontSize - 4,
             { depth: 254 }
         );
 
-        // Use MenuText for faucet link (interactive)
         this.faucetLink = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY + (isLandscapeMode ? 110 : 80), 
+            faucetLinkY, 
             "https://testnet.megaeth.com/", 
             titleFontSize - 4,
             {
@@ -248,6 +264,7 @@ export class Menu {
             this.submenuTitle,
             this.addressInput,
             this.instructionText,
+            this.warningText,
             this.faucetText,
             this.faucetLink,
             this.submenuXButton
@@ -304,43 +321,56 @@ export class Menu {
             ? Math.max(22, this.scene.screenWidth / 50)
             : Math.max(32, this.scene.screenWidth / 25);
         
-        // Use MenuText for submenu title
+        const titleY = this.scene.centerY - this.submenuHeight/2 + 30;
+        const balanceY = this.scene.centerY - (isLandscapeMode ? 120 : 120);
+        const addressLabelY = this.scene.centerY - (isLandscapeMode ? 50 : 60);
+        const addressInputY = this.scene.centerY + (isLandscapeMode ? 30 : 20);
+        const withdrawButtonY = this.scene.centerY + (isLandscapeMode ? 180 : 160);
+        
         this.submenuTitle = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY - this.submenuHeight/2 + 30, 
+            titleY, 
             "WITHDRAW FUNDS", 
             titleFontSize,
             { depth: 254 }
         );
 
-        const currentBalance = this.scene.currentBalance || "0 ETH";
+        let balanceString = "0.000000 ETH";
+        if (this.scene.currentBalance) {
+            try {
+                const balanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
+                balanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
+            } catch (error) {
+                console.error('Error converting balance:', error);
+                balanceString = `${this.scene.currentBalance} WEI`;
+            }
+        } else {
+            console.log('No balance available');
+        }
         
-        // Use MenuText for balance text
         this.balanceText = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY - (isLandscapeMode ? 120 : 80), 
-            `Balance: ${currentBalance}`, 
+            balanceY, 
+            `Balance: ${balanceString}`, 
             titleFontSize - 2,
             { depth: 254 }
         );
 
-        // Use MenuText for address label
         this.addressLabel = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY - (isLandscapeMode ? 50 : 30), 
+            addressLabelY, 
             "Enter destination address:", 
             titleFontSize - 4,
             { depth: 254 }
         );
 
-        // Use MenuInput for address input
         this.addressInput = new MenuInput(
             this.scene,
             this.scene.centerX,
-            this.scene.centerY + (isLandscapeMode ? 30 : 10),
+            addressInputY,
             'Enter address...',
             titleFontSize - 4
         );
@@ -348,7 +378,7 @@ export class Menu {
         this.withdrawButton = new MenuButton(
             this.scene,
             this.scene.centerX,
-            this.scene.centerY + (isLandscapeMode ? 180 : 120),
+            withdrawButtonY,
             "WITHDRAW", 
             titleFontSize,
             () => this.executeWithdraw()
@@ -395,21 +425,23 @@ export class Menu {
             ? Math.max(22, this.scene.screenWidth / 50)
             : Math.max(32, this.scene.screenWidth / 25);
         
-        // Use MenuText for submenu title
+        const titleY = this.scene.centerY - this.submenuHeight/2 + 30;
+        const warningY = this.scene.centerY - (isLandscapeMode ? 120 : 80);
+        const confirmButtonY = this.scene.centerY + (isLandscapeMode ? 120 : 80);
+        
         this.submenuTitle = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY - this.submenuHeight/2 + 30, 
+            titleY, 
             "FORFEIT GAME", 
             titleFontSize,
             { depth: 254 }
         );
 
-        // Use MenuText for warning text with wordWrap
         this.warningText = new MenuText(
             this.scene,
             this.scene.centerX, 
-            this.scene.centerY - (isLandscapeMode ? 80 : 50),
+            warningY,
             "This will forfeit your current game\nand clear all cached data.", 
             titleFontSize - 4,
             {
@@ -422,7 +454,7 @@ export class Menu {
         this.confirmButton = new MenuButton(
             this.scene,
             this.scene.centerX,
-            this.scene.centerY + (isLandscapeMode ? 50 : 10),
+            confirmButtonY,
             "CONFIRM FORFEIT", 
             titleFontSize,
             () => this.executeForfeit()
