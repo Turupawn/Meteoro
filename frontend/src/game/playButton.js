@@ -1,4 +1,5 @@
 import { commitGame } from '../main.js';
+import { isLandscape } from '../utils.js';
 
 export class PlayButton {
     constructor(scene) {
@@ -7,18 +8,36 @@ export class PlayButton {
     }
 
     createButton() {
+        // Check if fonts are already ready
+        if (window.fontsReady) {
+            this.createPlayButtonTexture();
+        } else {
+            // Wait for fonts to be ready
+            window.onFontsReady = () => {
+                this.createPlayButtonTexture();
+            };
+        }
+    }
+
+    createPlayButtonTexture() {
+        const isLandscapeMode = isLandscape();
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         const x = this.scene.centerX;
-        const y = this.scene.screenHeight * 0.85;
-        const fontSize = Math.max(36, this.scene.screenWidth / 20);
+        const y = isLandscapeMode ? this.scene.screenHeight * 0.85 : this.scene.screenHeight * 0.75;
+        
+        // Much bigger font and button on mobile
+        const fontSize = isMobile ? Math.max(72, this.scene.screenWidth / 10) : Math.max(48, this.scene.screenWidth / 15);
         
         const playButtonText = "PLAY";
-        const playButtonWidth = Math.max(400, playButtonText.length * 25);
+        const playButtonWidth = isMobile ? Math.max(800, playButtonText.length * 60) : Math.max(600, playButtonText.length * 40);
+        const playButtonHeight = isMobile ? 200 : 150;
         
         this.buttonBg = this.scene.add.rectangle(
             x,
             y,
             playButtonWidth,
-            100,
+            playButtonHeight,
             0x0066CC,
             0.4
         );
@@ -42,7 +61,10 @@ export class PlayButton {
 
         this.button.setDepth(200);
         
-        this.button.setSize(this.button.width + 160, this.button.height + 80);
+        // Bigger hit area on mobile
+        const hitAreaWidth = isMobile ? this.button.width + 300 : this.button.width + 200;
+        const hitAreaHeight = isMobile ? this.button.height + 150 : this.button.height + 100;
+        this.button.setSize(hitAreaWidth, hitAreaHeight);
 
         this.button.on('pointerdown', () => {
             if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {

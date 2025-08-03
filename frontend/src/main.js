@@ -15,6 +15,7 @@ import {
 const POLL_INTERVAL = 150
 
 var game
+var gameScene = null; // Reference to the main game scene
 
 const MIN_BALANCE = "0.00001";
 let commitStartTime = null;
@@ -22,15 +23,138 @@ let commitStartTime = null;
 let gameState = null;
 let shouldProcessCommit = false;
 
+// Loading coordination
+let web3LoadingProgress = 0;
+let gameDataLoadingProgress = 0;
+let isWeb3Ready = false;
+let isGameDataReady = false;
+
+// Loading screen coordination
+let loadingScreenReady = false;
+
 async function loadDapp() {
   try {
+    // Start Phaser with loading screen
     game = await loadPhaser();
-    await initWeb3();
-    onContractInitCallback();
+    
+    // Wait for loading screen to be ready
+    await waitForLoadingScreen();
+    
+    // Start Web3 initialization in parallel
+    initWeb3WithProgress();
+    
+    // Start game data loading in parallel
+    loadGameData();
+    
   } catch (error) {
-    console.error("Error initializing contract:", error);
+    console.error("Error initializing game:", error);
   }
 }
+
+async function waitForLoadingScreen() {
+  // Wait for loading screen to be ready
+  while (!loadingScreenReady) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+}
+
+async function initWeb3WithProgress() {
+  try {
+    // Update progress to show Web3 is starting
+    web3LoadingProgress = 0.1;
+    updateWeb3Progress(0.1);
+    
+    // Initialize Web3
+    await initWeb3();
+    
+    // Update progress to show Web3 is ready
+    web3LoadingProgress = 1;
+    isWeb3Ready = true;
+    updateWeb3Progress(1);
+    
+    console.log("Web3 initialization completed successfully");
+    
+  } catch (error) {
+    console.error("Error initializing Web3:", error);
+    // Mark as complete even if failed to prevent infinite loading
+    web3LoadingProgress = 1;
+    isWeb3Ready = true;
+    updateWeb3Progress(1);
+  }
+}
+
+function updateWeb3Progress(progress) {
+  if (window.updateWeb3Progress) {
+    window.updateWeb3Progress(progress);
+  } else {
+    console.warn("updateWeb3Progress not available yet, progress:", progress);
+  }
+}
+
+function updateGameDataProgress(progress) {
+  if (window.updateGameDataProgress) {
+    window.updateGameDataProgress(progress);
+  } else {
+    console.warn("updateGameDataProgress not available yet, progress:", progress);
+  }
+}
+
+async function loadGameData() {
+  try {
+    // Simulate progressive loading of game data
+    gameDataLoadingProgress = 0.2;
+    updateGameDataProgress(0.2);
+    
+    // Wait for Web3 to be ready
+    while (!isWeb3Ready) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    gameDataLoadingProgress = 0.5;
+    updateGameDataProgress(0.5);
+    
+    await initializeStakeAmount();
+    
+    gameDataLoadingProgress = 0.7;
+    updateGameDataProgress(0.7);
+    
+    await updateGasPrice();
+    await initializeNonce();
+    
+    gameDataLoadingProgress = 0.9;
+    updateGameDataProgress(0.9);
+    
+    await checkGameState();
+    
+    gameDataLoadingProgress = 1;
+    isGameDataReady = true;
+    updateGameDataProgress(1);
+    
+    // Start game loop once everything is ready
+    startGameLoop();
+    
+  } catch (error) {
+    console.error("Error loading game data:", error);
+    gameDataLoadingProgress = 1;
+    isGameDataReady = true;
+    updateGameDataProgress(1);
+  }
+}
+
+// Function to set the game scene reference
+export function setGameScene(scene) {
+    gameScene = scene;
+}
+
+// Function to notify that loading screen is ready
+export function setLoadingScreenReady() {
+    loadingScreenReady = true;
+}
+
+// Wait for game to be ready before starting
+window.addEventListener('gameReady', () => {
+  updateGameState();
+});
 
 loadDapp()
 
@@ -94,6 +218,7 @@ async function gameLoop() {
         printLog(['debug'], "Pending commit:", pendingCommit);
         printLog(['debug'], "Pending reveal:", pendingReveal);
 
+        // Handle case where game is revealed (state 2n) and there's a pending commit
         if (gameState && gameState.gameState === 2n && pendingCommit) {
             const result = calculateCards(pendingCommit.secret, gameState.houseHash);
             
@@ -110,10 +235,32 @@ async function gameLoop() {
 
             clearStoredCommit();
             storePendingReveal(pendingCommit.secret);
-            game.scene.scenes[0].updateCardDisplay(result.playerCard, result.houseCard);
+            // Use the game scene reference instead of hardcoded index
+            if (gameScene) {
+                gameScene.updateCardDisplay(result.playerCard, result.houseCard);
+            }
             printLog(['debug'], "Conditions met for reveal, attempting...");
             await performReveal(pendingCommit.secret);
         }
+        
+        // Handle case where game is already revealed (state 3n) and there's a pending reveal
+        if (gameState && gameState.gameState === 3n && pendingReveal) {
+            printLog(['debug'], "Game already revealed, clearing pending reveal");
+            clearPendingReveal();
+            
+            // Calculate and display the result
+            if (gameState.playerCard && gameState.houseCard) {
+                const playerCard = parseInt(gameState.playerCard);
+                const houseCard = parseInt(gameState.houseCard);
+                if (!isNaN(playerCard) && !isNaN(houseCard)) {
+                    if (gameScene) {
+                        gameScene.updateCardDisplay(playerCard, houseCard);
+                    }
+                }
+            }
+        }
+        
+        // Handle new game requests
         if (
             gameState && (
                 gameState.gameState === 0n /* NotStarted */ ||
@@ -165,7 +312,10 @@ async function updateGameState() {
     try {
         if (!gameState) return;
         const wallet = getLocalWallet()
-        game.scene.scenes[0].updateDisplay(gameState.playerBalance, gameState.recentHistory, wallet.address);
+        // Use the game scene reference instead of hardcoded index
+        if (gameScene) {
+            gameScene.updateDisplay(gameState.playerBalance, gameState.recentHistory, wallet.address);
+        }
     } catch (error) {
         console.error("Error updating game state:", error);
     }
@@ -175,6 +325,7 @@ function startGameLoop() {
     gameLoop();
     setInterval(gameLoop, POLL_INTERVAL);
 }
+
 const onWalletConnectedCallback = async () => {
 }
 
