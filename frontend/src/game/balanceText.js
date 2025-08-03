@@ -28,22 +28,18 @@ export class BalanceText {
         // Save the texture
         this.renderTexture.saveTexture('balanceTexture');
 
-
-        this.quadImage = this.scene.add.rexQuadImage({
-            x: this.scene.screenWidth - 40,
-            y: 500,
-            texture: 'balanceTexture',
-            ninePointMode: true,
-        });
-
-        this.quadImage.setVisible(false); // Start invisible
-        this.quadImage.setScale(50,50);
-        this.quadImage.setAlpha(0.85);
-
-        let perspectiveX = this.quadImage.centerLeft.x - 1000;
-        let perspectiveY = this.quadImage.centerLeft.y + 0;
-
-        //applyPerspectiveToQuadImageToLeft(this.quadImage, perspectiveX, perspectiveY);
+        // Create quad image with the texture - positioned in top right, much bigger
+        this.quadImage = this.scene.add.rexQuadImage(this.scene.screenWidth - 150, 200, 'balanceTexture');
+        
+        // Make sure it's visible and has proper size
+        this.quadImage.setVisible(true);
+        this.quadImage.setAlpha(1);
+        
+        // Apply perspective effect like game history - more pronounced
+        this.quadImage.topRight.x -= 100;
+        this.quadImage.topRight.y -= 100;
+        this.quadImage.bottomRight.x -= 100;
+        this.quadImage.bottomRight.y -= 100;
     }
 
     updateBalance(balance = null) {
