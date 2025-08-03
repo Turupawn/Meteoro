@@ -57,22 +57,14 @@ export function applyPerspectiveToQuadImageToLeft(quadImage, perspectiveX, persp
 }
 
 export function applyPerspectiveToQuadImageToDown(quadImage, perspectiveX, perspectiveY) {
-
-    let oldLeft = quadImage.bottomLeft.x;
-    let oldCenter = quadImage.bottomCenter.x;
-    let oldRight = quadImage.bottomRight.x;
-
     quadImage.centerLeft.x = applyPerspective(quadImage.topLeft.y, quadImage.topLeft.x, perspectiveY, perspectiveX, quadImage.centerLeft.y);
     quadImage.bottomLeft.x = applyPerspective(quadImage.topLeft.y, quadImage.topLeft.x, perspectiveY, perspectiveX, quadImage.bottomLeft.y);
     quadImage.center.x = applyPerspective(quadImage.topCenter.y, quadImage.topCenter.x, perspectiveY, perspectiveX, quadImage.center.y);
     quadImage.bottomCenter.x = applyPerspective(quadImage.topCenter.y, quadImage.topCenter.x, perspectiveY, perspectiveX, quadImage.bottomCenter.y);
     quadImage.centerRight.x = applyPerspective(quadImage.topRight.y, quadImage.topRight.x, perspectiveY, perspectiveX, quadImage.centerRight.y);
     quadImage.bottomRight.x = applyPerspective(quadImage.topRight.y, quadImage.topRight.x, perspectiveY, perspectiveX, quadImage.bottomRight.y);
-    
-    let deltaLeft = quadImage.bottomLeft.x - oldLeft;
-    let deltaCenter = quadImage.bottomCenter.x - oldCenter;
-    let deltaRight = quadImage.bottomRight.x - oldRight;
+}
 
-    //quadImage.center.y += deltaLeft;
-
+export function isLandscape() {
+    return window.innerWidth > window.innerHeight;
 }
