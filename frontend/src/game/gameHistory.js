@@ -54,21 +54,33 @@ export class GameHistory {
 
         this.renderTexture.saveTexture('gameHistoryTexture');
 
-        this.quadImage = this.scene.add.rexQuadImage({
+        if(isLandscape()) {
+            this.quadImage = this.scene.add.rexQuadImage({
                 x: 236+50,
                 y: 300,
                 texture: 'gameHistoryTexture',
                 ninePointMode: true
             
-        });
+            });
 
-        this.quadImage.setScale(16,16);
-        this.quadImage.setAlpha(0.85);
+            this.quadImage.setScale(16,16);
+            this.quadImage.setAlpha(0.85);
 
-        let perspectiveX = this.quadImage.topLeft.x + 1200;
-        let perspectiveY = this.quadImage.topLeft.y + 300;
+            let perspectiveX = this.quadImage.topLeft.x + 1200;
+            let perspectiveY = this.quadImage.topLeft.y + 300;
 
-        applyPerspectiveToQuadImageToRight(this.quadImage, perspectiveX, perspectiveY);
+            applyPerspectiveToQuadImageToRight(this.quadImage, perspectiveX, perspectiveY);
+        } else {
+            this.quadImage = this.scene.add.rexQuadImage({
+                x: 236+50,
+                y: 300,
+                texture: 'gameHistoryTexture',
+                ninePointMode: false
+            
+            });
+            this.quadImage.setScale(16,16);
+        }
+
     }
 
     updateGameHistory(recentHistory = null, playerAddress = null) {
@@ -82,23 +94,25 @@ export class GameHistory {
 
         this.renderTexture.clear();
 
-        const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
-            font: 'bold 24px Orbitron',
-            fill: '#E0F6FF',
-            stroke: '#0066CC',
-            strokeThickness: 2,
-            alpha: 0.9,
-            shadow: {
-                offsetX: 2,
-                offsetY: 2,
-                color: '#003366',
-                blur: 4,
-                fill: true
-            }
-        });
-        titleText.setVisible(false);
-        this.renderTexture.draw(titleText, 10, 10);
-        titleText.destroy();
+        if(isLandscape()) {
+            const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
+                font: 'bold 24px Orbitron',
+                fill: '#E0F6FF',
+                stroke: '#0066CC',
+                strokeThickness: 2,
+                alpha: 0.9,
+                shadow: {
+                    offsetX: 2,
+                    offsetY: 2,
+                    color: '#003366',
+                    blur: 4,
+                    fill: true
+                }
+            });
+            titleText.setVisible(false);
+            this.renderTexture.draw(titleText, 10, 10);
+            titleText.destroy();
+        }
         
         let yOffset = 40;
         recentHistory.forEach((game, index) => {
