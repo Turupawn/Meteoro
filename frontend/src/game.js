@@ -6,10 +6,13 @@ import { CardDisplay } from './game/cardDisplay.js';
 import { Background } from './game/background.js';
 import { Menu } from './game/menu/menu.js';
 import { OpenMenuButton } from './game/openMenuButton.js';
+import { SocialLinks } from './game/socialLinks.js';
 
 class Screen extends Phaser.Scene {
     preload() {
         this.load.image("card", "/g20.png");
+        this.load.image("github-icon", "/social_links/github.svg");
+        this.load.image("telegram-icon", "/social_links/telegram.svg");
         this.load.plugin('rexquadimageplugin', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexquadimageplugin.min.js', true);
     }
 
@@ -33,6 +36,7 @@ class Screen extends Phaser.Scene {
         this.openMenuButton = new OpenMenuButton(this, () => {
             this.menu.toggleMenu();
         });
+        this.socialLinks = new SocialLinks(this);
     }
 
     updateDisplay(balance = null, recentHistory = null, playerAddress = null) {
