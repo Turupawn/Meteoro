@@ -13,11 +13,19 @@ export class BalanceText {
         this.renderTexture = this.scene.add.renderTexture(0, 0, 600, 220);
         
         // Create the text content first - much bigger font
-        const balanceText = this.scene.add.text(0, 0, 'Balance: 0 ETH', {
-            font: 'bold 36px Orbitron',
-            fill: '#00FFFF',
-            stroke: '#000000',
-            strokeThickness: 4
+        const balanceText = this.scene.add.text(0, 0, '0.000000 ETH', {
+            font: 'bold 48px Orbitron',
+            fill: '#E0F6FF',
+            stroke: '#0066CC',
+            strokeThickness: 2,
+            alpha: 0.9,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#003366',
+                blur: 4,
+                fill: true
+            }
         });
         balanceText.setVisible(false);
 
