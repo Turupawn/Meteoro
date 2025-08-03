@@ -1,6 +1,7 @@
 
 import { applyPerspectiveToQuadImageToLeft } from '../utils.js';
 import { web3 } from '../blockchain_stuff.js';
+import { isLandscape } from '../utils.js';
 
 export class BalanceText {
     constructor(scene) {
@@ -10,7 +11,11 @@ export class BalanceText {
 
     createBalanceText() {
         // Create a render texture for the balance display - much bigger
-        this.renderTexture = this.scene.add.renderTexture(0, 0, 600, 220);
+        if(isLandscape()) {
+            this.renderTexture = this.scene.add.renderTexture(0, 0, 1200, 1200);
+        } else {
+            this.renderTexture = this.scene.add.renderTexture(0, 0, 600, 220);
+        }
         
         // Create the text content first - much bigger font
         const balanceText = this.scene.add.text(0, 0, '0.000000 ETH', {
@@ -30,24 +35,44 @@ export class BalanceText {
         balanceText.setVisible(false);
 
         // Draw text to render texture
-        this.renderTexture.draw(balanceText, 20, 30);
+        if(isLandscape()) {
+            this.renderTexture.draw(balanceText);
+        } else {
+            this.renderTexture.draw(balanceText, 20, 30);
+        }
         balanceText.destroy();
 
         // Save the texture
         this.renderTexture.saveTexture('balanceTexture');
 
-        // Create quad image with the texture - positioned in top right, much bigger
-        this.quadImage = this.scene.add.rexQuadImage(this.scene.screenWidth - 150, 200, 'balanceTexture');
-        
-        // Make sure it's visible and has proper size
-        this.quadImage.setVisible(true);
-        this.quadImage.setAlpha(1);
-        
-        // Apply perspective effect like game history - more pronounced
-        this.quadImage.topRight.x -= 100;
-        this.quadImage.topRight.y -= 100;
-        this.quadImage.bottomRight.x -= 100;
-        this.quadImage.bottomRight.y -= 100;
+        if(isLandscape()) {
+            this.quadImage = this.scene.add.rexQuadImage({
+                x: this.scene.screenWidth - 40,
+                y: 500,
+                texture: 'balanceTexture',
+                ninePointMode: true,
+            });
+    
+            this.quadImage.setVisible(false); // Start invisible
+            this.quadImage.setScale(50,50);
+            this.quadImage.setAlpha(0.85);
+            let perspectiveX = this.quadImage.centerLeft.x - 1000;
+            let perspectiveY = this.quadImage.centerLeft.y + 0;
+            applyPerspectiveToQuadImageToLeft(this.quadImage, perspectiveX, perspectiveY);
+        } else {
+            // Create quad image with the texture - positioned in top right, much bigger
+            this.quadImage = this.scene.add.rexQuadImage(this.scene.screenWidth - 150, 200, 'balanceTexture');
+            
+            // Make sure it's visible and has proper size
+            this.quadImage.setVisible(true);
+            this.quadImage.setAlpha(1);
+            
+            // Apply perspective effect like game history - more pronounced
+            this.quadImage.topRight.x -= 100;
+            this.quadImage.topRight.y -= 100;
+            this.quadImage.bottomRight.x -= 100;
+            this.quadImage.bottomRight.y -= 100;
+        }
     }
 
     updateBalance(balance = null) {
@@ -88,7 +113,11 @@ export class BalanceText {
             }
         });
         balanceText.setVisible(false);
-        this.renderTexture.draw(balanceText, 20, 30);
+        if(isLandscape()) {
+            this.renderTexture.draw(balanceText, 320, 100);
+        } else {
+            this.renderTexture.draw(balanceText, 20, 30);
+        }
         balanceText.destroy();
 
         // Update the quad image texture
