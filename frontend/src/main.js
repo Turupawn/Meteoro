@@ -102,36 +102,53 @@ function updateGameDataProgress(progress) {
 async function loadGameData() {
   try {
     // Simulate progressive loading of game data
+    console.log(111)
     gameDataLoadingProgress = 0.2;
     updateGameDataProgress(0.2);
+
+    console.log(111)
     
     // Wait for Web3 to be ready
     while (!isWeb3Ready) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
+
+    console.log(222)
+
     
     gameDataLoadingProgress = 0.5;
     updateGameDataProgress(0.5);
+    console.log(333)
     
     await initializeStakeAmount();
+    console.log(444)
     
     gameDataLoadingProgress = 0.7;
     updateGameDataProgress(0.7);
+    console.log(555)
     
     await updateGasPrice();
+    console.log(666)
     await initializeNonce();
+    console.log(777)
     
     gameDataLoadingProgress = 0.9;
     updateGameDataProgress(0.9);
     
+    console.log(888)
     await checkGameState();
+    console.log(999)
     
     gameDataLoadingProgress = 1;
     isGameDataReady = true;
     updateGameDataProgress(1);
+    console.log(1000)
+
     
     // Start game loop once everything is ready
     startGameLoop();
+    console.log(1111)
+
     
   } catch (error) {
     console.error("Error loading game data:", error);
