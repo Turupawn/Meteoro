@@ -32,6 +32,10 @@ let isGameDataReady = false;
 // Loading screen coordination
 let loadingScreenReady = false;
 
+// Add transaction state tracking
+let isTransactionInProgress = false;
+let lastTransactionHash = null;
+
 async function loadDapp() {
   try {
     // Start Phaser with loading screen
@@ -209,6 +213,12 @@ async function gameLoop() {
         return;
     }
 
+    // Don't process if a transaction is already in progress
+    if (isTransactionInProgress) {
+        printLog(['debug'], "Transaction in progress, skipping game loop");
+        return;
+    }
+
     try {
         printLog(['debug'], "=== GAME LOOP START ===");
 
@@ -242,7 +252,22 @@ async function gameLoop() {
                 gameScene.updateCardDisplay(result.playerCard, result.houseCard);
             }
             printLog(['debug'], "Conditions met for reveal, attempting...");
-            await performReveal(pendingCommit.secret);
+            
+            // Mark transaction as in progress
+            isTransactionInProgress = true;
+            try {
+                await performReveal(pendingCommit.secret);
+                printLog(['debug'], "Reveal transaction completed successfully");
+            } catch (error) {
+                printLog(['error'], "Reveal failed:", error);
+                // If it's an "already known" error, clear the pending reveal
+                if (error.message && error.message.includes('already known')) {
+                    printLog(['debug'], "Transaction already known, clearing pending reveal");
+                    clearPendingReveal();
+                }
+            } finally {
+                isTransactionInProgress = false;
+            }
         }
         
         // Handle case where game is already revealed (state 3n) and there's a pending reveal
@@ -292,13 +317,24 @@ async function gameLoop() {
                 printLog(['profile'], "Start time:", new Date(commitStartTime).toISOString());
 
                 printLog(['debug'], "Processing commit request...");
+                
+                // Mark transaction as in progress
+                isTransactionInProgress = true;
                 try {
                     await commit(web3.utils.soliditySha3(secret));
                     shouldProcessCommit = false;
                     updateGameState();
+                    printLog(['debug'], "Commit transaction completed successfully");
                 } catch (error) {
                     printLog(['error'], "Commit failed:", error);
                     shouldProcessCommit = false;
+                    // If it's an "already known" error, clear the stored commit
+                    if (error.message && error.message.includes('already known')) {
+                        printLog(['debug'], "Transaction already known, clearing stored commit");
+                        clearStoredCommit();
+                    }
+                } finally {
+                    isTransactionInProgress = false;
                 }
             }
         }
@@ -307,6 +343,7 @@ async function gameLoop() {
     } catch (error) {
         printLog(['error'], "Error in game loop:", error);
         shouldProcessCommit = false;
+        isTransactionInProgress = false;
     }
 }
 
