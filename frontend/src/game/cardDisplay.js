@@ -14,7 +14,7 @@ export class CardDisplay {
         this.cardSuits = ['clover', 'diamond', 'heart', 'spade'];
         this.inforFontSize = 70;
         const isLandscapeMode = isLandscape();
-        this.cardFontSize = isLandscapeMode ? 220 : 220;
+        this.cardFontSize = isLandscapeMode ? 160 : 160;
         this.baseScale = 0.7;
     }
 
@@ -23,10 +23,18 @@ export class CardDisplay {
         const y = this.scene.centerY + 150; // Position below the cards from the start
         
         this.currentGameText = this.scene.add.text(x, y, "", {
-            font: `80px Arial`, // Smaller size (was 120px)
-            fill: "#FF0000",
-            stroke: "#000000",
-            strokeThickness: 2
+            font: `bold 80px Orbitron`, // Changed to match other UI elements
+            fill: "#E0F6FF", // Changed to match other text colors
+            stroke: "#0066CC", // Changed to match other text strokes
+            strokeThickness: 3, // Changed to match other text strokes
+            alpha: 0.95, // Added alpha to match other text
+            shadow: { // Added shadow to match other text
+                offsetX: 3,
+                offsetY: 3,
+                color: '#003366',
+                blur: 6,
+                fill: true
+            }
         }).setOrigin(0.5);
     }
 
@@ -87,14 +95,14 @@ export class CardDisplay {
             .setAlpha(0);
         
         this.playerCardText = this.scene.add.text(leftCardX, cardY, this.getCardDisplay(playerCard), {
-            font: `${this.cardFontSize}px Arial`,
+            font: `${this.cardFontSize}px Orbitron`, // Changed from Arial to Orbitron
             fill: "#FFFFFF",
             stroke: "#000000",
             strokeThickness: 8 // Increased from 5 to 8 for better visibility
         }).setOrigin(0.5).setAlpha(0);
         
         this.houseCardText = this.scene.add.text(rightCardX, cardY, this.getCardDisplay(houseCard), {
-            font: `${this.cardFontSize}px Arial`,
+            font: `${this.cardFontSize}px Orbitron`, // Changed from Arial to Orbitron
             fill: "#FFFFFF",
             stroke: "#000000",
             strokeThickness: 8 // Increased from 5 to 8 for better visibility

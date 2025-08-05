@@ -418,5 +418,6 @@ function clearPendingReveal() {
 }
 
 export async function commitGame() {
+    gameScene.cardDisplay.clearCardSprites();
     shouldProcessCommit = true;
 }
