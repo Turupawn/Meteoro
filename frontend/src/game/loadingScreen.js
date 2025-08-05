@@ -62,16 +62,13 @@ export class LoadingScreen extends Phaser.Scene {
     }
 
     setupProgressMonitoring() {
-        // Monitor Phaser loading progress - this must be set up BEFORE loading assets
         this.load.on('progress', (value) => {
-            console.log("Phaser loading progress:", value);
             this.loadingProgress.phaser = value;
             this.updateProgress();
         });
         
         // Also monitor when loading is complete
         this.load.on('complete', () => {
-            console.log("Phaser loading complete");
             this.loadingProgress.phaser = 1;
             this.updateProgress();
         });
@@ -217,7 +214,6 @@ export class LoadingScreen extends Phaser.Scene {
     monitorWeb3Loading() {
         // This will be updated by main.js when Web3 is ready
         window.updateWeb3Progress = (progress) => {
-            console.log("Web3 progress update:", progress);
             this.loadingProgress.web3 = progress;
             this.updateProgress();
         };
@@ -226,7 +222,6 @@ export class LoadingScreen extends Phaser.Scene {
     monitorGameDataLoading() {
         // This will be updated by main.js when game data is ready
         window.updateGameDataProgress = (progress) => {
-            console.log("Game data progress update:", progress);
             this.loadingProgress.gameData = progress;
             this.updateProgress();
         };
@@ -235,7 +230,6 @@ export class LoadingScreen extends Phaser.Scene {
     updateProgress() {
         // Don't update UI if it's not ready yet
         if (!this.uiReady) {
-            console.log("UI not ready yet, skipping progress update");
             return;
         }
 
@@ -269,14 +263,6 @@ export class LoadingScreen extends Phaser.Scene {
             
             this.loadingDetails.setText(details.join(" • "));
         }
-        
-        console.log("Loading progress:", {
-            phaser: this.loadingProgress.phaser,
-            web3: this.loadingProgress.web3,
-            font: this.loadingProgress.font,
-            gameData: this.loadingProgress.gameData,
-            total: totalProgress
-        });
         
         // Check if everything is loaded
         if (totalProgress >= 1 && !this.isComplete) {

@@ -43,7 +43,12 @@ export class CardDisplay {
             const winner = playerCard > houseCard ? "Player" : "House";
             
             // Just update the text, no position change needed
-            this.currentGameText.setText(`${winner} wins!`);
+            
+            if(winner === "Player") {
+                this.currentGameText.setText(`You win!`);
+            }else{
+                this.currentGameText.setText(`House wins`);
+            }
             
             if (this.scene.background && this.scene.background.endBoostAnimation) {
                 this.scene.background.endBoostAnimation();
