@@ -22,7 +22,6 @@ export class LoadingScreen extends Phaser.Scene {
         this.setupProgressMonitoring();
         
         // Load minimal assets needed for loading screen
-        this.load.image("card", "/g20.png");
         this.load.image("clover", "/cards/clover.png");
         this.load.image("diamond", "/cards/diamond.png");
         this.load.image("heart", "/cards/heart.png");
