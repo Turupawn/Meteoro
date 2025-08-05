@@ -25,6 +25,7 @@ contract TwoPartyWarGame {
     mapping(address player => uint[] gameIds) playerGames;
     
     uint public constant MAX_RETURN_HISTORY = 10;
+    uint public constant MAX_PENDING_GAMES = 20;
     
     address public immutable house;
     uint public constant STAKE_AMOUNT = 0.000001 ether;
@@ -50,6 +51,7 @@ contract TwoPartyWarGame {
     }
 
     function commit(bytes32 _commitHash) external payable hasStaked {
+        require(pendingGameCount < MAX_PENDING_GAMES, "Too many pending games");
         Game memory playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.NotStarted ||
                     playerGame.gameState == State.Revealed ||
@@ -84,10 +86,13 @@ contract TwoPartyWarGame {
         for (uint i = 0; i < randomness.length; i++) {
             uint gameId = lastRandomnessPostedGameId + i + 1;
             Game storage playerGame = games[gameId];
-            require(playerGame.gameState == State.Committed, "Game has to be commited");
-            playerGame.gameState = State.HashPosted;
-            playerGame.houseHash = randomness[i];
-            playerGame.houseHashTimestamp = block.timestamp;
+            if(playerGame.gameState != State.Forfeited)
+            {
+                require(playerGame.gameState == State.Committed, "Game has to be commited");
+                playerGame.gameState = State.HashPosted;
+                playerGame.houseHash = randomness[i];
+                playerGame.houseHashTimestamp = block.timestamp;
+            }
         }
         lastRandomnessPostedGameId += randomness.length;
         pendingGameCount -= randomness.length;
@@ -129,17 +134,12 @@ contract TwoPartyWarGame {
     function forfeit() external {
         Game storage playerGame = games[getCurrentGameId(msg.sender)];
         // AI: keep it commented out for now
-        //require(playerGame.gameState == State.HashPosted, "Game not in correct state to forfeit");
-        
-        
+        require(playerGame.gameState == State.HashPosted ||
+                playerGame.gameState == State.Committed
+                , "Game not in correct state to forfeit"
+        );
         playerGame.gameState = State.Forfeited;
-        
-        // Transfer stakes to house
-        uint totalStake = STAKE_AMOUNT * 2;
-        // AI: keep it commented out for now
-        //payable(house).transfer(totalStake);
-        
-        // Emit events
+        payable(house).transfer(STAKE_AMOUNT);
         emit GameForfeited(msg.sender, house);
     }
 
