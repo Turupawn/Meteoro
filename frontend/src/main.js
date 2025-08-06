@@ -14,6 +14,15 @@ import {
     getMinimumPlayableBalance
 } from './blockchain_stuff.js';
 
+import posthog from 'posthog-js'
+
+posthog.init('phc_3vofleZVJy4GKoykZPb4bOEc7gjl6do5YoFDLB6NVYl',
+    {
+        api_host: 'https://us.i.posthog.com',
+        person_profiles: 'always' // or 'always' to create profiles for anonymous users as well
+    }
+)
+
 const POLL_INTERVAL = 150
 
 var game
@@ -40,6 +49,11 @@ let lastTransactionHash = null;
 
 async function loadDapp() {
   try {
+    // Track app initialization
+    posthog.capture('app_initialized', { 
+      timestamp: Date.now() 
+    });
+    
     // Start Phaser with loading screen
     game = await loadPhaser();
     
@@ -54,6 +68,9 @@ async function loadDapp() {
     
   } catch (error) {
     console.error("Error initializing game:", error);
+    posthog.capture('app_initialization_error', { 
+      error: error.message 
+    });
   }
 }
 
@@ -80,12 +97,22 @@ async function initWeb3WithProgress() {
     
     console.log("Web3 initialization completed successfully");
     
+    // Track successful Web3 initialization
+    posthog.capture('web3_initialized', { 
+      timestamp: Date.now() 
+    });
+    
   } catch (error) {
     console.error("Error initializing Web3:", error);
     // Mark as complete even if failed to prevent infinite loading
     web3LoadingProgress = 1;
     isWeb3Ready = true;
     updateWeb3Progress(1);
+    
+    // Track Web3 initialization error
+    posthog.capture('web3_initialization_error', { 
+      error: error.message 
+    });
   }
 }
 
@@ -245,6 +272,15 @@ async function gameLoop() {
                 printLog(['profile'], "End time:", new Date(endTime).toISOString());
                 printLog(['profile'], "=========================");
                 commitStartTime = null;
+                
+                // Track game completion performance
+                posthog.capture('game_completed', {
+                    game_id: gameState.gameId?.toString(),
+                    player_card: result.playerCard,
+                    house_card: result.houseCard,
+                    total_time_ms: totalTime,
+                    player_balance: gameState.playerBalance?.toString()
+                });
             }
 
             clearStoredCommit();
@@ -260,8 +296,23 @@ async function gameLoop() {
             try {
                 await performReveal(pendingCommit.secret);
                 printLog(['debug'], "Reveal transaction completed successfully");
+                
+                // Track successful reveal
+                posthog.capture('reveal_transaction_success', {
+                    game_id: gameState.gameId?.toString(),
+                    player_card: result.playerCard,
+                    house_card: result.houseCard
+                });
+                
             } catch (error) {
                 printLog(['error'], "Reveal failed:", error);
+                
+                // Track reveal failure
+                posthog.capture('reveal_transaction_failed', {
+                    game_id: gameState.gameId?.toString(),
+                    error: error.message
+                });
+                
                 // If it's an "already known" error, clear the pending reveal
                 if (error.message && error.message.includes('already known')) {
                     printLog(['debug'], "Transaction already known, clearing pending reveal");
@@ -302,13 +353,30 @@ async function gameLoop() {
                 printLog(['debug'], "Found pending commit from previous game:", storedCommit);
                 alert("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
                 shouldProcessCommit = false;
+                
+                // Track attempt to start game with pending commit
+                posthog.capture('game_start_blocked_pending_commit', {
+                    game_id: gameState.gameId?.toString()
+                });
+                
             } else if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
+                
+                // Track game start with uninitialized state
+                posthog.capture('game_start_failed_uninitialized_state');
+                
             } else if (BigInt(getPlayerBalance()) < BigInt(getMinimumPlayableBalance())) {
                 // Don't show alert anymore, let the UI handle it
                 printLog(['debug'], "Insufficient balance detected, UI will handle display");
                 shouldProcessCommit = false;
+                
+                // Track insufficient balance
+                posthog.capture('game_start_blocked_insufficient_balance', {
+                    player_balance: getPlayerBalance(),
+                    minimum_balance: getMinimumPlayableBalance()
+                });
+                
             } else if ( gameState.gameState === 0n /* NotStarted */ ||
                         gameState.gameState === 3n /* Revealed */   ||
                         gameState.gameState === 4n /* Forfeited */) {
@@ -320,6 +388,13 @@ async function gameLoop() {
 
                 printLog(['debug'], "Processing commit request...");
                 
+                // Track game start attempt
+                posthog.capture('game_start_attempted', {
+                    game_id: gameState.gameId?.toString(),
+                    player_balance: gameState.playerBalance?.toString(),
+                    game_state: gameState.gameState?.toString()
+                });
+                
                 // Mark transaction as in progress
                 isTransactionInProgress = true;
                 try {
@@ -327,9 +402,23 @@ async function gameLoop() {
                     shouldProcessCommit = false;
                     updateGameState();
                     printLog(['debug'], "Commit transaction completed successfully");
+                    
+                    // Track successful commit
+                    posthog.capture('commit_transaction_success', {
+                        game_id: gameState.gameId?.toString(),
+                        player_balance: gameState.playerBalance?.toString()
+                    });
+                    
                 } catch (error) {
                     printLog(['error'], "Commit failed:", error);
                     shouldProcessCommit = false;
+                    
+                    // Track commit failure
+                    posthog.capture('commit_transaction_failed', {
+                        game_id: gameState.gameId?.toString(),
+                        error: error.message
+                    });
+                    
                     // If it's an "already known" error, clear the stored commit
                     if (error.message && error.message.includes('already known')) {
                         printLog(['debug'], "Transaction already known, clearing stored commit");
@@ -346,6 +435,11 @@ async function gameLoop() {
         printLog(['error'], "Error in game loop:", error);
         shouldProcessCommit = false;
         isTransactionInProgress = false;
+        
+        // Track game loop error
+        posthog.capture('game_loop_error', {
+            error: error.message
+        });
     }
 }
 
@@ -422,4 +516,9 @@ function clearPendingReveal() {
 export async function commitGame() {
     gameScene.cardDisplay.clearCardSprites();
     shouldProcessCommit = true;
+    
+    // Track manual commit request
+    posthog.capture('commit_game_called', {
+        timestamp: Date.now()
+    });
 }
