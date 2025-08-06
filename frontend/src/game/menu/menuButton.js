@@ -45,12 +45,14 @@ export class MenuButton {
                 blur: 6,
                 fill: true
             }
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setInteractive();
 
         this.button.setDepth(256);
         
+        // Make both background and text clickable
         if (this.onClick && typeof this.onClick === 'function') {
             this.buttonBg.on('pointerdown', this.onClick);
+            this.button.on('pointerdown', this.onClick);
         }
     }
 

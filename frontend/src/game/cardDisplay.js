@@ -40,6 +40,7 @@ export class CardDisplay {
 
     updateCurrentGameDisplay(playerCard = null, houseCard = null) {
         if (playerCard !== null && houseCard !== null) {
+            // Clear any existing animations before creating new ones
             this.clearCardSprites();
             
             // Randomly select card suits for each card individually
@@ -64,7 +65,10 @@ export class CardDisplay {
 
             if (playerCard > houseCard) {
                 this.scene.time.delayedCall(1000, () => {
-                    this.triggerWinParticleAnimation();
+                    // Add null check before triggering animation
+                    if (this.houseCardSprite && this.houseCardSprite.active) {
+                        this.triggerWinParticleAnimation();
+                    }
                 });
             }
         }
@@ -141,6 +145,11 @@ export class CardDisplay {
         let currentStep = 0;
         
         const animateStep = () => {
+            // Add null checks to prevent errors if sprites were destroyed
+            if (!this.playerCardData || !this.houseCardData) {
+                return;
+            }
+            
             if (currentStep >= steps) {
                 this.showCardNumbers();
                 return;
@@ -165,6 +174,11 @@ export class CardDisplay {
     }
 
     animateCardInSpace(cardData, progress) {
+        // Add null checks to prevent errors
+        if (!cardData || !cardData.sprite || !cardData.sprite.active) {
+            return;
+        }
+        
         const currentX = cardData.startX + (cardData.finalX - cardData.startX) * progress;
         const currentY = cardData.startY + (cardData.finalY - cardData.startY) * progress;
         const currentZ = cardData.startZ + (cardData.finalZ - cardData.startZ) * progress;
@@ -184,24 +198,30 @@ export class CardDisplay {
     }
 
     showCardNumbers() {
-        this.scene.tweens.add({
-            targets: this.playerCardText,
-            alpha: 1,
-            duration: 300,
-            ease: 'Power2'
-        });
+        // Add null checks before creating tweens
+        if (this.playerCardText && this.playerCardText.active) {
+            this.scene.tweens.add({
+                targets: this.playerCardText,
+                alpha: 1,
+                duration: 300,
+                ease: 'Power2'
+            });
+        }
         
-        this.scene.tweens.add({
-            targets: this.houseCardText,
-            alpha: 1,
-            duration: 300,
-            delay: 100,
-            ease: 'Power2'
-        });
+        if (this.houseCardText && this.houseCardText.active) {
+            this.scene.tweens.add({
+                targets: this.houseCardText,
+                alpha: 1,
+                duration: 300,
+                delay: 100,
+                ease: 'Power2'
+            });
+        }
     }
 
     triggerWinParticleAnimation() {
-        if (!this.houseCardSprite) return;
+        // Add null check to prevent error
+        if (!this.houseCardSprite || !this.houseCardSprite.active) return;
 
         this.createScreenFlash();
         
@@ -432,6 +452,9 @@ export class CardDisplay {
     }
 
     shakeHouseCard() {
+        // Add null check to prevent error
+        if (!this.houseCardSprite) return;
+        
         const originalX = this.houseCardSprite.x;
         const originalY = this.houseCardSprite.y;
         
@@ -443,7 +466,10 @@ export class CardDisplay {
             yoyo: true,
             repeat: 10,
             onComplete: () => {
-                this.houseCardSprite.setPosition(originalX, originalY);
+                // Add null check before setting position
+                if (this.houseCardSprite && this.houseCardSprite.active) {
+                    this.houseCardSprite.setPosition(originalX, originalY);
+                }
             }
         });
     }
@@ -453,19 +479,24 @@ export class CardDisplay {
     }
 
     clearCardSprites() {
+        // Stop any running tweens on the sprites before destroying them
         if (this.playerCardSprite) {
+            this.scene.tweens.killTweensOf(this.playerCardSprite);
             this.playerCardSprite.destroy();
             this.playerCardSprite = null;
         }
         if (this.houseCardSprite) {
+            this.scene.tweens.killTweensOf(this.houseCardSprite);
             this.houseCardSprite.destroy();
             this.houseCardSprite = null;
         }
         if (this.playerCardText) {
+            this.scene.tweens.killTweensOf(this.playerCardText);
             this.playerCardText.destroy();
             this.playerCardText = null;
         }
         if (this.houseCardText) {
+            this.scene.tweens.killTweensOf(this.houseCardText);
             this.houseCardText.destroy();
             this.houseCardText = null;
         }

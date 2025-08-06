@@ -9,7 +9,9 @@ import {
     updateGasPrice,
     initializeNonce,
     initializeStakeAmount,
-    web3
+    web3,
+    getPlayerBalance,
+    getMinimumPlayableBalance
 } from './blockchain_stuff.js';
 
 const POLL_INTERVAL = 150
@@ -303,7 +305,7 @@ async function gameLoop() {
             } else if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
-            } else if (BigInt(gameState.playerBalance) < BigInt(web3.utils.toWei(MIN_BALANCE, 'ether'))) {
+            } else if (BigInt(getPlayerBalance()) < BigInt(getMinimumPlayableBalance())) {
                 // Don't show alert anymore, let the UI handle it
                 printLog(['debug'], "Insufficient balance detected, UI will handle display");
                 shouldProcessCommit = false;

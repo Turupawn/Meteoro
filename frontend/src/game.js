@@ -10,7 +10,7 @@ import { OpenMenuButton } from './game/openMenuButton.js';
 import { SocialLinks } from './game/socialLinks.js';
 import { InsufficientBalanceScreen } from './game/insufficientBalanceScreen.js';
 import { setGameScene } from './main.js';
-import { web3 } from './blockchain_stuff.js';
+import { getMinimumPlayableBalance } from './blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -66,9 +66,7 @@ class GameScene extends Phaser.Scene {
 
     checkInsufficientBalance(balance) {
         try {
-            const minBalanceWei = web3.utils.toWei("0.00001", 'ether');
-            const hasInsufficientBalance = BigInt(balance) < BigInt(minBalanceWei);
-            
+            const hasInsufficientBalance = BigInt(balance) < BigInt(getMinimumPlayableBalance());
             if (hasInsufficientBalance) {
                 this.insufficientBalanceScreen.show();
             } else {

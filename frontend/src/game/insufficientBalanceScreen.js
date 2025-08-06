@@ -1,4 +1,4 @@
-import { web3, getLocalWallet, globalStakeAmount } from '../blockchain_stuff.js';
+import { web3, getLocalWallet, getPlayerBalance, getRecommendedPlayableBalance, getMinimumPlayableBalance } from '../blockchain_stuff.js';
 import { isLandscape } from '../utils.js';
 import { MenuText } from './menu/menuText.js';
 import { MenuInput } from './menu/menuInput.js';
@@ -29,8 +29,7 @@ export class InsufficientBalanceScreen {
     createScreenElements() {
         const isLandscapeMode = isLandscape();
         
-        const recommendedAmountWei = BigInt(globalStakeAmount) * 10n;
-        const recommendedAmountEth = web3.utils.fromWei(recommendedAmountWei.toString(), 'ether');
+        const recommendedAmountEth = web3.utils.fromWei(getRecommendedPlayableBalance().toString(), 'ether');
         
         this.screenWidth = isLandscapeMode
             ? Math.min(1000, this.scene.screenWidth * 0.95)
@@ -297,10 +296,7 @@ export class InsufficientBalanceScreen {
             const wallet = getLocalWallet();
             if (!wallet) return;
 
-            const balance = await web3.eth.getBalance(wallet.address);
-            const minBalanceWei = web3.utils.toWei("0.00001", 'ether');
-            
-            if (BigInt(balance) >= BigInt(minBalanceWei)) {
+            if (BigInt(getPlayerBalance()) >= BigInt(getMinimumPlayableBalance())) {
                 // User now has sufficient balance, hide the screen
                 this.hide();
             }
