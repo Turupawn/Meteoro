@@ -80,7 +80,7 @@ export class PlayButton {
             
             if (hasInsufficientBalance) {
                 if (this.scene.insufficientBalanceScreen) {
-                    this.scene.insufficientBalanceScreen.show();
+                    this.scene.insufficientBalanceScreen.show(true); // Force show when play button is clicked
                     this.scene.insufficientBalanceScreen.triggerShakeAnimation();
                 }
                 return;

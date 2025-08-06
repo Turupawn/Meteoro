@@ -312,7 +312,7 @@ export async function initializeStakeAmount() {
 }
 
 export function getMinimumPlayableBalance() {
-    return BigInt(globalStakeAmount) + BigInt(globalStakeAmount/2n);
+    return BigInt(globalStakeAmount) + BigInt(globalStakeAmount);
 }
 
 export function getRecommendedPlayableBalance() {

@@ -67,9 +67,12 @@ class GameScene extends Phaser.Scene {
     checkInsufficientBalance(balance) {
         try {
             const hasInsufficientBalance = BigInt(balance) < BigInt(getMinimumPlayableBalance());
-            if (hasInsufficientBalance) {
-                this.insufficientBalanceScreen.show();
-            } else {
+            
+            // Only show insufficient balance screen on startup, not during gameplay
+            if (hasInsufficientBalance && this.cardDisplay && 
+                (!this.cardDisplay.playerCardSprite || !this.cardDisplay.playerCardSprite.active)) {
+                this.insufficientBalanceScreen.show(false); // Normal show (startup only)
+            } else if (!hasInsufficientBalance) {
                 this.insufficientBalanceScreen.hide();
             }
         } catch (error) {

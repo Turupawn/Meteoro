@@ -11,6 +11,7 @@ export class InsufficientBalanceScreen {
         this.checkInterval = null;
         this.isAnimating = false;
         this.isDisabled = false; // Add disabled state
+        this.forceShow = false; // Add flag to force show when play button is clicked
         this.createScreen();
     }
 
@@ -131,10 +132,37 @@ export class InsufficientBalanceScreen {
         ];
     }
 
-    show() {
+    show(force = false) {
+        // Only show if forced (play button click) or if no cards are being displayed
+        if (!force && this.scene.cardDisplay && this.scene.cardDisplay.playerCardSprite && this.scene.cardDisplay.playerCardSprite.active) {
+            return;
+        }
+        
         if (this.isVisible) return;
         
         this.isVisible = true;
+        this.forceShow = force;
+        
+        // Hide the card display message
+        if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {
+            this.scene.cardDisplay.currentGameText.setVisible(false);
+        }
+        
+        // Hide the card sprites if they exist
+        if (this.scene.cardDisplay) {
+            if (this.scene.cardDisplay.playerCardSprite && this.scene.cardDisplay.playerCardSprite.active) {
+                this.scene.cardDisplay.playerCardSprite.setVisible(false);
+            }
+            if (this.scene.cardDisplay.houseCardSprite && this.scene.cardDisplay.houseCardSprite.active) {
+                this.scene.cardDisplay.houseCardSprite.setVisible(false);
+            }
+            if (this.scene.cardDisplay.playerCardText && this.scene.cardDisplay.playerCardText.active) {
+                this.scene.cardDisplay.playerCardText.setVisible(false);
+            }
+            if (this.scene.cardDisplay.houseCardText && this.scene.cardDisplay.houseCardText.active) {
+                this.scene.cardDisplay.houseCardText.setVisible(false);
+            }
+        }
         
         // Show all elements
         this.elements.forEach(element => {
@@ -155,6 +183,28 @@ export class InsufficientBalanceScreen {
         if (!this.isVisible) return;
         
         this.isVisible = false;
+        this.forceShow = false;
+        
+        // Show the card display message again
+        if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {
+            this.scene.cardDisplay.currentGameText.setVisible(true);
+        }
+        
+        // Show the card sprites again if they exist
+        if (this.scene.cardDisplay) {
+            if (this.scene.cardDisplay.playerCardSprite && this.scene.cardDisplay.playerCardSprite.active) {
+                this.scene.cardDisplay.playerCardSprite.setVisible(true);
+            }
+            if (this.scene.cardDisplay.houseCardSprite && this.scene.cardDisplay.houseCardSprite.active) {
+                this.scene.cardDisplay.houseCardSprite.setVisible(true);
+            }
+            if (this.scene.cardDisplay.playerCardText && this.scene.cardDisplay.playerCardText.active) {
+                this.scene.cardDisplay.playerCardText.setVisible(true);
+            }
+            if (this.scene.cardDisplay.houseCardText && this.scene.cardDisplay.houseCardText.active) {
+                this.scene.cardDisplay.houseCardText.setVisible(true);
+            }
+        }
         
         // Hide all elements
         this.elements.forEach(element => {
