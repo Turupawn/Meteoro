@@ -67,6 +67,7 @@ export async function initWeb3() {
     return awaitContract();
   };
   return awaitWeb3();
+  
 }
 
 export async function checkGameState() {
@@ -309,4 +310,4 @@ export async function initializeStakeAmount() {
     printLog(['debug'], "Stake amount initialized:", globalStakeAmount);
 }
 
-export { web3, my_contract }; 
+export { web3, my_contract, globalStakeAmount }; 

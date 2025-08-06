@@ -8,7 +8,9 @@ import { Background } from './game/background.js';
 import { Menu } from './game/menu/menu.js';
 import { OpenMenuButton } from './game/openMenuButton.js';
 import { SocialLinks } from './game/socialLinks.js';
+import { InsufficientBalanceScreen } from './game/insufficientBalanceScreen.js';
 import { setGameScene } from './main.js';
+import { web3 } from './blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -42,6 +44,7 @@ class GameScene extends Phaser.Scene {
             this.menu.toggleMenu();
         });
         this.socialLinks = new SocialLinks(this);
+        this.insufficientBalanceScreen = new InsufficientBalanceScreen(this);
         
         // Set the game scene reference for main.js
         setGameScene(this);
@@ -52,10 +55,28 @@ class GameScene extends Phaser.Scene {
         this.balanceText.updateBalance(balance);
         this.cardDisplay.updateCurrentGameDisplay();
         this.gameHistory.updateGameHistory(recentHistory, playerAddress);
+        
+        // Check if we should show the insufficient balance screen
+        this.checkInsufficientBalance(balance);
     }
 
     updateCardDisplay(playerCard, houseCard) {
         this.cardDisplay.updateCurrentGameDisplay(playerCard, houseCard);
+    }
+
+    checkInsufficientBalance(balance) {
+        try {
+            const minBalanceWei = web3.utils.toWei("0.00001", 'ether');
+            const hasInsufficientBalance = BigInt(balance) < BigInt(minBalanceWei);
+            
+            if (hasInsufficientBalance) {
+                this.insufficientBalanceScreen.show();
+            } else {
+                this.insufficientBalanceScreen.hide();
+            }
+        } catch (error) {
+            console.error('Error checking insufficient balance:', error);
+        }
     }
 }
 

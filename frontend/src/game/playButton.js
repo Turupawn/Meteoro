@@ -1,5 +1,7 @@
 import { commitGame } from '../main.js';
 import { isLandscape } from '../utils.js';
+import { web3 } from '../blockchain_stuff.js';
+import { getLocalWallet } from '../blockchain_stuff.js';
 
 export class PlayButton {
     constructor(scene) {
@@ -66,7 +68,18 @@ export class PlayButton {
         const hitAreaHeight = isMobile ? this.button.height + 150 : this.button.height + 100;
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
-        this.button.on('pointerdown', () => {
+        this.button.on('pointerdown', async () => {
+            const hasInsufficientBalance = await this.checkInsufficientBalance();
+            
+            if (hasInsufficientBalance) {
+                if (this.scene.insufficientBalanceScreen) {
+                    this.scene.insufficientBalanceScreen.show();
+                    this.scene.insufficientBalanceScreen.triggerShakeAnimation();
+                }
+                return;
+            }
+            
+            // Proceed with normal game flow
             if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {
                 this.scene.cardDisplay.currentGameText.setText(`Please wait...`);
             }
@@ -77,5 +90,20 @@ export class PlayButton {
             
             commitGame();
         });
+    }
+
+    async checkInsufficientBalance() {
+        try {
+            const wallet = getLocalWallet();
+            if (!wallet) return false;
+
+            const balance = await web3.eth.getBalance(wallet.address);
+            const minBalanceWei = web3.utils.toWei("0.00001", 'ether');
+            
+            return BigInt(balance) < BigInt(minBalanceWei);
+        } catch (error) {
+            console.error('Error checking balance:', error);
+            return false;
+        }
     }
 }

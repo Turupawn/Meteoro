@@ -304,8 +304,8 @@ async function gameLoop() {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
             } else if (BigInt(gameState.playerBalance) < BigInt(web3.utils.toWei(MIN_BALANCE, 'ether'))) {
-                const currentEth = web3.utils.fromWei(gameState.playerBalance, 'ether');
-                alert(`Insufficient balance! You need at least ${MIN_BALANCE} ETH to play.\nCurrent balance: ${parseFloat(currentEth).toFixed(6)} ETH`);
+                // Don't show alert anymore, let the UI handle it
+                printLog(['debug'], "Insufficient balance detected, UI will handle display");
                 shouldProcessCommit = false;
             } else if ( gameState.gameState === 0n /* NotStarted */ ||
                         gameState.gameState === 3n /* Revealed */   ||
