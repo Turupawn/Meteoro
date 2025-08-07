@@ -107,19 +107,21 @@ async function checkForNewGames() {
         return;
     }
     
+    isProcessing = true;
+    
     try {
-        isProcessing = true;
-        
         // Get backend state: last responded gameId and pending count
         const backendState = await contract.methods.getBackendGameState().call({}, 'pending');
         const lastRandomnessPostedGameId = parseInt(backendState[0]);
         const pendingGameCount = parseInt(backendState[1]);
 
-        if(pendingGameCount === 0)
+        if(pendingGameCount === 0) {
             return;
+        }
 
-        if(lastProcessedGameId != null && lastProcessedGameId >= lastRandomnessPostedGameId)
+        if(lastProcessedGameId != null && lastProcessedGameId >= lastRandomnessPostedGameId) {
             return;
+        }
         
         lastProcessedGameId = lastRandomnessPostedGameId + pendingGameCount;
         console.log(`Found ${pendingGameCount} pending games (last processed: ${lastProcessedGameId}, current: ${lastRandomnessPostedGameId}), generating randomness...`);
