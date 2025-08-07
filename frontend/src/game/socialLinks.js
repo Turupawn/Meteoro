@@ -11,7 +11,7 @@ export class SocialLinks {
         const iconSize = isLandscapeMode ? 80 : 70;
         
         // Position relative to bottom of screen, below the play button, higher up in portrait
-        const bottomMargin = isLandscapeMode ? 50 : 250;
+        const bottomMargin = isLandscapeMode ? 50 : 300;
         const rightMargin = isLandscapeMode ? 50 : 45;
         const spacing = isLandscapeMode ? 100 : 90;
 

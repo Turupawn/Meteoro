@@ -26,7 +26,7 @@ export class PlayButton {
         
         const x = this.scene.centerX;
         // Position relative to bottom of screen, higher up in portrait to avoid mobile browser UI
-        const bottomMargin = isLandscapeMode ? 120 : 450;
+        const bottomMargin = isLandscapeMode ? 120 : 500;
         const y = this.scene.screenHeight - bottomMargin;
         
         // Much bigger font and button on portrait (mobile)
