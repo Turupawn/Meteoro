@@ -73,7 +73,7 @@ export class GameHistory {
         } else {
             this.quadImage = this.scene.add.rexQuadImage({
                 x: 236+50,
-                y: 300,
+                y: 350,
                 texture: 'gameHistoryTexture',
                 ninePointMode: false
             

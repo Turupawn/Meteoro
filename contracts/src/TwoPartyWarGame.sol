@@ -46,6 +46,11 @@ contract TwoPartyWarGame {
         _;
     }
 
+    modifier hasStakedForMultiple(uint count) {
+        require(msg.value == STAKE_AMOUNT * count, "Incorrect stake amount for multiple games");
+        _;
+    }
+
     constructor(address _house) {
         house = _house;
     }
@@ -80,7 +85,7 @@ contract TwoPartyWarGame {
         emit GameCreated(msg.sender, _commitHash, nextGameId);
     }
 
-    function multiPostRandomness(bytes32[] memory randomness) external payable hasStaked onlyHouse {
+    function multiPostRandomness(bytes32[] memory randomness) external payable hasStakedForMultiple(randomness.length) onlyHouse {
         require(randomness.length > 0, "Should not be 0");
         require(randomness.length <= pendingGameCount, "Too many randomness values");
         for (uint i = 0; i < randomness.length; i++) {

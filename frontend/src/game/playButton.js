@@ -23,17 +23,18 @@ export class PlayButton {
 
     createPlayButtonTexture() {
         const isLandscapeMode = isLandscape();
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         const x = this.scene.centerX;
-        const y = isLandscapeMode ? this.scene.screenHeight * 0.85 : this.scene.screenHeight * 0.75;
+        // Position relative to bottom of screen, consistent with social links
+        const bottomMargin = isLandscapeMode ? 120 : 350;
+        const y = this.scene.screenHeight - bottomMargin;
         
-        // Much bigger font and button on mobile
-        const fontSize = isMobile ? Math.max(72, this.scene.screenWidth / 10) : Math.max(48, this.scene.screenWidth / 15);
+        // Much bigger font and button on portrait (mobile)
+        const fontSize = isLandscapeMode ? Math.max(48, this.scene.screenWidth / 15) : Math.max(72, this.scene.screenWidth / 10);
         
         const playButtonText = "PLAY";
-        const playButtonWidth = isMobile ? Math.max(800, playButtonText.length * 60) : Math.max(600, playButtonText.length * 40);
-        const playButtonHeight = isMobile ? 200 : 150;
+        const playButtonWidth = isLandscapeMode ? Math.max(600, playButtonText.length * 40) : Math.max(800, playButtonText.length * 60);
+        const playButtonHeight = isLandscapeMode ? 150 : 200;
         
         this.buttonBg = this.scene.add.rectangle(
             x,
@@ -66,13 +67,13 @@ export class PlayButton {
 
         this.button.setDepth(200);
         
-        // Bigger hit area on mobile
-        const hitAreaWidth = isMobile ? this.button.width + 300 : this.button.width + 200;
-        const hitAreaHeight = isMobile ? this.button.height + 150 : this.button.height + 100;
+        // Bigger hit area on portrait (mobile)
+        const hitAreaWidth = isLandscapeMode ? this.button.width + 200 : this.button.width + 300;
+        const hitAreaHeight = isLandscapeMode ? this.button.height + 100 : this.button.height + 150;
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
         // Create stake amount display inside the button (below the PLAY text)
-        this.createStakeAmountDisplay(x, y + 50, isMobile);
+        this.createStakeAmountDisplay(x, y + 50, isLandscapeMode);
 
         // Add click handler to both background and text
         const clickHandler = async () => {
@@ -102,7 +103,7 @@ export class PlayButton {
         this.button.on('pointerdown', clickHandler);
     }
 
-    createStakeAmountDisplay(x, y, isMobile) {
+    createStakeAmountDisplay(x, y, isLandscapeMode) {
         // Convert stake amount from Wei to ETH
         let stakeAmountText = "loading...";
         try {
@@ -113,7 +114,7 @@ export class PlayButton {
             stakeAmountText = `${getStakeAmount()} WEI per game`;
         }
 
-        const stakeFontSize = isMobile ? Math.max(16, this.scene.screenWidth / 60) : Math.max(14, this.scene.screenWidth / 80);
+        const stakeFontSize = isLandscapeMode ? Math.max(14, this.scene.screenWidth / 80) : Math.max(16, this.scene.screenWidth / 60);
         
         this.stakeAmountText = this.scene.add.text(x, y, stakeAmountText, {
             font: `${stakeFontSize}px Orbitron`,

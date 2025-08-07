@@ -51,7 +51,7 @@ async function multiPostRandomnessForGames(randomness) {
             from: houseAccount.address,
             to: contractAddress,
             value: web3.utils.toBN(stakeAmount).mul(web3.utils.toBN(randomness.length)).toString(),
-            gas: 500000 + 200000 * randomness.length,
+            gas: 1000000 + 500000 * randomness.length, // Fixed high gas limit for speed
             nonce: nonce,
             data: contract.methods.multiPostRandomness(randomness).encodeABI()
         };
@@ -70,9 +70,14 @@ async function multiPostRandomnessForGames(randomness) {
             });
         } else {
             console.error(`multiPostRandomness transaction failed:`, receipt);
+            // Reset lastProcessedGameId on transaction failure
+            lastProcessedGameId = null;
         }
     } catch (error) {
         console.error('Error in multiPostRandomnessForGames:', error);
+        
+        // Reset lastProcessedGameId on any error
+        lastProcessedGameId = null;
         
         // If it's an "already known" error, the transaction was already sent
         if (error.message && error.message.includes('already known')) {
@@ -82,6 +87,13 @@ async function multiPostRandomnessForGames(randomness) {
         else if (error.message && error.message.includes('nonce too low')) {
             console.log('Nonce too low, resetting nonce...');
             currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
+        }
+        // If it's a revert error, log more details
+        else if (error.message && error.message.includes('reverted')) {
+            console.error('Transaction reverted. Error details:', error);
+            if (error.receipt) {
+                console.error('Receipt:', error.receipt);
+            }
         }
     }
 }
@@ -94,17 +106,18 @@ async function checkForNewGames() {
         const lastRandomnessPostedGameId = parseInt(backendState[0]);
         const pendingGameCount = parseInt(backendState[1]);
 
-        if(pendingGameCount === 0)
+        if(pendingGameCount === 0) {
             return;
+        }
 
-        if(lastProcessedGameId != null && lastProcessedGameId >= lastRandomnessPostedGameId)
+        if(lastProcessedGameId != null && lastProcessedGameId > lastRandomnessPostedGameId) {
             return;
+        }
         
-        lastProcessedGameId = lastRandomnessPostedGameId;
+        lastProcessedGameId = lastRandomnessPostedGameId + pendingGameCount;
         console.log(`Found ${pendingGameCount} pending games (last processed: ${lastProcessedGameId}, current: ${lastRandomnessPostedGameId}), generating randomness...`);
         const randomness = Array.from({ length: pendingGameCount }, () => generateRandomHash());
         await multiPostRandomnessForGames(randomness);
-        
     } catch (error) {
         console.error('Error checking for new games:', error);
     }
@@ -135,7 +148,7 @@ app.get('/health', (req, res) => {
         lastProcessedBlock: lastProcessedBlock,
         processingGameIds: Array.from(processingGameIds),
         currentNonce: currentNonce,
-        lastProcessedGameId: lastProcessedGameId
+        lastProcessedGameId: lastProcessedGameId,
     });
 });
 
