@@ -110,7 +110,7 @@ async function checkForNewGames() {
             return;
         }
 
-        if(lastProcessedGameId != null && lastProcessedGameId >= lastRandomnessPostedGameId) {
+        if(lastProcessedGameId != null && lastProcessedGameId > lastRandomnessPostedGameId) {
             return;
         }
         
