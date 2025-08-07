@@ -25,8 +25,8 @@ export class PlayButton {
         const isLandscapeMode = isLandscape();
         
         const x = this.scene.centerX;
-        // Position relative to bottom of screen, consistent with social links
-        const bottomMargin = isLandscapeMode ? 120 : 350;
+        // Position relative to bottom of screen, higher up in portrait to avoid mobile browser UI
+        const bottomMargin = isLandscapeMode ? 120 : 450;
         const y = this.scene.screenHeight - bottomMargin;
         
         // Much bigger font and button on portrait (mobile)
