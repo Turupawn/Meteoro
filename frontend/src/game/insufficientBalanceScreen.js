@@ -91,7 +91,7 @@ export class InsufficientBalanceScreen {
                 wordWrap: { width: this.screenWidth - 100 },
                 align: 'center',
                 interactive: true,
-                onClick: () => window.open('https://placeholder.com/#TODO', '_blank')
+                onClick: () => window.open('https://dev.to/filosofiacodigoen/how-local-storage-wallets-on-ethereum-work-4c0p', '_blank')
             }
         );
         this.warningText.textElement.setVisible(false);
