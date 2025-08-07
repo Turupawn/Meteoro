@@ -1,113 +1,216 @@
-import Web3 from 'web3';
-import Phaser from "phaser";
 import { loadPhaser } from './game.js';
+import { generateRandomBytes32, calculateCards, printLog } from './utils.js';
+import { 
+    initWeb3, 
+    getLocalWallet, 
+    checkGameState, 
+    commit,
+    performReveal, 
+    updateGasPrice,
+    initializeNonce,
+    initializeStakeAmount,
+    web3,
+    getPlayerBalance,
+    getMinimumPlayableBalance
+} from './blockchain_stuff.js';
 
-const NETWORK_ID = 6342
+import posthog from 'posthog-js'
 
-const POLL_INTERVAL = 150 // 150
+posthog.init('phc_3vofleZVJy4GKoykZPb4bOEc7gjl6do5YoFDLB6NVYl',
+    {
+        api_host: 'https://us.i.posthog.com',
+        person_profiles: 'always' // or 'always' to create profiles for anonymous users as well
+    }
+)
 
-const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
-const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json"
-var my_contract
-
-var web3
+const POLL_INTERVAL = 150
 
 var game
+var gameScene = null; // Reference to the main game scene
 
 const MIN_BALANCE = "0.00001";
 let commitStartTime = null;
 
-const PRINT_LEVELS = ['profile', 'error']; //['debug', 'profile', 'error'];
-
-let globalGameState = null;
-let globalStakeAmount = null;
-let globalGasPrice = null;
-let globalNonce = null;
-let lastGasPriceUpdate = 0;
-const GAS_PRICE_UPDATE_INTERVAL = 60000;
-const GAS_LIMIT = 600000;
+let gameState = null;
 let shouldProcessCommit = false;
 
-function getLocalWallet() {
-    const walletData = localStorage.getItem('localWallet');
-    if (walletData) {
-      return JSON.parse(walletData);
-    }
-    return null;
-  }
+// Loading coordination
+let web3LoadingProgress = 0;
+let gameDataLoadingProgress = 0;
+let isWeb3Ready = false;
+let isGameDataReady = false;
 
-const getWeb3 = async () => {
-  return new Promise((resolve, reject) => {
-    const provider = new Web3.providers.HttpProvider("https://carrot.megaeth.com/rpc");
-    const web3 = new Web3(provider);
-    resolve(web3);
-  });
-};
+// Loading screen coordination
+let loadingScreenReady = false;
 
-const getContract = async (web3, address, abi_path) => {
-  const response = await fetch(abi_path);
-  const data = await response.json();
-  const contract = new web3.eth.Contract(
-    data,
-    address
-    );
-  return contract
-}
+// Add transaction state tracking
+let isTransactionInProgress = false;
+let lastTransactionHash = null;
 
 async function loadDapp() {
-  var awaitWeb3 = async function () {
-    game = await loadPhaser()
-    web3 = await getWeb3()
-        var awaitContract = async function () {
-      try {
-          my_contract = await getContract(web3, MY_CONTRACT_ADDRESS, MY_CONTRACT_ABI_PATH)
-        let wallet = getLocalWallet();
-        if (!wallet) {
-          wallet = generateWallet();
-        }
-        onContractInitCallback();
-        
-      } catch (error) {
-        console.error("Error initializing contract:", error);
-        document.getElementById("game-status").textContent = "Error connecting to blockchain";
-      }
-    };
-    awaitContract();
-  };
-  awaitWeb3();
+  try {
+    // Track app initialization
+    posthog.capture('app_initialized', { 
+      timestamp: Date.now() 
+    });
+    
+    // Start Phaser with loading screen
+    game = await loadPhaser();
+    
+    // Wait for loading screen to be ready
+    await waitForLoadingScreen();
+    
+    // Start Web3 initialization in parallel
+    initWeb3WithProgress();
+    
+    // Start game data loading in parallel
+    loadGameData();
+    
+  } catch (error) {
+    console.error("Error initializing game:", error);
+    posthog.capture('app_initialization_error', { 
+      error: error.message 
+    });
+  }
 }
+
+async function waitForLoadingScreen() {
+  // Wait for loading screen to be ready
+  while (!loadingScreenReady) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+}
+
+async function initWeb3WithProgress() {
+  try {
+    // Update progress to show Web3 is starting
+    web3LoadingProgress = 0.1;
+    updateWeb3Progress(0.1);
+    
+    // Initialize Web3
+    await initWeb3();
+    
+    // Update progress to show Web3 is ready
+    web3LoadingProgress = 1;
+    isWeb3Ready = true;
+    updateWeb3Progress(1);
+    
+    console.log("Web3 initialization completed successfully");
+    
+    // Track successful Web3 initialization
+    posthog.capture('web3_initialized', { 
+      timestamp: Date.now() 
+    });
+    
+  } catch (error) {
+    console.error("Error initializing Web3:", error);
+    // Mark as complete even if failed to prevent infinite loading
+    web3LoadingProgress = 1;
+    isWeb3Ready = true;
+    updateWeb3Progress(1);
+    
+    // Track Web3 initialization error
+    posthog.capture('web3_initialization_error', { 
+      error: error.message 
+    });
+  }
+}
+
+function updateWeb3Progress(progress) {
+  if (window.updateWeb3Progress) {
+    window.updateWeb3Progress(progress);
+  } else {
+    console.warn("updateWeb3Progress not available yet, progress:", progress);
+  }
+}
+
+function updateGameDataProgress(progress) {
+  if (window.updateGameDataProgress) {
+    window.updateGameDataProgress(progress);
+  } else {
+    console.warn("updateGameDataProgress not available yet, progress:", progress);
+  }
+}
+
+async function loadGameData() {
+  try {
+    // Simulate progressive loading of game data
+    console.log("Loading game data...")
+    gameDataLoadingProgress = 0.2;
+    updateGameDataProgress(0.2);
+
+    console.log("Waiting for Web3 to be ready...")
+    
+    // Wait for Web3 to be ready
+    while (!isWeb3Ready) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    gameDataLoadingProgress = 0.5;
+    updateGameDataProgress(0.5);
+    console.log("Initializing stake amount...")
+    await initializeStakeAmount();
+    console.log("Updating gas price...")
+    await new Promise(resolve => setTimeout(resolve, 150));
+    gameDataLoadingProgress = 0.7;
+    updateGameDataProgress(0.7);
+    console.log("Updating gas price...")
+    await updateGasPrice();
+    console.log("Initializing nonce...")
+    await new Promise(resolve => setTimeout(resolve, 150));
+    await initializeNonce();
+    gameDataLoadingProgress = 0.9;
+    updateGameDataProgress(0.9);
+    console.log("Checking game state...")
+    await checkGameState();
+    await new Promise(resolve => setTimeout(resolve, 150));    
+    gameDataLoadingProgress = 1;
+    isGameDataReady = true;
+    updateGameDataProgress(1);
+    console.log("Starting game loop...")
+    startGameLoop();
+  } catch (error) {
+    console.error("Error loading game data:", error);
+    gameDataLoadingProgress = 1;
+    isGameDataReady = true;
+    updateGameDataProgress(1);
+  }
+}
+
+// Function to set the game scene reference
+export function setGameScene(scene) {
+    gameScene = scene;
+}
+
+// Function to notify that loading screen is ready
+export function setLoadingScreenReady() {
+    loadingScreenReady = true;
+}
+
+// Wait for game to be ready before starting
+window.addEventListener('gameReady', () => {
+  updateGameState();
+});
 
 loadDapp()
 
 const onContractInitCallback = async () => {
   try {
-    globalStakeAmount = await my_contract.methods.STAKE_AMOUNT().call();
-    printLog(['debug'], "Stake amount initialized:", globalStakeAmount);
+    await initializeStakeAmount();
     
-    await updateGasPrice(); // Initialize gas price
-    await initializeNonce(); // Initialize nonce
+    await updateGasPrice();
+    await initializeNonce();
     
-    // Initialize game state first
     await checkGameState();
     
     updateGameState();
     startGameLoop();
-    
-    // Signal that everything is ready
-    window.gameReady = true;
-    window.globalGameState = globalGameState;
-    window.web3 = web3;
-    
+        
     window.dispatchEvent(new CustomEvent('gameReady'));
     
   } catch (error) {
     console.error("Error in contract initialization:", error);
 
   }
-}
-
-function generateRandomBytes32() {
-    return web3.utils.randomHex(32);
 }
 
 function getStoredSecret() {
@@ -132,12 +235,6 @@ function getCardDisplay(cardValue) {
     return cardValue.toString();
 }
 
-function updateCardDisplay(playerCard, houseCard) {
-    if (game) {
-        game.scene.scenes[0].updateCurrentGameDisplay(playerCard, houseCard);
-    }
-}
-
 async function gameLoop() {
     const wallet = getLocalWallet();
     if (!wallet) {
@@ -145,19 +242,26 @@ async function gameLoop() {
         return;
     }
 
+    // Don't process if a transaction is already in progress
+    if (isTransactionInProgress) {
+        printLog(['debug'], "Transaction in progress, skipping game loop");
+        return;
+    }
+
     try {
         printLog(['debug'], "=== GAME LOOP START ===");
 
-        await checkGameState();
-        printLog(['debug'], "Current game state:", globalGameState);
+        gameState = await checkGameState();
+        printLog(['debug'], "Current game state:", gameState);
         
         const pendingCommit = getStoredCommit();
         const pendingReveal = getPendingReveal();
         printLog(['debug'], "Pending commit:", pendingCommit);
         printLog(['debug'], "Pending reveal:", pendingReveal);
 
-        if (globalGameState.gameState === 2n && pendingCommit) {
-            const result = calculateCards(pendingCommit.secret, globalGameState.houseHash);
+        // Handle case where game is revealed (state 2n) and there's a pending commit
+        if (gameState && gameState.gameState === 2n && pendingCommit) {
+            const result = calculateCards(pendingCommit.secret, gameState.houseHash);
             
             if (commitStartTime) {
                 const endTime = Date.now();
@@ -168,19 +272,80 @@ async function gameLoop() {
                 printLog(['profile'], "End time:", new Date(endTime).toISOString());
                 printLog(['profile'], "=========================");
                 commitStartTime = null;
+                
+                // Track game completion performance
+                posthog.capture('game_completed', {
+                    game_id: gameState.gameId?.toString(),
+                    player_card: result.playerCard,
+                    house_card: result.houseCard,
+                    total_time_ms: totalTime,
+                    player_balance: gameState.playerBalance?.toString()
+                });
             }
 
             clearStoredCommit();
             storePendingReveal(pendingCommit.secret);
-            updateCardDisplay(result.playerCard, result.houseCard);
+            // Use the game scene reference instead of hardcoded index
+            if (gameScene) {
+                gameScene.updateCardDisplay(result.playerCard, result.houseCard);
+            }
             printLog(['debug'], "Conditions met for reveal, attempting...");
-            await performReveal(wallet, pendingCommit.secret);
+            
+            // Mark transaction as in progress
+            isTransactionInProgress = true;
+            try {
+                await performReveal(pendingCommit.secret);
+                printLog(['debug'], "Reveal transaction completed successfully");
+                
+                // Track successful reveal
+                posthog.capture('reveal_transaction_success', {
+                    game_id: gameState.gameId?.toString(),
+                    player_card: result.playerCard,
+                    house_card: result.houseCard
+                });
+                
+            } catch (error) {
+                printLog(['error'], "Reveal failed:", error);
+                
+                // Track reveal failure
+                posthog.capture('reveal_transaction_failed', {
+                    game_id: gameState.gameId?.toString(),
+                    error: error.message
+                });
+                
+                // If it's an "already known" error, clear the pending reveal
+                if (error.message && error.message.includes('already known')) {
+                    printLog(['debug'], "Transaction already known, clearing pending reveal");
+                    clearPendingReveal();
+                }
+            } finally {
+                isTransactionInProgress = false;
+            }
         }
+        
+        // Handle case where game is already revealed (state 3n) and there's a pending reveal
+        if (gameState && gameState.gameState === 3n && pendingReveal) {
+            printLog(['debug'], "Game already revealed, clearing pending reveal");
+            clearPendingReveal();
+            
+            // Calculate and display the result
+            if (gameState.playerCard && gameState.houseCard) {
+                const playerCard = parseInt(gameState.playerCard);
+                const houseCard = parseInt(gameState.houseCard);
+                if (!isNaN(playerCard) && !isNaN(houseCard)) {
+                    if (gameScene) {
+                        gameScene.updateCardDisplay(playerCard, houseCard);
+                    }
+                }
+            }
+        }
+        
+        // Handle new game requests
         if (
-            (
-                globalGameState.gameState === 0n /* NotStarted */ ||
-                globalGameState.gameState === 3n /* Revealed */   ||
-                globalGameState.gameState === 4n /* Forfeited */)
+            gameState && (
+                gameState.gameState === 0n /* NotStarted */ ||
+                gameState.gameState === 3n /* Revealed */   ||
+                gameState.gameState === 4n /* Forfeited */)
             && shouldProcessCommit) {
             shouldProcessCommit = false;
             const storedCommit = getStoredCommit();
@@ -188,18 +353,33 @@ async function gameLoop() {
                 printLog(['debug'], "Found pending commit from previous game:", storedCommit);
                 alert("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
                 shouldProcessCommit = false;
-            } else if (!globalGameState) {
+                
+                // Track attempt to start game with pending commit
+                posthog.capture('game_start_blocked_pending_commit', {
+                    game_id: gameState.gameId?.toString()
+                });
+                
+            } else if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
-            } else if (BigInt(globalGameState.playerBalance) < BigInt(web3.utils.toWei(MIN_BALANCE, 'ether'))) {
-                const currentEth = web3.utils.fromWei(globalGameState.playerBalance, 'ether');
-                alert(`Insufficient balance! You need at least ${MIN_BALANCE} ETH to play.\nCurrent balance: ${parseFloat(currentEth).toFixed(6)} ETH`);
+                
+                // Track game start with uninitialized state
+                posthog.capture('game_start_failed_uninitialized_state');
+                
+            } else if (BigInt(getPlayerBalance()) < BigInt(getMinimumPlayableBalance())) {
+                // Don't show alert anymore, let the UI handle it
+                printLog(['debug'], "Insufficient balance detected, UI will handle display");
                 shouldProcessCommit = false;
-            } else if ( globalGameState.gameState === 0n /* NotStarted */ ||
-                        globalGameState.gameState === 3n /* Revealed */   ||
-                        globalGameState.gameState === 4n /* Forfeited */) {
-                document.getElementById("game-status").textContent = "Please wait...";
-
+                
+                // Track insufficient balance
+                posthog.capture('game_start_blocked_insufficient_balance', {
+                    player_balance: getPlayerBalance(),
+                    minimum_balance: getMinimumPlayableBalance()
+                });
+                
+            } else if ( gameState.gameState === 0n /* NotStarted */ ||
+                        gameState.gameState === 3n /* Revealed */   ||
+                        gameState.gameState === 4n /* Forfeited */) {
                 const secret = generateRandomBytes32();
                 storeCommit(secret);
                 commitStartTime = Date.now();
@@ -207,39 +387,45 @@ async function gameLoop() {
                 printLog(['profile'], "Start time:", new Date(commitStartTime).toISOString());
 
                 printLog(['debug'], "Processing commit request...");
-                const data = my_contract.methods.commit(web3.utils.soliditySha3(secret)).encodeABI();
-                const nonce = getAndIncrementNonce();
-                const gasPrice = await getCurrentGasPrice();
                 
-                if (nonce === null || !gasPrice) {
-                    printLog(['error'], "Failed to get nonce or gas price");
-                    shouldProcessCommit = false;
-                    return;
-                }
-                
-                const tx = {
-                    from: wallet.address,
-                    to: MY_CONTRACT_ADDRESS,
-                    nonce: nonce,
-                    gasPrice: gasPrice,
-                    gas: GAS_LIMIT,
-                    value: globalStakeAmount,
-                    data: data
-                };
-
-                const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
-                const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-
-                printLog(['debug'], "Commit Transaction Receipt:", {
-                    transactionHash: receipt.transactionHash,
-                    blockNumber: receipt.blockNumber,
-                    status: receipt.status ? "Confirmed" : "Failed",
-                    gasUsed: receipt.gasUsed
+                // Track game start attempt
+                posthog.capture('game_start_attempted', {
+                    game_id: gameState.gameId?.toString(),
+                    player_balance: gameState.playerBalance?.toString(),
+                    game_state: gameState.gameState?.toString()
                 });
                 
-                if (receipt.status) {
+                // Mark transaction as in progress
+                isTransactionInProgress = true;
+                try {
+                    await commit(web3.utils.soliditySha3(secret));
                     shouldProcessCommit = false;
                     updateGameState();
+                    printLog(['debug'], "Commit transaction completed successfully");
+                    
+                    // Track successful commit
+                    posthog.capture('commit_transaction_success', {
+                        game_id: gameState.gameId?.toString(),
+                        player_balance: gameState.playerBalance?.toString()
+                    });
+                    
+                } catch (error) {
+                    printLog(['error'], "Commit failed:", error);
+                    shouldProcessCommit = false;
+                    
+                    // Track commit failure
+                    posthog.capture('commit_transaction_failed', {
+                        game_id: gameState.gameId?.toString(),
+                        error: error.message
+                    });
+                    
+                    // If it's an "already known" error, clear the stored commit
+                    if (error.message && error.message.includes('already known')) {
+                        printLog(['debug'], "Transaction already known, clearing stored commit");
+                        clearStoredCommit();
+                    }
+                } finally {
+                    isTransactionInProgress = false;
                 }
             }
         }
@@ -248,73 +434,23 @@ async function gameLoop() {
     } catch (error) {
         printLog(['error'], "Error in game loop:", error);
         shouldProcessCommit = false;
-    }
-}
-
-async function commit() {
-    const wallet = getLocalWallet();
-    if (!wallet) {
-        alert("No local wallet found!");
-        return;
-    }
-    shouldProcessCommit = true;
-}
-
-async function checkGameState() {
-    try {
-        const wallet = getLocalWallet();
-        if (!wallet) {
-            return null;
-        }
+        isTransactionInProgress = false;
         
-        const gameState = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
-        
-        globalGameState = {
-            playerBalance: gameState.player_balance,
-            gameState: gameState.gameState,
-            playerCommit: gameState.playerCommit,
-            houseHash: gameState.houseHash,
-            gameId: gameState.gameId,
-            recentHistory: gameState.recentHistory
-        };
-        
-        // Update the global reference
-        window.globalGameState = globalGameState;
-        
-        return globalGameState;
-    } catch (error) {
-        console.error("Error checking game state:", error);
-        return null;
+        // Track game loop error
+        posthog.capture('game_loop_error', {
+            error: error.message
+        });
     }
-}
-
-function calculateCards(secret, houseHash) {
-    const secretBig = BigInt(secret);
-    const houseHashBig = BigInt(houseHash);
-    const xorResult = secretBig ^ houseHashBig;
-    const playerCard = Number((xorResult >> 128n) % 13n) + 1;
-    const houseCard = Number((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn) % 13n) + 1;
-    let winner;
-    if (playerCard > houseCard) {
-        winner = 'Player';
-    } else {
-        winner = 'House';
-    }
-    return { playerCard, houseCard, winner };
 }
 
 async function updateGameState() {
     try {
-        if (!globalGameState) return;
-        const gameStateElement = document.getElementById("game-state");
-        if (gameStateElement) {
-            let stateText = `Game State: ${globalGameState.gameState}`;
-            if (globalGameState.gameState === 2n && !getStoredSecret()) {
-                stateText += " (Secret lost - can forfeit)";
-            }
-            gameStateElement.textContent = stateText;
+        if (!gameState) return;
+        const wallet = getLocalWallet()
+        // Use the game scene reference instead of hardcoded index
+        if (gameScene) {
+            gameScene.updateDisplay(gameState.playerBalance, gameState.recentHistory, wallet.address);
         }
-        // Removed the personal games list update since it's now handled in game.js
     } catch (error) {
         console.error("Error updating game state:", error);
     }
@@ -324,184 +460,8 @@ function startGameLoop() {
     gameLoop();
     setInterval(gameLoop, POLL_INTERVAL);
 }
+
 const onWalletConnectedCallback = async () => {
-}
-
-function generateWallet() {
-  const account = web3.eth.accounts.create();
-  localStorage.setItem('localWallet', JSON.stringify({
-    address: account.address,
-    privateKey: account.privateKey
-  }));
-  return account;
-}
-
-async function forfeit() {
-    const wallet = getLocalWallet();
-    if (!wallet) {
-        alert("No local wallet found!");
-        return;
-    }
-    try {
-        const data = my_contract.methods.forfeit().encodeABI();
-        const nonce = getAndIncrementNonce();
-        const gasPrice = await getCurrentGasPrice();
-        
-        if (nonce === null || !gasPrice) {
-            printLog(['error'], "Failed to get nonce or gas price");
-            return;
-        }
-        
-        const tx = {
-            from: wallet.address,
-            to: MY_CONTRACT_ADDRESS,
-            nonce: nonce,
-            gasPrice: gasPrice,
-            gas: GAS_LIMIT,
-            data: data
-        };
-        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
-        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        printLog(['debug'], "Forfeit Transaction Receipt:", {
-            transactionHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber,
-            status: receipt.status ? "Confirmed" : "Failed",
-            gasUsed: receipt.gasUsed
-        });
-
-        if (receipt.status) {
-            window.location.reload();
-        } else {
-            updateGameState();
-        }
-    } catch (error) {
-        printLog(['error'], "Error in forfeit:", error);
-    }
-}
-
-async function performReveal(wallet, secret) {
-    try {
-        printLog(['debug'], "=== PERFORM REVEAL START ===");
-        if (!globalGameState) {
-            printLog(['error'], "Global game state not initialized");
-            return;
-        }
-        const gameId = globalGameState.gameId;
-        printLog(['debug'], "Game state at reveal start:", {
-            gameId: gameId,
-            gameState: globalGameState.gameState,
-            playerCommit: globalGameState.playerCommit,
-            houseHash: globalGameState.houseHash
-        });
-        printLog(['debug'], `Started processing reveal for game ${gameId}`);
-        const data = my_contract.methods.reveal(secret).encodeABI();
-        const nonce = getAndIncrementNonce();
-        const gasPrice = await getCurrentGasPrice();
-        
-        if (nonce === null || !gasPrice) {
-            printLog(['error'], "Failed to get nonce or gas price");
-            return;
-        }
-        
-        const tx = {
-            from: wallet.address,
-            to: MY_CONTRACT_ADDRESS,
-            nonce: nonce,
-            gasPrice: gasPrice,
-            gas: GAS_LIMIT,
-            data: data
-        };
-        printLog(['debug'], "Sending reveal transaction...");
-        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
-        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        printLog(['debug'], "Reveal Transaction Receipt:", {
-            transactionHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber,
-            status: receipt.status ? "Confirmed" : "Failed",
-            gasUsed: receipt.gasUsed
-        });
-        if (receipt.status) {
-            printLog(['debug'], "=== REVEAL SUCCESSFUL ===");
-            if (globalGameState.gameId === gameId &&
-                globalGameState.gameState === 0n &&
-                globalGameState.playerCommit === "0x0000000000000000000000000000000000000000000000000000000000000000") {
-                printLog(['debug'], "Same game ID, completed state, and zero commit - clearing secret");
-            } else {
-                printLog(['debug'], "Game state changed or new game started, keeping secret");
-            }
-        }
-        printLog(['debug'], "=== PERFORM REVEAL END ===");
-        updateGameState();
-    } catch (error) {
-        printLog(['error'], "Error in reveal:", error);
-    }
-}
-
-async function withdrawFunds(destinationAddress) {
-    const wallet = getLocalWallet();
-    if (!wallet) {
-        alert("No local wallet found!");
-        return;
-    }
-    try {
-        const balance = await web3.eth.getBalance(wallet.address);
-        if (balance <= 0) {
-            alert("No funds to withdraw!");
-            return;
-        }
-        const ethLeftForGas = web3.utils.toWei("0.000000001", "ether");
-        if (BigInt(balance) <= BigInt(ethLeftForGas)) {
-            alert("Balance too low! Leaving funds for gas fees.");
-            return;
-        }
-        if (!destinationAddress || !web3.utils.isAddress(destinationAddress)) {
-            alert("Invalid Ethereum address!");
-            return;
-        }
-        const gasPrice = await web3.eth.getGasPrice();
-        const gasLimit = 21000;
-        const gasCost = BigInt(gasPrice) * BigInt(gasLimit);
-        const amountToSend = BigInt(balance) - gasCost - BigInt(ethLeftForGas);
-        if (amountToSend <= 0) {
-            alert("Balance too low to withdraw after reserving gas fees!");
-            return;
-        }
-        const tx = {
-            from: wallet.address,
-            to: destinationAddress,
-            value: amountToSend.toString(),
-            gas: gasLimit,
-            gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
-        };
-        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
-        document.getElementById("game-status").textContent = "Withdrawing...";
-        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        if (receipt.status) {
-            const ethAmount = web3.utils.fromWei(amountToSend.toString(), 'ether');
-            const leftAmount = web3.utils.fromWei(ethLeftForGas, 'ether');
-            alert(`Successfully withdrew ${ethAmount} ETH to ${destinationAddress}\nLeft ${leftAmount} ETH for future gas fees`);
-            document.getElementById("game-status").textContent = "";
-        } else {
-            alert("Withdrawal failed!");
-            document.getElementById("game-status").textContent = "";
-        }
-    } catch (error) {
-        printLog(['error'], "Error withdrawing funds:", error);
-        alert("Error withdrawing funds: " + error.message);
-        document.getElementById("game-status").textContent = "";
-    }
-}
-
-function printLog(levels, ...args) {
-    if (!Array.isArray(levels)) levels = [levels];
-    const shouldPrint = levels.some(level => PRINT_LEVELS.includes(level));
-    if (!shouldPrint) return;
-    if (levels.includes('error')) {
-        console.error(...args);
-    } else {
-        console.log(...args);
-    }
 }
 
 function storeCommit(secret) {
@@ -553,61 +513,12 @@ function clearPendingReveal() {
     localStorage.removeItem('pendingReveal');
 }
 
-async function updateGasPrice() {
-    try {
-        const startTime = Date.now();
-        globalGasPrice = await web3.eth.getGasPrice();
-        lastGasPriceUpdate = startTime;
-        printLog(['profile'], "=== GAS PRICE UPDATE ===");
-        printLog(['profile'], "New gas price:", globalGasPrice);
-        printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
-        printLog(['profile'], "=========================");
-    } catch (error) {
-        printLog(['error'], "Error updating gas price:", error);
-    }
+export async function commitGame() {
+    gameScene.cardDisplay.clearCardSprites();
+    shouldProcessCommit = true;
+    
+    // Track manual commit request
+    posthog.capture('commit_game_called', {
+        timestamp: Date.now()
+    });
 }
-
-async function getCurrentGasPrice() {
-    const now = Date.now();
-    if (!globalGasPrice || (now - lastGasPriceUpdate) > GAS_PRICE_UPDATE_INTERVAL) {
-        await updateGasPrice();
-    }
-    return globalGasPrice*2n;
-}
-
-async function initializeNonce() {
-    try {
-        const wallet = getLocalWallet();
-        if (!wallet) return;
-        
-        const startTime = Date.now();
-        globalNonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
-        printLog(['profile'], "=== NONCE INITIALIZATION ===");
-        printLog(['profile'], "Initial nonce:", globalNonce);
-        printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
-        printLog(['profile'], "===========================");
-    } catch (error) {
-        printLog(['error'], "Error initializing nonce:", error);
-    }
-}
-
-function getAndIncrementNonce() {
-    if (globalNonce === null) {
-        printLog(['error'], "Nonce not initialized");
-        return null;
-    }
-    return globalNonce++;
-}
-
-// Make functions globally available for inline script access
-window.getLocalWallet = getLocalWallet;
-window.commit = commit;
-window.performReveal = performReveal;
-window.clearStoredSecret = clearStoredSecret;
-window.forfeit = forfeit;
-window.withdrawFunds = withdrawFunds;
-window.web3 = web3;
-window.globalGameState = globalGameState;
-window.gameReady = false;
-window.calculateCards = calculateCards;
-window.getPendingReveal = getPendingReveal;

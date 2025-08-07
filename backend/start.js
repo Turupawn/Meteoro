@@ -20,25 +20,48 @@ console.log('Server started on port', port);
 let lastProcessedBlock = 0;
 const processingGameIds = new Set();
 let STAKE_AMOUNT = null;
+let currentNonce = null;
+let lastProcessedGameId = null;
 
 function generateRandomHash() {
     return web3.utils.randomHex(32);
 }
 
+function getAndIncrementNonce() {
+    if (currentNonce === null) {
+        console.error('Nonce not initialized');
+        return null;
+    }
+    return currentNonce++;
+}
+
 async function multiPostRandomnessForGames(randomness) {
     try {
         if (!randomness || randomness.length === 0) return;
+        
         const stakeAmount = STAKE_AMOUNT;
+        const nonce = getAndIncrementNonce();
+        
+        if (nonce === null) {
+            console.error('Failed to get nonce');
+            return;
+        }
+        
         const tx = {
             from: houseAccount.address,
             to: contractAddress,
             value: web3.utils.toBN(stakeAmount).mul(web3.utils.toBN(randomness.length)).toString(),
             gas: 500000 + 200000 * randomness.length,
+            nonce: nonce,
             data: contract.methods.multiPostRandomness(randomness).encodeABI()
         };
+        
+        console.log(`Sending multiPostRandomness transaction with nonce ${nonce}...`);
         const signedTx = await web3.eth.accounts.signTransaction(tx, houseAccount.privateKey);
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        
         if (receipt.status) {
+            console.log(`multiPostRandomness transaction successful:`, receipt.transactionHash);
             randomness.forEach((hash, idx) => {
                 console.log(`Posted hash #${idx + 1}:`, {
                     hash: hash,
@@ -50,6 +73,16 @@ async function multiPostRandomnessForGames(randomness) {
         }
     } catch (error) {
         console.error('Error in multiPostRandomnessForGames:', error);
+        
+        // If it's an "already known" error, the transaction was already sent
+        if (error.message && error.message.includes('already known')) {
+            console.log('Transaction already known, skipping...');
+        }
+        // If it's a "nonce too low" error, reset the nonce
+        else if (error.message && error.message.includes('nonce too low')) {
+            console.log('Nonce too low, resetting nonce...');
+            currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
+        }
     }
 }
 
@@ -58,25 +91,39 @@ async function checkForNewGames() {
     try {
         // Get backend state: last responded gameId and pending count
         const backendState = await contract.methods.getBackendGameState().call({}, 'pending');
-        const lastRandomnessPostedGameIdStr = backendState[0];
-        const pendingGameCountStr = backendState[1];
-        const lastRandomnessPostedGameId = parseInt(lastRandomnessPostedGameIdStr);
-        const pendingGameCount = parseInt(pendingGameCountStr);
-        if (pendingGameCount === 0) return;
+        const lastRandomnessPostedGameId = parseInt(backendState[0]);
+        const pendingGameCount = parseInt(backendState[1]);
 
-        // Generate randomness array
+        if(pendingGameCount === 0)
+            return;
+
+        if(lastProcessedGameId != null && lastProcessedGameId >= lastRandomnessPostedGameId)
+            return;
+        
+        lastProcessedGameId = lastRandomnessPostedGameId;
+        console.log(`Found ${pendingGameCount} pending games (last processed: ${lastProcessedGameId}, current: ${lastRandomnessPostedGameId}), generating randomness...`);
         const randomness = Array.from({ length: pendingGameCount }, () => generateRandomHash());
         await multiPostRandomnessForGames(randomness);
+        
     } catch (error) {
         console.error('Error checking for new games:', error);
     }
 }
 
 async function initialize() {
-    STAKE_AMOUNT = await contract.methods.STAKE_AMOUNT().call({}, 'pending');
-    console.log('Stake amount loaded:', STAKE_AMOUNT);
-    setInterval(checkForNewGames, POLL_INTERVAL);
-    console.log('Initialization complete. Polling for new games.');
+    try {
+        STAKE_AMOUNT = await contract.methods.STAKE_AMOUNT().call({}, 'pending');
+        console.log('Stake amount loaded:', STAKE_AMOUNT);
+        
+        // Initialize nonce only once at startup
+        currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
+        console.log('Initial nonce:', currentNonce);
+        
+        setInterval(checkForNewGames, POLL_INTERVAL);
+        console.log('Initialization complete. Polling for new games.');
+    } catch (error) {
+        console.error('Error during initialization:', error);
+    }
 }
 
 initialize();
@@ -86,7 +133,9 @@ app.get('/health', (req, res) => {
         status: 'ok', 
         houseAddress: houseAccount.address,
         lastProcessedBlock: lastProcessedBlock,
-        processingGameIds: Array.from(processingGameIds)
+        processingGameIds: Array.from(processingGameIds),
+        currentNonce: currentNonce,
+        lastProcessedGameId: lastProcessedGameId
     });
 });
 
