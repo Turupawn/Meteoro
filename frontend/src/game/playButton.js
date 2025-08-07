@@ -1,5 +1,7 @@
 import { commitGame } from '../main.js';
 import { isLandscape } from '../utils.js';
+import { web3, getPlayerBalance } from '../blockchain_stuff.js';
+import { getLocalWallet, getMinimumPlayableBalance, getStakeAmount } from '../blockchain_stuff.js';
 
 export class PlayButton {
     constructor(scene) {
@@ -44,7 +46,10 @@ export class PlayButton {
         this.buttonBg.setStrokeStyle(3, 0x00FFFF);
         this.buttonBg.setDepth(199);
         
-        this.button = this.scene.add.text(x, y, "PLAY", {
+        // Make the background clickable
+        this.buttonBg.setInteractive();
+        
+        this.button = this.scene.add.text(x, y - 20, "PLAY", {
             font: `bold ${fontSize}px Orbitron`,
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -66,7 +71,22 @@ export class PlayButton {
         const hitAreaHeight = isMobile ? this.button.height + 150 : this.button.height + 100;
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
-        this.button.on('pointerdown', () => {
+        // Create stake amount display inside the button (below the PLAY text)
+        this.createStakeAmountDisplay(x, y + 50, isMobile);
+
+        // Add click handler to both background and text
+        const clickHandler = async () => {
+            const hasInsufficientBalance = await this.checkInsufficientBalance();
+            
+            if (hasInsufficientBalance) {
+                if (this.scene.insufficientBalanceScreen) {
+                    this.scene.insufficientBalanceScreen.show(true); // Force show when play button is clicked
+                    this.scene.insufficientBalanceScreen.triggerShakeAnimation();
+                }
+                return;
+            }
+            
+            // Proceed with normal game flow
             if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {
                 this.scene.cardDisplay.currentGameText.setText(`Please wait...`);
             }
@@ -76,6 +96,68 @@ export class PlayButton {
             }
             
             commitGame();
-        });
+        };
+
+        this.buttonBg.on('pointerdown', clickHandler);
+        this.button.on('pointerdown', clickHandler);
+    }
+
+    createStakeAmountDisplay(x, y, isMobile) {
+        // Convert stake amount from Wei to ETH
+        let stakeAmountText = "loading...";
+        try {
+            const stakeAmountEth = web3.utils.fromWei(getStakeAmount().toString(), 'ether');
+            stakeAmountText = `${parseFloat(stakeAmountEth).toFixed(6)} ETH per game`;
+        } catch (error) {
+            console.error('Error converting stake amount:', error);
+            stakeAmountText = `${getStakeAmount()} WEI per game`;
+        }
+
+        const stakeFontSize = isMobile ? Math.max(16, this.scene.screenWidth / 60) : Math.max(14, this.scene.screenWidth / 80);
+        
+        this.stakeAmountText = this.scene.add.text(x, y, stakeAmountText, {
+            font: `${stakeFontSize}px Orbitron`,
+            fill: '#E0F6FF',
+            stroke: '#0066CC',
+            strokeThickness: 1,
+            alpha: 0.8,
+            shadow: {
+                offsetX: 1,
+                offsetY: 1,
+                color: '#003366',
+                blur: 2,
+                fill: true
+            }
+        }).setOrigin(0.5);
+        
+        this.stakeAmountText.setDepth(201);
+    }
+
+    async checkInsufficientBalance() {
+        try {
+            const wallet = getLocalWallet();
+            if (!wallet) return false;
+
+            const balance = await getPlayerBalance();
+            const minBalanceWei = getMinimumPlayableBalance();
+            
+            return BigInt(balance) < BigInt(minBalanceWei);
+        } catch (error) {
+            console.error('Error checking balance:', error);
+            return false;
+        }
+    }
+
+    // Add method to update stake amount display if needed
+    updateStakeAmountDisplay() {
+        if (this.stakeAmountText) {
+            try {
+                const stakeAmountEth = web3.utils.fromWei(getStakeAmount().toString(), 'ether');
+                const stakeAmountText = `${parseFloat(stakeAmountEth).toFixed(6)} ETH per game`;
+                this.stakeAmountText.setText(stakeAmountText);
+            } catch (error) {
+                console.error('Error updating stake amount display:', error);
+            }
+        }
     }
 }

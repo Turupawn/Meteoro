@@ -80,7 +80,7 @@ export class GameHistory {
             });
             this.quadImage.setScale(16,16);
         }
-
+        this.quadImage.setVisible(false);
     }
 
     updateGameHistory(recentHistory = null, playerAddress = null) {
@@ -150,6 +150,7 @@ export class GameHistory {
 
         if (this.quadImage) {
             this.quadImage.setTexture('gameHistoryTexture');
+            this.quadImage.setVisible(true);
         }
     }
 }

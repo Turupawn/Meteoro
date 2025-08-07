@@ -14,7 +14,7 @@ export class CardDisplay {
         this.cardSuits = ['clover', 'diamond', 'heart', 'spade'];
         this.inforFontSize = 70;
         const isLandscapeMode = isLandscape();
-        this.cardFontSize = isLandscapeMode ? 220 : 220;
+        this.cardFontSize = isLandscapeMode ? 160 : 160;
         this.baseScale = 0.7;
     }
 
@@ -23,15 +23,24 @@ export class CardDisplay {
         const y = this.scene.centerY + 150; // Position below the cards from the start
         
         this.currentGameText = this.scene.add.text(x, y, "", {
-            font: `80px Arial`, // Smaller size (was 120px)
-            fill: "#FF0000",
-            stroke: "#000000",
-            strokeThickness: 2
+            font: `bold 80px Orbitron`, // Changed to match other UI elements
+            fill: "#E0F6FF", // Changed to match other text colors
+            stroke: "#0066CC", // Changed to match other text strokes
+            strokeThickness: 3, // Changed to match other text strokes
+            alpha: 0.95, // Added alpha to match other text
+            shadow: { // Added shadow to match other text
+                offsetX: 3,
+                offsetY: 3,
+                color: '#003366',
+                blur: 6,
+                fill: true
+            }
         }).setOrigin(0.5);
     }
 
     updateCurrentGameDisplay(playerCard = null, houseCard = null) {
         if (playerCard !== null && houseCard !== null) {
+            // Clear any existing animations before creating new ones
             this.clearCardSprites();
             
             // Randomly select card suits for each card individually
@@ -43,7 +52,12 @@ export class CardDisplay {
             const winner = playerCard > houseCard ? "Player" : "House";
             
             // Just update the text, no position change needed
-            this.currentGameText.setText(`${winner} wins!`);
+            
+            if(winner === "Player") {
+                this.currentGameText.setText(`You win!`);
+            }else{
+                this.currentGameText.setText(`House wins`);
+            }
             
             if (this.scene.background && this.scene.background.endBoostAnimation) {
                 this.scene.background.endBoostAnimation();
@@ -51,7 +65,10 @@ export class CardDisplay {
 
             if (playerCard > houseCard) {
                 this.scene.time.delayedCall(1000, () => {
-                    this.triggerWinParticleAnimation();
+                    // Add null check before triggering animation
+                    if (this.houseCardSprite && this.houseCardSprite.active) {
+                        this.triggerWinParticleAnimation();
+                    }
                 });
             }
         }
@@ -82,14 +99,14 @@ export class CardDisplay {
             .setAlpha(0);
         
         this.playerCardText = this.scene.add.text(leftCardX, cardY, this.getCardDisplay(playerCard), {
-            font: `${this.cardFontSize}px Arial`,
+            font: `${this.cardFontSize}px Orbitron`, // Changed from Arial to Orbitron
             fill: "#FFFFFF",
             stroke: "#000000",
             strokeThickness: 8 // Increased from 5 to 8 for better visibility
         }).setOrigin(0.5).setAlpha(0);
         
         this.houseCardText = this.scene.add.text(rightCardX, cardY, this.getCardDisplay(houseCard), {
-            font: `${this.cardFontSize}px Arial`,
+            font: `${this.cardFontSize}px Orbitron`, // Changed from Arial to Orbitron
             fill: "#FFFFFF",
             stroke: "#000000",
             strokeThickness: 8 // Increased from 5 to 8 for better visibility
@@ -128,6 +145,11 @@ export class CardDisplay {
         let currentStep = 0;
         
         const animateStep = () => {
+            // Add null checks to prevent errors if sprites were destroyed
+            if (!this.playerCardData || !this.houseCardData) {
+                return;
+            }
+            
             if (currentStep >= steps) {
                 this.showCardNumbers();
                 return;
@@ -152,6 +174,11 @@ export class CardDisplay {
     }
 
     animateCardInSpace(cardData, progress) {
+        // Add null checks to prevent errors
+        if (!cardData || !cardData.sprite || !cardData.sprite.active) {
+            return;
+        }
+        
         const currentX = cardData.startX + (cardData.finalX - cardData.startX) * progress;
         const currentY = cardData.startY + (cardData.finalY - cardData.startY) * progress;
         const currentZ = cardData.startZ + (cardData.finalZ - cardData.startZ) * progress;
@@ -171,24 +198,30 @@ export class CardDisplay {
     }
 
     showCardNumbers() {
-        this.scene.tweens.add({
-            targets: this.playerCardText,
-            alpha: 1,
-            duration: 300,
-            ease: 'Power2'
-        });
+        // Add null checks before creating tweens
+        if (this.playerCardText && this.playerCardText.active) {
+            this.scene.tweens.add({
+                targets: this.playerCardText,
+                alpha: 1,
+                duration: 300,
+                ease: 'Power2'
+            });
+        }
         
-        this.scene.tweens.add({
-            targets: this.houseCardText,
-            alpha: 1,
-            duration: 300,
-            delay: 100,
-            ease: 'Power2'
-        });
+        if (this.houseCardText && this.houseCardText.active) {
+            this.scene.tweens.add({
+                targets: this.houseCardText,
+                alpha: 1,
+                duration: 300,
+                delay: 100,
+                ease: 'Power2'
+            });
+        }
     }
 
     triggerWinParticleAnimation() {
-        if (!this.houseCardSprite) return;
+        // Add null check to prevent error
+        if (!this.houseCardSprite || !this.houseCardSprite.active) return;
 
         this.createScreenFlash();
         
@@ -419,6 +452,9 @@ export class CardDisplay {
     }
 
     shakeHouseCard() {
+        // Add null check to prevent error
+        if (!this.houseCardSprite) return;
+        
         const originalX = this.houseCardSprite.x;
         const originalY = this.houseCardSprite.y;
         
@@ -430,7 +466,10 @@ export class CardDisplay {
             yoyo: true,
             repeat: 10,
             onComplete: () => {
-                this.houseCardSprite.setPosition(originalX, originalY);
+                // Add null check before setting position
+                if (this.houseCardSprite && this.houseCardSprite.active) {
+                    this.houseCardSprite.setPosition(originalX, originalY);
+                }
             }
         });
     }
@@ -440,19 +479,24 @@ export class CardDisplay {
     }
 
     clearCardSprites() {
+        // Stop any running tweens on the sprites before destroying them
         if (this.playerCardSprite) {
+            this.scene.tweens.killTweensOf(this.playerCardSprite);
             this.playerCardSprite.destroy();
             this.playerCardSprite = null;
         }
         if (this.houseCardSprite) {
+            this.scene.tweens.killTweensOf(this.houseCardSprite);
             this.houseCardSprite.destroy();
             this.houseCardSprite = null;
         }
         if (this.playerCardText) {
+            this.scene.tweens.killTweensOf(this.playerCardText);
             this.playerCardText.destroy();
             this.playerCardText = null;
         }
         if (this.houseCardText) {
+            this.scene.tweens.killTweensOf(this.houseCardText);
             this.houseCardText.destroy();
             this.houseCardText = null;
         }

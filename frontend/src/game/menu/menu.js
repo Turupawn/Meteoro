@@ -24,6 +24,11 @@ export class Menu {
     openMenu() {
         this.isOpen = true;
         
+        // Disable insufficient balance screen if it exists
+        if (this.scene.insufficientBalanceScreen) {
+            this.scene.insufficientBalanceScreen.disable();
+        }
+        
         this.background = this.scene.add.rectangle(
             this.scene.centerX, 
             this.scene.centerY, 
@@ -185,9 +190,9 @@ export class Menu {
         const titleY = this.scene.centerY - this.submenuHeight/2 + 40;
         const addressY = this.scene.centerY - (isLandscapeMode ? this.submenuHeight/4 : this.submenuHeight/3);
         const instructionY = this.scene.centerY;
-        const warningY = this.scene.centerY + (isLandscapeMode ? 60 : 40);
-        const faucetTextY = this.scene.centerY + (isLandscapeMode ? 140 : 100);
-        const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 180 : 140);
+        const warningY = this.scene.centerY + (isLandscapeMode ? 90 : 80);
+        const faucetTextY = this.scene.centerY + (isLandscapeMode ? 220 : 160);
+        const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 260 : 200);
         
         this.submenuTitle = new MenuText(
             this.scene,
@@ -227,13 +232,13 @@ export class Menu {
             this.scene.centerX,
             warningY, 
             "This is your local storage wallet, do not clear browser data nor deposit large amounts.\nClick to learn more.", 
-            titleFontSize - 25,
+            isLandscapeMode ? titleFontSize - 20 : titleFontSize - 18,
             { 
                 depth: 254,
                 wordWrap: { width: this.submenuWidth - 100 },
                 align: 'center',
                 interactive: true,
-                onClick: () => window.open('https://placeholder.com/#TODO', '_blank')
+                onClick: () => window.open('https://dev.to/filosofiacodigoen/how-local-storage-wallets-on-ethereum-work-4c0p', '_blank')
             }
         );
 
@@ -254,6 +259,7 @@ export class Menu {
             titleFontSize - 4,
             {
                 interactive: true,
+                isLink: true, // Add link styling
                 onClick: () => window.open('https://testnet.megaeth.com/', '_blank'),
                 depth: 254
             }
@@ -539,6 +545,11 @@ export class Menu {
         if (!this.isOpen) return;
         
         this.isOpen = false;
+        
+        // Re-enable insufficient balance screen if it exists
+        if (this.scene.insufficientBalanceScreen) {
+            this.scene.insufficientBalanceScreen.enable();
+        }
         
         this.menuElements.forEach(element => {
             if (element && typeof element.destroy === 'function') {

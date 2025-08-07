@@ -30,6 +30,8 @@ export class MenuButton {
         this.buttonBg.setStrokeStyle(3, 0x00FFFF);
         this.buttonBg.setDepth(255);
         
+        this.buttonBg.setInteractive();
+        
         this.button = this.scene.add.text(this.x, this.y, this.text, {
             font: `bold ${this.fontSize}px Orbitron`,
             fill: '#E0F6FF',
@@ -47,12 +49,9 @@ export class MenuButton {
 
         this.button.setDepth(256);
         
-        this.button.setSize(
-            this.button.width + (isLandscapeMode ? 200 : 200), 
-            this.button.height + (isLandscapeMode ? 100 : 120)
-        );
-        
+        // Make both background and text clickable
         if (this.onClick && typeof this.onClick === 'function') {
+            this.buttonBg.on('pointerdown', this.onClick);
             this.button.on('pointerdown', this.onClick);
         }
     }

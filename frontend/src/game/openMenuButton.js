@@ -62,6 +62,9 @@ export class OpenMenuButton {
         this.menuButtonBg.setStrokeStyle(2, 0x00FFFF);
         this.menuButtonBg.setDepth(99);
         
+        // Make the background clickable
+        this.menuButtonBg.setInteractive();
+        
         this.menuButton = this.scene.add.rexQuadImage({
             x: x,
             y: y,
@@ -82,11 +85,15 @@ export class OpenMenuButton {
         
         this.menuButton.setSize(isLandscapeMode ? 300 : 250, isLandscapeMode ? 120 : 100);
         
-        this.menuButton.on('pointerdown', () => {
+        // Add click handler to both background and text/image
+        const clickHandler = () => {
             if (this.onToggle && typeof this.onToggle === 'function') {
                 this.onToggle();
             }
-        });
+        };
+        
+        this.menuButtonBg.on('pointerdown', clickHandler);
+        this.menuButton.on('pointerdown', clickHandler);
 
         this.menuButton.setTexture('menuButtonTexture');
     }

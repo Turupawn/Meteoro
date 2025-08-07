@@ -10,6 +10,7 @@ let my_contract;
 let globalStakeAmount = null;
 let globalGasPrice = null;
 let globalNonce = null;
+let globalBalance = null;
 let lastGasPriceUpdate = 0;
 const GAS_PRICE_UPDATE_INTERVAL = 60000;
 
@@ -67,6 +68,7 @@ export async function initWeb3() {
     return awaitContract();
   };
   return awaitWeb3();
+  
 }
 
 export async function checkGameState() {
@@ -77,7 +79,7 @@ export async function checkGameState() {
         }
         
         const gameStateTemp = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
-        
+        globalBalance = gameStateTemp.player_balance;
         const gameState = {
             playerBalance: gameStateTemp.player_balance,
             gameState: gameStateTemp.gameState,
@@ -307,6 +309,22 @@ export function getAndIncrementNonce() {
 export async function initializeStakeAmount() {
     globalStakeAmount = await my_contract.methods.STAKE_AMOUNT().call();
     printLog(['debug'], "Stake amount initialized:", globalStakeAmount);
+}
+
+export function getMinimumPlayableBalance() {
+    return BigInt(globalStakeAmount) + BigInt(globalStakeAmount);
+}
+
+export function getRecommendedPlayableBalance() {
+    return BigInt(globalStakeAmount) * 10n;
+}
+
+export function getStakeAmount() {
+    return globalStakeAmount;
+}
+
+export function getPlayerBalance() {
+    return globalBalance;
 }
 
 export { web3, my_contract }; 

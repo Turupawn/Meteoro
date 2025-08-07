@@ -8,7 +8,9 @@ import { Background } from './game/background.js';
 import { Menu } from './game/menu/menu.js';
 import { OpenMenuButton } from './game/openMenuButton.js';
 import { SocialLinks } from './game/socialLinks.js';
+import { InsufficientBalanceScreen } from './game/insufficientBalanceScreen.js';
 import { setGameScene } from './main.js';
+import { getMinimumPlayableBalance } from './blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -42,6 +44,7 @@ class GameScene extends Phaser.Scene {
             this.menu.toggleMenu();
         });
         this.socialLinks = new SocialLinks(this);
+        this.insufficientBalanceScreen = new InsufficientBalanceScreen(this);
         
         // Set the game scene reference for main.js
         setGameScene(this);
@@ -52,10 +55,29 @@ class GameScene extends Phaser.Scene {
         this.balanceText.updateBalance(balance);
         this.cardDisplay.updateCurrentGameDisplay();
         this.gameHistory.updateGameHistory(recentHistory, playerAddress);
+        
+        // Check if we should show the insufficient balance screen
+        this.checkInsufficientBalance(balance);
     }
 
     updateCardDisplay(playerCard, houseCard) {
         this.cardDisplay.updateCurrentGameDisplay(playerCard, houseCard);
+    }
+
+    checkInsufficientBalance(balance) {
+        try {
+            const hasInsufficientBalance = BigInt(balance) < BigInt(getMinimumPlayableBalance());
+            
+            // Only show insufficient balance screen on startup, not during gameplay
+            if (hasInsufficientBalance && this.cardDisplay && 
+                (!this.cardDisplay.playerCardSprite || !this.cardDisplay.playerCardSprite.active)) {
+                this.insufficientBalanceScreen.show(false); // Normal show (startup only)
+            } else if (!hasInsufficientBalance) {
+                this.insufficientBalanceScreen.hide();
+            }
+        } catch (error) {
+            console.error('Error checking insufficient balance:', error);
+        }
     }
 }
 

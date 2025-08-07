@@ -5,5 +5,8 @@ dotenv.config()
 export default defineConfig({
   define: {
     'import.meta.env.CONTRACT_ADDRESS': JSON.stringify(process.env.CONTRACT_ADDRESS)
+  },
+  optimizeDeps: {
+    exclude: ['posthog-js']
   }
 })

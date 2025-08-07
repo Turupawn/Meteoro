@@ -35,6 +35,16 @@ export class MenuText {
             }
         };
 
+        // Add link styling if specified
+        if (this.options.isLink) {
+            textStyle.fill = '#00BFFF'; // Bright blue for links
+            textStyle.stroke = '#0066CC';
+            textStyle.strokeThickness = 1;
+            textStyle.underline = true; // Add underline
+            textStyle.underlineColor = '#00BFFF';
+            textStyle.underlineThickness = 2;
+        }
+
         // Add wordWrap if specified
         if (this.options.wordWrap) {
             textStyle.wordWrap = this.options.wordWrap;
