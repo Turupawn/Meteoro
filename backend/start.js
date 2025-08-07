@@ -22,7 +22,6 @@ const processingGameIds = new Set();
 let STAKE_AMOUNT = null;
 let currentNonce = null;
 let lastProcessedGameId = null;
-let isProcessing = false; // Thread lock to prevent concurrent processing
 
 function generateRandomHash() {
     return web3.utils.randomHex(32);
@@ -101,14 +100,6 @@ async function multiPostRandomnessForGames(randomness) {
 
 // Function to check for new games
 async function checkForNewGames() {
-    // Thread lock to prevent concurrent processing
-    if (isProcessing) {
-        console.log('Already processing games, skipping...');
-        return;
-    }
-    
-    isProcessing = true;
-    
     try {
         // Get backend state: last responded gameId and pending count
         const backendState = await contract.methods.getBackendGameState().call({}, 'pending');
@@ -129,8 +120,6 @@ async function checkForNewGames() {
         await multiPostRandomnessForGames(randomness);
     } catch (error) {
         console.error('Error checking for new games:', error);
-    } finally {
-        isProcessing = false;
     }
 }
 
@@ -160,7 +149,6 @@ app.get('/health', (req, res) => {
         processingGameIds: Array.from(processingGameIds),
         currentNonce: currentNonce,
         lastProcessedGameId: lastProcessedGameId,
-        isProcessing: isProcessing
     });
 });
 
