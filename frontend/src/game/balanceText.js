@@ -58,8 +58,12 @@ export class BalanceText {
             let perspectiveY = this.quadImage.centerLeft.y + 0;
             applyPerspectiveToQuadImageToLeft(this.quadImage, perspectiveX, perspectiveY);
         } else {
-            this.quadImage = this.scene.add.rexQuadImage(this.scene.screenWidth - 150, 200, 'balanceTexture');            
+            this.quadImage = this.scene.add.rexQuadImage(
+                this.scene.screenWidth - 5,
+                300,
+                'balanceTexture');            
             this.quadImage.setAlpha(1);
+            this.quadImage.setScale(1.6,1.6);
             this.quadImage.topRight.x -= 100;
             this.quadImage.topRight.y -= 100;
             this.quadImage.bottomRight.x -= 100;

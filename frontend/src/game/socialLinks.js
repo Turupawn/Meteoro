@@ -8,11 +8,10 @@ export class SocialLinks {
 
     createSocialLinks() {
         const isLandscapeMode = isLandscape();
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const iconSize = isLandscapeMode ? 80 : 70;
         
-        // Much higher up on mobile
-        const bottomMargin = isLandscapeMode ? 120 : (isMobile ? 250 : 200);
+        // Position relative to bottom of screen, below the play button
+        const bottomMargin = isLandscapeMode ? 50 : 150;
         const rightMargin = isLandscapeMode ? 50 : 45;
         const spacing = isLandscapeMode ? 100 : 90;
 
@@ -27,9 +26,9 @@ export class SocialLinks {
         this.githubIcon.setScale(iconSize / 250); // Original SVG size is 250px
         this.githubIcon.setAlpha(0.8);
         
-        // Much bigger hit area on mobile
-        const hitAreaWidth = isMobile ? 80 : 30;
-        const hitAreaHeight = isMobile ? 80 : 20;
+        // Bigger hit area on portrait (mobile)
+        const hitAreaWidth = isLandscapeMode ? 30 : 80;
+        const hitAreaHeight = isLandscapeMode ? 20 : 80;
         this.githubIcon.setSize(
             this.githubIcon.width + hitAreaWidth,
             this.githubIcon.height + hitAreaHeight
@@ -50,7 +49,7 @@ export class SocialLinks {
         this.telegramIcon.setScale(iconSize / 250); // Original SVG size is 250px
         this.telegramIcon.setAlpha(0.8);
         
-        // Much bigger hit area on mobile
+        // Bigger hit area on portrait (mobile)
         this.telegramIcon.setSize(
             this.telegramIcon.width + hitAreaWidth,
             this.telegramIcon.height + hitAreaHeight
