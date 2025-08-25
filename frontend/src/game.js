@@ -9,6 +9,8 @@ import { Menu } from './game/menu/menu.js';
 import { OpenMenuButton } from './game/openMenuButton.js';
 import { SocialLinks } from './game/socialLinks.js';
 import { InsufficientBalanceScreen } from './game/insufficientBalanceScreen.js';
+import { CosmicButton } from './game/cosmicButton.js';
+import { CosmicScene } from './game/cosmicScene.js';
 import { setGameScene } from './main.js';
 import { getMinimumPlayableBalance } from './blockchain_stuff.js';
 
@@ -45,6 +47,7 @@ class GameScene extends Phaser.Scene {
         });
         this.socialLinks = new SocialLinks(this);
         this.insufficientBalanceScreen = new InsufficientBalanceScreen(this);
+        this.cosmicButton = new CosmicButton(this);
         
         // Set the game scene reference for main.js
         setGameScene(this);
@@ -92,7 +95,7 @@ const loadPhaser = async () => {
         parent: container,
         width: width,
         height: height,
-        scene: [LoadingScreen, GameScene],
+        scene: [LoadingScreen, GameScene, CosmicScene],
         title: "War Game",
         version: "1.0",
         dom: {
