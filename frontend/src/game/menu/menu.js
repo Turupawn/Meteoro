@@ -342,24 +342,24 @@ export class Menu {
             { depth: 254 }
         );
 
-        let balanceString = "0.000000 ETH";
+        let ethBalanceString = "0.000000 ETH";
         if (this.scene.currentBalance) {
             try {
-                const balanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
-                balanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
+                const ethBalanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
+                ethBalanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
             } catch (error) {
                 console.error('Error converting balance:', error);
-                balanceString = `${this.scene.currentBalance} WEI`;
+                ethBalanceString = `${this.scene.currentBalance} WEI`;
             }
         } else {
             console.log('No balance available');
         }
         
-        this.balanceText = new MenuText(
+        this.ethBalanceText = new MenuText(
             this.scene,
             this.scene.centerX, 
             balanceY, 
-            `Balance: ${balanceString}`, 
+            `Balance: ${ethBalanceString}`, 
             titleFontSize - 2,
             { depth: 254 }
         );
@@ -393,7 +393,7 @@ export class Menu {
         this.submenuElements = [
             this.submenuContainer,
             this.submenuTitle,
-            this.balanceText,
+            this.ethBalanceText,
             this.addressLabel,
             this.addressInput,
             this.withdrawButton,

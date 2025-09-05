@@ -10,7 +10,7 @@ import {
     initializeNonce,
     initializeStakeAmount,
     web3,
-    getPlayerBalance,
+    getPlayerETHBalance,
     getMinimumPlayableBalance
 } from './blockchain_stuff.js';
 
@@ -279,7 +279,7 @@ async function gameLoop() {
                     player_card: result.playerCard,
                     house_card: result.houseCard,
                     total_time_ms: totalTime,
-                    player_balance: gameState.playerBalance?.toString()
+                    player_balance: gameState.playerETHBalance?.toString()
                 });
             }
 
@@ -362,18 +362,13 @@ async function gameLoop() {
             } else if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
-                
-                // Track game start with uninitialized state
                 posthog.capture('game_start_failed_uninitialized_state');
                 
-            } else if (BigInt(getPlayerBalance()) < BigInt(getMinimumPlayableBalance())) {
-                // Don't show alert anymore, let the UI handle it
+            } else if (BigInt(getPlayerETHBalance()) < BigInt(getMinimumPlayableBalance())) {
                 printLog(['debug'], "Insufficient balance detected, UI will handle display");
                 shouldProcessCommit = false;
-                
-                // Track insufficient balance
                 posthog.capture('game_start_blocked_insufficient_balance', {
-                    player_balance: getPlayerBalance(),
+                    player_balance: getPlayerETHBalance(),
                     minimum_balance: getMinimumPlayableBalance()
                 });
                 
@@ -391,7 +386,7 @@ async function gameLoop() {
                 // Track game start attempt
                 posthog.capture('game_start_attempted', {
                     game_id: gameState.gameId?.toString(),
-                    player_balance: gameState.playerBalance?.toString(),
+                    player_balance: gameState.playerETHBalance?.toString(),
                     game_state: gameState.gameState?.toString()
                 });
                 
@@ -406,7 +401,7 @@ async function gameLoop() {
                     // Track successful commit
                     posthog.capture('commit_transaction_success', {
                         game_id: gameState.gameId?.toString(),
-                        player_balance: gameState.playerBalance?.toString()
+                        player_balance: gameState.playerETHBalance?.toString()
                     });
                     
                 } catch (error) {
@@ -449,7 +444,7 @@ async function updateGameState() {
         const wallet = getLocalWallet()
         // Use the game scene reference instead of hardcoded index
         if (gameScene) {
-            gameScene.updateDisplay(gameState.playerBalance, gameState.recentHistory, wallet.address);
+            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, gameState.recentHistory, wallet.address);
         }
     } catch (error) {
         console.error("Error updating game state:", error);

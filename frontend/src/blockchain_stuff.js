@@ -10,7 +10,8 @@ let my_contract;
 let globalStakeAmount = null;
 let globalGasPrice = null;
 let globalNonce = null;
-let globalBalance = null;
+let globalETHBalance = null;
+let globalGachaTokenBalance = null;
 let lastGasPriceUpdate = 0;
 const GAS_PRICE_UPDATE_INTERVAL = 60000;
 
@@ -79,16 +80,17 @@ export async function checkGameState() {
         }
         
         const gameStateTemp = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
-        globalBalance = gameStateTemp.player_balance;
+        globalETHBalance = gameStateTemp.player_eth_balance;
+        globalGachaTokenBalance = gameStateTemp.player_gacha_token_balance;
         const gameState = {
-            playerBalance: gameStateTemp.player_balance,
+            playerETHBalance: gameStateTemp.player_eth_balance,
+            playerGachaTokenBalance: gameStateTemp.player_gacha_token_balance,
             gameState: gameStateTemp.gameState,
             playerCommit: gameStateTemp.playerCommit,
             houseHash: gameStateTemp.houseHash,
             gameId: gameStateTemp.gameId,
             recentHistory: gameStateTemp.recentHistory
         };
-        
         return gameState;
     } catch (error) {
         console.error("Error checking game state:", error);
@@ -323,8 +325,12 @@ export function getStakeAmount() {
     return globalStakeAmount;
 }
 
-export function getPlayerBalance() {
-    return globalBalance;
+export function getPlayerETHBalance() {
+    return globalETHBalance;
+}
+
+export function getPlayerGachaTokenBalance() {
+    return globalGachaTokenBalance;
 }
 
 export { web3, my_contract }; 

@@ -1,6 +1,6 @@
 import { commitGame } from '../main.js';
 import { isLandscape } from '../utils.js';
-import { web3, getPlayerBalance } from '../blockchain_stuff.js';
+import { web3, getPlayerETHBalance } from '../blockchain_stuff.js';
 import { getLocalWallet, getMinimumPlayableBalance, getStakeAmount } from '../blockchain_stuff.js';
 
 export class PlayButton {
@@ -139,7 +139,7 @@ export class PlayButton {
             const wallet = getLocalWallet();
             if (!wallet) return false;
 
-            const balance = await getPlayerBalance();
+            const balance = await getPlayerETHBalance();
             const minBalanceWei = getMinimumPlayableBalance();
             
             return BigInt(balance) < BigInt(minBalanceWei);

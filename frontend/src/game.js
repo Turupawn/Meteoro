@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { LoadingScreen } from './game/loadingScreen.js';
 import { PlayButton } from './game/playButton.js';
-import { BalanceText } from './game/balanceText.js';
+import { ETHBalanceText } from './game/ethBalanceText.js';
+import { GachaTokenBalanceText } from './game/gachaTokenBalanceText.js';
 import { GameHistory } from './game/gameHistory.js';
 import { CardDisplay } from './game/cardDisplay.js';
 import { Background } from './game/background.js';
@@ -38,7 +39,8 @@ class GameScene extends Phaser.Scene {
         
         this.background = new Background(this);
         this.cardDisplay = new CardDisplay(this);
-        this.balanceText = new BalanceText(this);
+        this.ethBalanceText = new ETHBalanceText(this);
+        this.gachaTokenBalanceText = new GachaTokenBalanceText(this);
         this.gameHistory = new GameHistory(this);
         this.playButton = new PlayButton(this);
         this.menu = new Menu(this);
@@ -53,9 +55,10 @@ class GameScene extends Phaser.Scene {
         setGameScene(this);
     }
 
-    updateDisplay(balance = null, recentHistory = null, playerAddress = null) {
+    updateDisplay(balance = null, gachaTokenBalance = null, recentHistory = null, playerAddress = null) {
         this.currentBalance = balance;
-        this.balanceText.updateBalance(balance);
+        this.ethBalanceText.updateBalance(balance);
+        this.gachaTokenBalanceText.updateBalance(gachaTokenBalance);
         this.cardDisplay.updateCurrentGameDisplay();
         this.gameHistory.updateGameHistory(recentHistory, playerAddress);
         
