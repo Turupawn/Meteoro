@@ -196,6 +196,28 @@ contract TwoPartyWarGame {
         );
     }
 
+    function getGames(uint offset, uint amount, bool ascendant) external view returns (Game[] memory) {
+        uint endIndex = offset + amount;
+        if (endIndex > nextGameId) {
+            endIndex = nextGameId;
+        }
+        
+        uint actualAmount = endIndex - offset;
+        Game[] memory result = new Game[](actualAmount);
+        
+        for (uint i = 0; i < actualAmount; i++) {
+            uint gameId;
+            if (ascendant) {
+                gameId = offset + i + 1; // +1 because game IDs start from 1
+            } else {
+                gameId = nextGameId - offset - i; // Reverse order
+            }
+            result[i] = games[gameId];
+        }
+        
+        return result;
+    }
+
     function getCurrentGameId(address player) public view returns(uint) {
         uint gameAmount = playerGames[player].length;
         if (gameAmount == 0)
