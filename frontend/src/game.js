@@ -7,10 +7,11 @@ import { GameHistory } from './game/gameHistory.js';
 import { CardDisplay } from './game/cardDisplay.js';
 import { Background } from './game/background.js';
 import { Menu } from './game/menu/menu.js';
+import { BetMenu } from './game/menu/betMenu.js';
+import { BetAmountButton } from './game/betAmountButton.js';
 import { OpenMenuButton } from './game/openMenuButton.js';
 import { SocialLinks } from './game/socialLinks.js';
 import { InsufficientBalanceScreen } from './game/insufficientBalanceScreen.js';
-import { CosmicButton } from './game/cosmicButton.js';
 import { CosmicScene } from './game/cosmicScene.js';
 import { setGameScene } from './main.js';
 import { getMinimumPlayableBalance } from './blockchain_stuff.js';
@@ -29,6 +30,9 @@ class GameScene extends Phaser.Scene {
         if (this.menu) {
             this.menu.closeMenu();
         }
+        if (this.betMenu) {
+            this.betMenu.closeMenu();
+        }
     }
 
     create() {
@@ -44,12 +48,14 @@ class GameScene extends Phaser.Scene {
         this.gameHistory = new GameHistory(this);
         this.playButton = new PlayButton(this);
         this.menu = new Menu(this);
+        this.betMenu = new BetMenu(this);
+        this.betAmountButton = new BetAmountButton(this, this.betMenu);
         this.openMenuButton = new OpenMenuButton(this, () => {
             this.menu.toggleMenu();
         });
         this.socialLinks = new SocialLinks(this);
         this.insufficientBalanceScreen = new InsufficientBalanceScreen(this);
-        this.cosmicButton = new CosmicButton(this);
+        // Removed cosmicButton
         
         // Set the game scene reference for main.js
         setGameScene(this);
@@ -62,12 +68,20 @@ class GameScene extends Phaser.Scene {
         this.cardDisplay.updateCurrentGameDisplay();
         this.gameHistory.updateGameHistory(recentHistory, playerAddress);
         
+        if (this.betAmountButton) {
+            this.betAmountButton.updateDisplay();
+        }
+        
         // Check if we should show the insufficient balance screen
         this.checkInsufficientBalance(balance);
     }
 
     updateCardDisplay(playerCard, houseCard) {
         this.cardDisplay.updateCurrentGameDisplay(playerCard, houseCard);
+    }
+
+    onBetAmountChanged(newBetAmount) {
+        console.log('Bet amount changed to:', newBetAmount);
     }
 
     checkInsufficientBalance(balance) {

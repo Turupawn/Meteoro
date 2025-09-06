@@ -8,6 +8,7 @@ const GAS_LIMIT = 300000;
 let web3;
 let my_contract;
 let globalSelectedBetAmount = null;
+let globalBetAmountsArray = null;
 let globalGasPrice = null;
 let globalNonce = null;
 let globalETHBalance = null;
@@ -312,6 +313,7 @@ export async function initializeBetAmount() {
     try {
         // Get the bet amounts array in a single call
         const betAmountsArray = await my_contract.methods.getBetAmountsArray().call();
+        globalBetAmountsArray = betAmountsArray;
         printLog(['debug'], "Bet amounts array from contract:", betAmountsArray);
 
         console.log("betAmountsArray", betAmountsArray);
@@ -326,18 +328,17 @@ export async function initializeBetAmount() {
         printLog(['debug'], "betAmountsArray", betAmountsArray);
         
         if (storedBetAmount) {
-            const isValidBetAmount = betAmountsArray.includes(storedBetAmount);
+            const storedBetAmountBigInt = BigInt(storedBetAmount);
+            const isValidBetAmount = betAmountsArray.includes(storedBetAmountBigInt);
             if (isValidBetAmount) {
-                globalSelectedBetAmount = storedBetAmount;
+                setSelectedBetAmount(storedBetAmountBigInt);
                 printLog(['debug'], "Using stored bet amount:", globalSelectedBetAmount);
             } else {
-                globalSelectedBetAmount = betAmountsArray[0];
-                localStorage.setItem('selectedBetAmount', globalSelectedBetAmount);
+                setSelectedBetAmount(betAmountsArray[0]);
                 printLog(['debug'], "Stored bet amount no longer valid, selected first:", globalSelectedBetAmount);
             }
         } else {
-            globalSelectedBetAmount = betAmountsArray[0];
-            localStorage.setItem('selectedBetAmount', globalSelectedBetAmount);
+            setSelectedBetAmount(betAmountsArray[0]);
             printLog(['debug'], "No stored bet amount, selected first:", globalSelectedBetAmount);
         }
         printLog(['debug'], "Bet amount initialized:", globalSelectedBetAmount);
@@ -345,6 +346,20 @@ export async function initializeBetAmount() {
         printLog(['error'], "Error initializing bet amount:", error);
         throw error;
     }
+}
+
+export function getBetAmountsArray() {
+    return globalBetAmountsArray;
+}
+
+export function setSelectedBetAmount(betAmount) {
+    globalSelectedBetAmount = betAmount;
+    localStorage.setItem('selectedBetAmount', betAmount);
+    printLog(['debug'], "Bet amount updated:", betAmount);
+}
+
+export function getSelectedBetAmount() {
+    return globalSelectedBetAmount;
 }
 
 export function getMinimumPlayableBalance() {
@@ -359,10 +374,6 @@ export function getRecommendedPlayableBalance() {
         throw new Error("Bet amount not initialized");
     }
     return BigInt(globalSelectedBetAmount) * 10n;
-}
-
-export function getSelectedBetAmount() {
-    return globalSelectedBetAmount;
 }
 
 export function getPlayerETHBalance() {

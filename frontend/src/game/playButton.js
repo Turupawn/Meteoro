@@ -34,7 +34,7 @@ export class PlayButton {
         
         const playButtonText = "PLAY";
         const playButtonWidth = isLandscapeMode ? Math.max(600, playButtonText.length * 40) : Math.max(800, playButtonText.length * 60);
-        const playButtonHeight = isLandscapeMode ? 150 : 200;
+        const playButtonHeight = isLandscapeMode ? 200 : 280;
         
         this.buttonBg = this.scene.add.rectangle(
             x,
@@ -50,7 +50,7 @@ export class PlayButton {
         // Make the background clickable
         this.buttonBg.setInteractive();
         
-        this.button = this.scene.add.text(x, y - 20, "PLAY", {
+        this.button = this.scene.add.text(x, y, "PLAY", {
             font: `bold ${fontSize}px Orbitron`,
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -72,10 +72,6 @@ export class PlayButton {
         const hitAreaHeight = isLandscapeMode ? this.button.height + 100 : this.button.height + 150;
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
-        // Create bet amount display inside the button (below the PLAY text)
-        this.createBetAmountDisplay(x, y + 50, isLandscapeMode);
-
-        // Add click handler to both background and text
         const clickHandler = async () => {
             const hasInsufficientBalance = await this.checkInsufficientBalance();
             
@@ -103,43 +99,6 @@ export class PlayButton {
         this.button.on('pointerdown', clickHandler);
     }
 
-    createBetAmountDisplay(x, y, isLandscapeMode) {
-        // Convert bet amount from Wei to ETH
-        let betAmountText = "loading...";
-        try {
-            const betAmount = getSelectedBetAmount();
-            if (betAmount) {
-                const betAmountEth = web3.utils.fromWei(betAmount.toString(), 'ether');
-                betAmountText = `${parseFloat(betAmountEth).toFixed(6)} ETH per game`;
-            } else {
-                betAmountText = "Loading bet amount...";
-            }
-        } catch (error) {
-            console.error('Error converting bet amount:', error);
-            const betAmount = getSelectedBetAmount();
-            betAmountText = betAmount ? `${betAmount} WEI per game` : "Loading bet amount...";
-        }
-
-        const betFontSize = isLandscapeMode ? Math.max(14, this.scene.screenWidth / 80) : Math.max(16, this.scene.screenWidth / 60);
-        
-        this.betAmountText = this.scene.add.text(x, y, betAmountText, {
-            font: `${betFontSize}px Orbitron`,
-            fill: '#E0F6FF',
-            stroke: '#0066CC',
-            strokeThickness: 1,
-            alpha: 0.8,
-            shadow: {
-                offsetX: 1,
-                offsetY: 1,
-                color: '#003366',
-                blur: 2,
-                fill: true
-            }
-        }).setOrigin(0.5);
-        
-        this.betAmountText.setDepth(201);
-    }
-
     async checkInsufficientBalance() {
         try {
             const wallet = getLocalWallet();
@@ -152,26 +111,6 @@ export class PlayButton {
         } catch (error) {
             console.error('Error checking balance:', error);
             return false;
-        }
-    }
-
-    // Add method to update bet amount display if needed
-    updateBetAmountDisplay() {
-        if (this.betAmountText) {
-            try {
-                const betAmount = getSelectedBetAmount();
-                if (betAmount) {
-                    const betAmountEth = web3.utils.fromWei(betAmount.toString(), 'ether');
-                    const betAmountText = `${parseFloat(betAmountEth).toFixed(6)} ETH per game`;
-                    this.betAmountText.setText(betAmountText);
-                } else {
-                    this.betAmountText.setText("Loading bet amount...");
-                }
-            } catch (error) {
-                console.error('Error updating bet amount display:', error);
-                const betAmount = getSelectedBetAmount();
-                this.betAmountText.setText(betAmount ? `${betAmount} WEI per game` : "Loading bet amount...");
-            }
         }
     }
 }

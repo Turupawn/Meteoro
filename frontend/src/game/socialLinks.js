@@ -12,15 +12,15 @@ export class SocialLinks {
         
         // Position relative to bottom of screen, below the play button, higher up in portrait
         const bottomMargin = isLandscapeMode ? 50 : 300;
-        const rightMargin = isLandscapeMode ? 50 : 45;
+        const leftMargin = isLandscapeMode ? 50 : 45;
         const spacing = isLandscapeMode ? 100 : 90;
 
-        // GitHub icon (rightmost)
+        // GitHub icon (leftmost)
         this.githubIcon = this.scene.add.image(
-            this.scene.screenWidth - rightMargin,
+            leftMargin,
             this.scene.screenHeight - bottomMargin,
             'github-icon'
-        ).setOrigin(1, 1).setInteractive();
+        ).setOrigin(0, 1).setInteractive();
 
         this.githubIcon.setDepth(50);
         this.githubIcon.setScale(iconSize / 250); // Original SVG size is 250px
@@ -38,12 +38,12 @@ export class SocialLinks {
             window.open('https://github.com/Turupawn/fast-casino', '_blank');
         });
 
-        // Telegram icon (to the left of GitHub)
+        // Telegram icon (to the right of GitHub)
         this.telegramIcon = this.scene.add.image(
-            this.scene.screenWidth - rightMargin - spacing,
+            leftMargin + spacing,
             this.scene.screenHeight - bottomMargin,
             'telegram-icon'
-        ).setOrigin(1, 1).setInteractive();
+        ).setOrigin(0, 1).setInteractive();
 
         this.telegramIcon.setDepth(50);
         this.telegramIcon.setScale(iconSize / 250); // Original SVG size is 250px
