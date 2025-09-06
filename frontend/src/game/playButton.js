@@ -1,7 +1,7 @@
 import { commitGame } from '../main.js';
 import { isLandscape } from '../utils.js';
 import { web3, getPlayerETHBalance } from '../blockchain_stuff.js';
-import { getLocalWallet, getMinimumPlayableBalance, getStakeAmount } from '../blockchain_stuff.js';
+import { getLocalWallet, getMinimumPlayableBalance, getSelectedBetAmount } from '../blockchain_stuff.js';
 
 export class PlayButton {
     constructor(scene) {
@@ -72,8 +72,8 @@ export class PlayButton {
         const hitAreaHeight = isLandscapeMode ? this.button.height + 100 : this.button.height + 150;
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
-        // Create stake amount display inside the button (below the PLAY text)
-        this.createStakeAmountDisplay(x, y + 50, isLandscapeMode);
+        // Create bet amount display inside the button (below the PLAY text)
+        this.createBetAmountDisplay(x, y + 50, isLandscapeMode);
 
         // Add click handler to both background and text
         const clickHandler = async () => {
@@ -103,21 +103,27 @@ export class PlayButton {
         this.button.on('pointerdown', clickHandler);
     }
 
-    createStakeAmountDisplay(x, y, isLandscapeMode) {
-        // Convert stake amount from Wei to ETH
-        let stakeAmountText = "loading...";
+    createBetAmountDisplay(x, y, isLandscapeMode) {
+        // Convert bet amount from Wei to ETH
+        let betAmountText = "loading...";
         try {
-            const stakeAmountEth = web3.utils.fromWei(getStakeAmount().toString(), 'ether');
-            stakeAmountText = `${parseFloat(stakeAmountEth).toFixed(6)} ETH per game`;
+            const betAmount = getSelectedBetAmount();
+            if (betAmount) {
+                const betAmountEth = web3.utils.fromWei(betAmount.toString(), 'ether');
+                betAmountText = `${parseFloat(betAmountEth).toFixed(6)} ETH per game`;
+            } else {
+                betAmountText = "Loading bet amount...";
+            }
         } catch (error) {
-            console.error('Error converting stake amount:', error);
-            stakeAmountText = `${getStakeAmount()} WEI per game`;
+            console.error('Error converting bet amount:', error);
+            const betAmount = getSelectedBetAmount();
+            betAmountText = betAmount ? `${betAmount} WEI per game` : "Loading bet amount...";
         }
 
-        const stakeFontSize = isLandscapeMode ? Math.max(14, this.scene.screenWidth / 80) : Math.max(16, this.scene.screenWidth / 60);
+        const betFontSize = isLandscapeMode ? Math.max(14, this.scene.screenWidth / 80) : Math.max(16, this.scene.screenWidth / 60);
         
-        this.stakeAmountText = this.scene.add.text(x, y, stakeAmountText, {
-            font: `${stakeFontSize}px Orbitron`,
+        this.betAmountText = this.scene.add.text(x, y, betAmountText, {
+            font: `${betFontSize}px Orbitron`,
             fill: '#E0F6FF',
             stroke: '#0066CC',
             strokeThickness: 1,
@@ -131,7 +137,7 @@ export class PlayButton {
             }
         }).setOrigin(0.5);
         
-        this.stakeAmountText.setDepth(201);
+        this.betAmountText.setDepth(201);
     }
 
     async checkInsufficientBalance() {
@@ -149,15 +155,22 @@ export class PlayButton {
         }
     }
 
-    // Add method to update stake amount display if needed
-    updateStakeAmountDisplay() {
-        if (this.stakeAmountText) {
+    // Add method to update bet amount display if needed
+    updateBetAmountDisplay() {
+        if (this.betAmountText) {
             try {
-                const stakeAmountEth = web3.utils.fromWei(getStakeAmount().toString(), 'ether');
-                const stakeAmountText = `${parseFloat(stakeAmountEth).toFixed(6)} ETH per game`;
-                this.stakeAmountText.setText(stakeAmountText);
+                const betAmount = getSelectedBetAmount();
+                if (betAmount) {
+                    const betAmountEth = web3.utils.fromWei(betAmount.toString(), 'ether');
+                    const betAmountText = `${parseFloat(betAmountEth).toFixed(6)} ETH per game`;
+                    this.betAmountText.setText(betAmountText);
+                } else {
+                    this.betAmountText.setText("Loading bet amount...");
+                }
             } catch (error) {
-                console.error('Error updating stake amount display:', error);
+                console.error('Error updating bet amount display:', error);
+                const betAmount = getSelectedBetAmount();
+                this.betAmountText.setText(betAmount ? `${betAmount} WEI per game` : "Loading bet amount...");
             }
         }
     }

@@ -17,6 +17,19 @@
   },
   {
     "type": "function",
+    "name": "HOUSE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_PENDING_GAMES",
     "inputs": [],
     "outputs": [
@@ -43,8 +56,14 @@
   },
   {
     "type": "function",
-    "name": "STAKE_AMOUNT",
-    "inputs": [],
+    "name": "betAmountsArray",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -148,6 +167,11 @@
         "internalType": "uint256"
       },
       {
+        "name": "betAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "houseHash",
         "type": "bytes32",
         "internalType": "bytes32"
@@ -194,6 +218,24 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getBetAmountsArray",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "view"
@@ -219,7 +261,7 @@
   },
   {
     "type": "function",
-    "name": "getGameState",
+    "name": "getFrontendGameState",
     "inputs": [
       {
         "name": "player",
@@ -229,12 +271,12 @@
     ],
     "outputs": [
       {
-        "name": "player_eth_balance",
+        "name": "playerEthBalance",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "player_gacha_token_balance",
+        "name": "playerGachaTokenBalance",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -280,6 +322,11 @@
           },
           {
             "name": "commitTimestamp",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "betAmount",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -365,6 +412,11 @@
             "internalType": "uint256"
           },
           {
+            "name": "betAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "houseHash",
             "type": "bytes32",
             "internalType": "bytes32"
@@ -395,19 +447,6 @@
             "internalType": "uint256"
           }
         ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "house",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -499,6 +538,19 @@
   },
   {
     "type": "function",
+    "name": "setBetAmounts",
+    "inputs": [
+      {
+        "name": "_betAmounts",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setGachaToken",
     "inputs": [
       {
@@ -551,10 +603,42 @@
   },
   {
     "type": "function",
+    "name": "whitelistedBetAmounts",
+    "inputs": [
+      {
+        "name": "betAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "withdrawStuckFunds",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "BetAmountsUpdated",
+    "inputs": [
+      {
+        "name": "newBetAmounts",
+        "type": "uint256[]",
+        "indexed": false,
+        "internalType": "uint256[]"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -574,6 +658,12 @@
       },
       {
         "name": "gameId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "betAmount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

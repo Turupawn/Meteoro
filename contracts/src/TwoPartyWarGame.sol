@@ -252,6 +252,10 @@ contract TwoPartyWarGame is Ownable {
         return playerGames[player][gameAmount-1];
     }
 
+    function getBetAmountsArray() external view returns (uint[] memory) {
+        return betAmountsArray;
+    }
+
     // Owner functions
     function setBetAmounts(uint[] memory _betAmounts) external onlyOwner {
         for (uint i = 0; i < betAmountsArray.length; i++) {

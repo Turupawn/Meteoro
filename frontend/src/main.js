@@ -8,7 +8,7 @@ import {
     performReveal, 
     updateGasPrice,
     initializeNonce,
-    initializeStakeAmount,
+    initializeBetAmount,
     web3,
     getPlayerETHBalance,
     getMinimumPlayableBalance
@@ -147,8 +147,8 @@ async function loadGameData() {
     }
     gameDataLoadingProgress = 0.5;
     updateGameDataProgress(0.5);
-    console.log("Initializing stake amount...")
-    await initializeStakeAmount();
+    console.log("Initializing bet amount...")
+    await initializeBetAmount();
     console.log("Updating gas price...")
     await new Promise(resolve => setTimeout(resolve, 150));
     gameDataLoadingProgress = 0.7;
@@ -195,7 +195,7 @@ loadDapp()
 
 const onContractInitCallback = async () => {
   try {
-    await initializeStakeAmount();
+    await initializeBetAmount();
     
     await updateGasPrice();
     await initializeNonce();

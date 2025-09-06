@@ -19,7 +19,7 @@ contract TwoPartyWarGameScript is Script {
         game = new TwoPartyWarGame(msg.sender, address(gachaToken));
 
         uint[] memory betAmounts = new uint[](3);
-        betAmounts[0] = 0.000001 ether;
+        betAmounts[0] = 0.000004 ether;
         betAmounts[1] = 0.000002 ether;
         betAmounts[2] = 0.000003 ether;
         game.setBetAmounts(betAmounts);

@@ -7,7 +7,7 @@ const GAS_LIMIT = 300000;
 
 let web3;
 let my_contract;
-let globalStakeAmount = null;
+let globalSelectedBetAmount = null;
 let globalGasPrice = null;
 let globalNonce = null;
 let globalETHBalance = null;
@@ -104,8 +104,8 @@ export async function commit(commitHash) {
         throw new Error("No local wallet found!");
     }
 
-    if (!globalStakeAmount) {
-        await initializeStakeAmount();
+    if (!globalSelectedBetAmount) {
+        await initializeBetAmount();
     }
     let data;
     try {
@@ -127,7 +127,7 @@ export async function commit(commitHash) {
         nonce: nonce,
         gasPrice: gasPrice,
         gas: GAS_LIMIT,
-        value: globalStakeAmount,
+        value: globalSelectedBetAmount,
         data: data
     };
 
@@ -308,21 +308,61 @@ export function getAndIncrementNonce() {
     return globalNonce++;
 }
 
-export async function initializeStakeAmount() {
-    globalStakeAmount = await my_contract.methods.STAKE_AMOUNT().call();
-    printLog(['debug'], "Stake amount initialized:", globalStakeAmount);
+export async function initializeBetAmount() {
+    try {
+        // Get the bet amounts array in a single call
+        const betAmountsArray = await my_contract.methods.getBetAmountsArray().call();
+        printLog(['debug'], "Bet amounts array from contract:", betAmountsArray);
+
+        console.log("betAmountsArray", betAmountsArray);
+        
+        if (betAmountsArray.length === 0) {
+            throw new Error("No bet amounts configured in contract");
+        }
+        
+        const storedBetAmount = localStorage.getItem('selectedBetAmount');
+
+        printLog(['debug'], "storedBetAmount", storedBetAmount);
+        printLog(['debug'], "betAmountsArray", betAmountsArray);
+        
+        if (storedBetAmount) {
+            const isValidBetAmount = betAmountsArray.includes(storedBetAmount);
+            if (isValidBetAmount) {
+                globalSelectedBetAmount = storedBetAmount;
+                printLog(['debug'], "Using stored bet amount:", globalSelectedBetAmount);
+            } else {
+                globalSelectedBetAmount = betAmountsArray[0];
+                localStorage.setItem('selectedBetAmount', globalSelectedBetAmount);
+                printLog(['debug'], "Stored bet amount no longer valid, selected first:", globalSelectedBetAmount);
+            }
+        } else {
+            globalSelectedBetAmount = betAmountsArray[0];
+            localStorage.setItem('selectedBetAmount', globalSelectedBetAmount);
+            printLog(['debug'], "No stored bet amount, selected first:", globalSelectedBetAmount);
+        }
+        printLog(['debug'], "Bet amount initialized:", globalSelectedBetAmount);
+    } catch (error) {
+        printLog(['error'], "Error initializing bet amount:", error);
+        throw error;
+    }
 }
 
 export function getMinimumPlayableBalance() {
-    return BigInt(globalStakeAmount) + BigInt(globalStakeAmount);
+    if (!globalSelectedBetAmount) {
+        throw new Error("Bet amount not initialized");
+    }
+    return BigInt(globalSelectedBetAmount) + BigInt(globalSelectedBetAmount);
 }
 
 export function getRecommendedPlayableBalance() {
-    return BigInt(globalStakeAmount) * 10n;
+    if (!globalSelectedBetAmount) {
+        throw new Error("Bet amount not initialized");
+    }
+    return BigInt(globalSelectedBetAmount) * 10n;
 }
 
-export function getStakeAmount() {
-    return globalStakeAmount;
+export function getSelectedBetAmount() {
+    return globalSelectedBetAmount;
 }
 
 export function getPlayerETHBalance() {
