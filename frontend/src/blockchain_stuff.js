@@ -79,12 +79,12 @@ export async function checkGameState() {
             return null;
         }
         
-        const gameStateTemp = await my_contract.methods.getGameState(wallet.address).call({}, 'pending');
-        globalETHBalance = gameStateTemp.player_eth_balance;
-        globalGachaTokenBalance = gameStateTemp.player_gacha_token_balance;
+        const gameStateTemp = await my_contract.methods.getFrontendGameState(wallet.address).call({}, 'pending');
+        globalETHBalance = gameStateTemp.playerEthBalance;
+        globalGachaTokenBalance = gameStateTemp.playerGachaTokenBalance;
         const gameState = {
-            playerETHBalance: gameStateTemp.player_eth_balance,
-            playerGachaTokenBalance: gameStateTemp.player_gacha_token_balance,
+            playerETHBalance: gameStateTemp.playerEthBalance,
+            playerGachaTokenBalance: gameStateTemp.playerGachaTokenBalance,
             gameState: gameStateTemp.gameState,
             playerCommit: gameStateTemp.playerCommit,
             houseHash: gameStateTemp.houseHash,

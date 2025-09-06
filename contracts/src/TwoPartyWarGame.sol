@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "./GachaToken.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {GachaToken} from "./GachaToken.sol";
 
 contract TwoPartyWarGame is Ownable {
     enum State { NotStarted, Committed, HashPosted, Revealed, Forfeited }
@@ -13,6 +13,7 @@ contract TwoPartyWarGame is Ownable {
         address playerAddress;
         bytes32 playerCommit;
         uint commitTimestamp;
+        uint betAmount;
 
         bytes32 houseHash;
         uint houseHashTimestamp;
@@ -26,11 +27,14 @@ contract TwoPartyWarGame is Ownable {
     mapping(uint gameId => Game) public games;
     mapping(address player => uint[] gameIds) playerGames;
     
+    // Whitelisted bet amounts
+    mapping(uint betAmount => bool) public whitelistedBetAmounts;
+    uint[] public betAmountsArray;
+
     uint public constant MAX_RETURN_HISTORY = 10;
     uint public constant MAX_PENDING_GAMES = 20;
     
-    address public immutable house;
-    uint public constant STAKE_AMOUNT = 0.000001 ether;
+    address public immutable HOUSE;
     uint public nextGameId;
     uint public lastRandomnessPostedGameId;
     uint public pendingGameCount;
@@ -39,32 +43,24 @@ contract TwoPartyWarGame is Ownable {
     uint public tieRewardAmount = 100 ether;
 
     event GameForfeited(address indexed player, address house);
-    event GameCreated(address indexed player, bytes32 commitHash, uint gameId);
+    event GameCreated(address indexed player, bytes32 commitHash, uint gameId, uint betAmount);
     event TieRewardMinted(address indexed player, uint amount, uint gameId);
     event TieRewardAmountUpdated(uint newAmount);
+    event BetAmountsUpdated(uint[] newBetAmounts);
 
     modifier onlyHouse() {
-        require(msg.sender == house, "Not house");
-        _;
-    }
-
-    modifier hasStaked() {
-        require(msg.value == STAKE_AMOUNT, "Incorrect stake amount");
-        _;
-    }
-
-    modifier hasStakedForMultiple(uint count) {
-        require(msg.value == STAKE_AMOUNT * count, "Incorrect stake amount for multiple games");
+        require(msg.sender == HOUSE, "Not house");
         _;
     }
 
     constructor(address _house, address _gachaToken) Ownable(msg.sender) {
-        house = _house;
+        HOUSE = _house;
         gachaToken = GachaToken(_gachaToken);
     }
 
     // Public functions
-    function commit(bytes32 _commitHash) external payable hasStaked {
+    function commit(bytes32 _commitHash) external payable {
+        require(whitelistedBetAmounts[msg.value], "Bet amount not whitelisted");
         require(pendingGameCount < MAX_PENDING_GAMES, "Too many pending games");
         Game memory playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.NotStarted ||
@@ -77,6 +73,7 @@ contract TwoPartyWarGame is Ownable {
             playerAddress: msg.sender,
             playerCommit: _commitHash,
             commitTimestamp: block.timestamp,
+            betAmount: msg.value,
             
             houseHash: bytes32(0),
             houseHashTimestamp: 0,
@@ -90,23 +87,27 @@ contract TwoPartyWarGame is Ownable {
         pendingGameCount++;
         games[nextGameId] = newGame;
         playerGames[msg.sender].push(nextGameId);
-        emit GameCreated(msg.sender, _commitHash, nextGameId);
+        emit GameCreated(msg.sender, _commitHash, nextGameId, msg.value);
     }
 
-    function multiPostRandomness(bytes32[] memory randomness) external payable hasStakedForMultiple(randomness.length) onlyHouse {
+    function multiPostRandomness(bytes32[] memory randomness) external payable onlyHouse {
         require(randomness.length > 0, "Should not be 0");
         require(randomness.length <= pendingGameCount, "Too many randomness values");
+        
+        uint totalExpectedValue = 0;
         for (uint i = 0; i < randomness.length; i++) {
             uint gameId = lastRandomnessPostedGameId + i + 1;
             Game storage playerGame = games[gameId];
-            if(playerGame.gameState != State.Forfeited)
-            {
+            if(playerGame.gameState != State.Forfeited) {
                 require(playerGame.gameState == State.Committed, "Game has to be commited");
+                totalExpectedValue += playerGame.betAmount;
                 playerGame.gameState = State.HashPosted;
                 playerGame.houseHash = randomness[i];
                 playerGame.houseHashTimestamp = block.timestamp;
             }
         }
+        require(msg.value == totalExpectedValue, "Incorrect total bet amount");
+        
         lastRandomnessPostedGameId += randomness.length;
         pendingGameCount -= randomness.length;
     }
@@ -124,11 +125,10 @@ contract TwoPartyWarGame is Ownable {
         if (playerCard > houseCard) {
             winner = msg.sender;
         } else if (houseCard > playerCard) {
-            winner = house;
+            winner = HOUSE;
         } else {
-            // Cards are equal - it's a tie
             isTie = true;
-            winner = address(0); // No winner in a tie
+            winner = address(0);
         }
 
         playerGame.gameState = State.Revealed;
@@ -137,30 +137,29 @@ contract TwoPartyWarGame is Ownable {
         playerGame.houseCard = houseCard;
         playerGame.revealTimestamp = block.timestamp;
 
-        uint totalStake = STAKE_AMOUNT * 2;
+        uint totalStake = playerGame.betAmount * 2;
         if (isTie) {
             gachaToken.mint(msg.sender, tieRewardAmount);
             emit TieRewardMinted(msg.sender, tieRewardAmount, getCurrentGameId(msg.sender));
-            transferETH(payable(house), totalStake);
+            transferEth(payable(HOUSE), totalStake);
         } else {
-            transferETH(payable(winner), totalStake);
+            transferEth(payable(winner), totalStake);
         }
     }
 
     function forfeit() external {
         Game storage playerGame = games[getCurrentGameId(msg.sender)];
-        // AI: keep it commented out for now
         require(playerGame.gameState == State.HashPosted ||
                 playerGame.gameState == State.Committed
                 , "Game not in correct state to forfeit"
         );
         playerGame.gameState = State.Forfeited;
-        transferETH(payable(house), STAKE_AMOUNT);
-        emit GameForfeited(msg.sender, house);
+        transferEth(payable(HOUSE), playerGame.betAmount);
+        emit GameForfeited(msg.sender, HOUSE);
     }
 
     // Helpers
-    function transferETH(address to, uint amount) internal {
+    function transferEth(address to, uint amount) internal {
         (bool sent,) = payable(to).call{value: amount}("");
         require(sent, "Failed ETH transfer");
     }
@@ -173,9 +172,9 @@ contract TwoPartyWarGame is Ownable {
     }
 
     // View functions
-    function getGameState(address player) external view returns (
-        uint player_eth_balance,
-        uint player_gacha_token_balance,
+    function getFrontendGameState(address player) external view returns (
+        uint playerEthBalance,
+        uint playerGachaTokenBalance,
         State gameState,
         bytes32 playerCommit,
         bytes32 houseHash,
@@ -205,10 +204,22 @@ contract TwoPartyWarGame is Ownable {
         );
     }
 
-    function getBackendGameState() external view returns (uint,uint) {
+    function getBackendGameState() external view returns (uint, uint, uint[] memory) {
+        uint[] memory pendingBetAmounts = new uint[](pendingGameCount);
+        uint pendingIndex = 0;
+        
+        for (uint i = lastRandomnessPostedGameId + 1; i <= nextGameId && pendingIndex < pendingGameCount; i++) {
+            Game storage game = games[i];
+            if (game.gameState == State.Committed) {
+                pendingBetAmounts[pendingIndex] = game.betAmount;
+                pendingIndex++;
+            }
+        }
+        
         return (
             lastRandomnessPostedGameId,
-            pendingGameCount
+            pendingGameCount,
+            pendingBetAmounts
         );
     }
 
@@ -242,6 +253,19 @@ contract TwoPartyWarGame is Ownable {
     }
 
     // Owner functions
+    function setBetAmounts(uint[] memory _betAmounts) external onlyOwner {
+        for (uint i = 0; i < betAmountsArray.length; i++) {
+            whitelistedBetAmounts[betAmountsArray[i]] = false;
+        }
+        
+        betAmountsArray = _betAmounts;
+        for (uint i = 0; i < _betAmounts.length; i++) {
+            whitelistedBetAmounts[_betAmounts[i]] = true;
+        }
+        
+        emit BetAmountsUpdated(_betAmounts);
+    }
+
     function setTieRewardAmount(uint _newAmount) external onlyOwner {
         tieRewardAmount = _newAmount;
         emit TieRewardAmountUpdated(_newAmount);
@@ -253,6 +277,6 @@ contract TwoPartyWarGame is Ownable {
 
     function withdrawStuckFunds() external onlyOwner {
         require(address(this).balance > 0, "No funds to withdraw");
-        transferETH(payable(house), address(this).balance);
+        transferEth(payable(owner()), address(this).balance);
     }
 }
