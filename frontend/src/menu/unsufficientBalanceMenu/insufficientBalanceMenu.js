@@ -1,5 +1,5 @@
-import { web3, getLocalWallet, getPlayerETHBalance, getRecommendedPlayableBalance, getMinimumPlayableBalance } from '../../../blockchain_stuff.js';
-import { isLandscape } from '../../../utils.js';
+import { web3, getLocalWallet, getPlayerETHBalance, getRecommendedPlayableBalance, getMinimumPlayableBalance } from '../../blockchain_stuff.js';
+import { isLandscape } from '../../utils.js';
 import { MenuText } from '../menuElements/menuText.js';
 import { MenuInput } from '../menuElements/menuInput.js';
 

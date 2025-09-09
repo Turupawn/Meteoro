@@ -1,5 +1,5 @@
-import { getSelectedBetAmount, web3 } from '../../../blockchain_stuff.js';
-import { isLandscape } from '../../../utils.js';
+import { getSelectedBetAmount, web3 } from '../../blockchain_stuff.js';
+import { isLandscape } from '../../utils.js';
 
 export class BetMenuButton {
     constructor(scene, betMenu) {

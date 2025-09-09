@@ -1,5 +1,5 @@
-import { isLandscape } from '../../utils.js';
-import { setLoadingScreenReady } from '../../main.js';
+import { isLandscape } from '../utils.js';
+import { setLoadingScreenReady } from '../main.js';
 import { Background } from './background.js';
 
 export class LoadingScreen extends Phaser.Scene {

@@ -1,5 +1,5 @@
-import { getBetAmountsArray, setSelectedBetAmount, getSelectedBetAmount, web3 } from '../../../blockchain_stuff.js';
-import { isLandscape } from '../../../utils.js';
+import { getBetAmountsArray, setSelectedBetAmount, getSelectedBetAmount, web3 } from '../../blockchain_stuff.js';
+import { isLandscape } from '../../utils.js';
 import { MenuButton } from '../menuElements/menuButton.js';
 import { MenuText } from '../menuElements/menuText.js';
 

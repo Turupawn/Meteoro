@@ -1,6 +1,6 @@
 
-import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../../utils.js';
-import { web3 } from '../../blockchain_stuff.js';
+import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../utils.js';
+import { web3 } from '../blockchain_stuff.js';
 
 export class ETHBalanceText {
     constructor(scene) {
