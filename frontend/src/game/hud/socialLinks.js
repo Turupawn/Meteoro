@@ -1,4 +1,4 @@
-import { isLandscape } from '../utils.js';
+import { isLandscape } from '../../utils.js';
 
 export class SocialLinks {
     constructor(scene) {

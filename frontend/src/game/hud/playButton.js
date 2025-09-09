@@ -1,7 +1,6 @@
-import { commitGame } from '../main.js';
-import { isLandscape } from '../utils.js';
-import { web3, getPlayerETHBalance } from '../blockchain_stuff.js';
-import { getLocalWallet, getMinimumPlayableBalance, getSelectedBetAmount } from '../blockchain_stuff.js';
+import { commitGame } from '../../main.js';
+import { isLandscape } from '../../utils.js';
+import { getPlayerETHBalance, getLocalWallet, getMinimumPlayableBalance } from '../../blockchain_stuff.js';
 
 export class PlayButton {
     constructor(scene) {
@@ -10,11 +9,9 @@ export class PlayButton {
     }
 
     createButton() {
-        // Check if fonts are already ready
         if (window.fontsReady) {
             this.createPlayButtonTexture();
         } else {
-            // Wait for fonts to be ready
             window.onFontsReady = () => {
                 this.createPlayButtonTexture();
             };
@@ -25,11 +22,10 @@ export class PlayButton {
         const isLandscapeMode = isLandscape();
         
         const x = this.scene.centerX;
-        // Position relative to bottom of screen, higher up in portrait to avoid mobile browser UI
+
         const bottomMargin = isLandscapeMode ? 120 : 500;
         const y = this.scene.screenHeight - bottomMargin;
         
-        // Much bigger font and button on portrait (mobile)
         const fontSize = isLandscapeMode ? Math.max(48, this.scene.screenWidth / 15) : Math.max(72, this.scene.screenWidth / 10);
         
         const playButtonText = "PLAY";
@@ -47,7 +43,6 @@ export class PlayButton {
         this.buttonBg.setStrokeStyle(3, 0x00FFFF);
         this.buttonBg.setDepth(199);
         
-        // Make the background clickable
         this.buttonBg.setInteractive();
         
         this.button = this.scene.add.text(x, y, "PLAY", {
@@ -67,7 +62,6 @@ export class PlayButton {
 
         this.button.setDepth(200);
         
-        // Bigger hit area on portrait (mobile)
         const hitAreaWidth = isLandscapeMode ? this.button.width + 200 : this.button.width + 300;
         const hitAreaHeight = isLandscapeMode ? this.button.height + 100 : this.button.height + 150;
         this.button.setSize(hitAreaWidth, hitAreaHeight);

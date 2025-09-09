@@ -1,24 +1,21 @@
 
-import { applyPerspectiveToQuadImageToLeft } from '../utils.js';
-import { web3 } from '../blockchain_stuff.js';
-import { isLandscape } from '../utils.js';
+import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../../utils.js';
+import { web3 } from '../../blockchain_stuff.js';
 
-export class GachaTokenBalanceText {
+export class ETHBalanceText {
     constructor(scene) {
         this.scene = scene;
-        this.createGachaTokenBalanceText();
+        this.createETHBalanceText();
     }
 
-    createGachaTokenBalanceText() {
-        // Create a render texture for the balance display - much bigger
+    createETHBalanceText() {
         if(isLandscape()) {
             this.renderTexture = this.scene.add.renderTexture(0, 0, 1200, 1200);
         } else {
             this.renderTexture = this.scene.add.renderTexture(0, 0, 600, 220);
         }
         
-        // Create the text content first - much bigger font
-        const gachaTokenBalanceText = this.scene.add.text(0, 0, '     0 GACHA', {
+        const ethBalanceText = this.scene.add.text(0, 0, '0.000000 ETH', {
             font: 'bold 48px Orbitron',
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -32,24 +29,22 @@ export class GachaTokenBalanceText {
                 fill: true
             }
         });
-        gachaTokenBalanceText.setVisible(false);
+        ethBalanceText.setVisible(false);
 
-        // Draw text to render texture
         if(isLandscape()) {
-            this.renderTexture.draw(gachaTokenBalanceText);
+            this.renderTexture.draw(ethBalanceText);
         } else {
-            this.renderTexture.draw(gachaTokenBalanceText, 20, 30);
+            this.renderTexture.draw(ethBalanceText, 20, 30);
         }
-        gachaTokenBalanceText.destroy();
+        ethBalanceText.destroy();
 
-        // Save the texture
-        this.renderTexture.saveTexture('gachaTokenBalanceTexture');
+        this.renderTexture.saveTexture('ethBalanceTexture');
 
         if(isLandscape()) {
             this.quadImage = this.scene.add.rexQuadImage({
                 x: this.scene.screenWidth - 40,
-                y: 550,
-                texture: 'gachaTokenBalanceTexture',
+                y: 500,
+                texture: 'ethBalanceTexture',
                 ninePointMode: true,
             });
             this.quadImage.setScale(50,50);
@@ -60,8 +55,8 @@ export class GachaTokenBalanceText {
         } else {
             this.quadImage = this.scene.add.rexQuadImage(
                 this.scene.screenWidth - 5,
-                350,
-                'gachaTokenBalanceTexture');            
+                300,
+                'ethBalanceTexture');            
             this.quadImage.setAlpha(1);
             this.quadImage.setScale(1.6,1.6);
             this.quadImage.topRight.x -= 100;
@@ -77,25 +72,23 @@ export class GachaTokenBalanceText {
             return;
         }
 
-        // Clear the render texture
         this.renderTexture.clear();
 
-
-        let gachaTokenBalanceString = "     0 GACHA";
+        let ethBalanceString = "0.000000 ETH";
         if (balance !== null) {
             try {
                 if (web3 && web3.utils) {
                     const balanceInEth = web3.utils.fromWei(balance, 'ether');
-                    gachaTokenBalanceString = `${parseFloat(balanceInEth).toFixed(0)} GACHA`;
+                    ethBalanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
                 } else {
-                    gachaTokenBalanceString = `${balance} WEI`;
+                    ethBalanceString = `${balance} WEI`;
                 }
             } catch (error) {
-                gachaTokenBalanceString = `${balance} WEI`;
+                ethBalanceString = `${balance} WEI`;
             }
         }
 
-        const gachaTokenBalanceText = this.scene.add.text(0, 0, gachaTokenBalanceString, {
+        const ethBalanceText = this.scene.add.text(0, 0, ethBalanceString, {
             font: 'bold 32px Orbitron',
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -109,17 +102,16 @@ export class GachaTokenBalanceText {
                 fill: true
             }
         });
-        gachaTokenBalanceText.setVisible(false);
+        ethBalanceText.setVisible(false);
         if(isLandscape()) {
-            this.renderTexture.draw(gachaTokenBalanceText, 320, 100);
+            this.renderTexture.draw(ethBalanceText, 320, 100);
         } else {
-            this.renderTexture.draw(gachaTokenBalanceText, 20, 30);
+            this.renderTexture.draw(ethBalanceText, 20, 30);
         }
-        gachaTokenBalanceText.destroy();
+        ethBalanceText.destroy();
 
-        // Update the quad image texture
         if (this.quadImage) {
-            this.quadImage.setTexture('gachaTokenBalanceTexture');
+            this.quadImage.setTexture('ethBalanceTexture');
             this.quadImage.setVisible(true);
         }
     }
