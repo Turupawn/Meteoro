@@ -15,11 +15,11 @@ const houseAccount = web3.eth.accounts.privateKeyToAccount(process.env.HOUSE_PRI
 web3.eth.accounts.wallet.add(houseAccount);
 
 console.log('House wallet address:', houseAccount.address);
+console.log('Contract address:', contractAddress);
 console.log('Server started on port', port);
 
 let lastProcessedBlock = 0;
 const processingGameIds = new Set();
-let STAKE_AMOUNT = null;
 let currentNonce = null;
 let lastProcessedGameId = null;
 
@@ -35,11 +35,10 @@ function getAndIncrementNonce() {
     return currentNonce++;
 }
 
-async function multiPostRandomnessForGames(randomness) {
+async function multiPostRandomnessForGames(randomness, totalBetAmount) {
     try {
         if (!randomness || randomness.length === 0) return;
         
-        const stakeAmount = STAKE_AMOUNT;
         const nonce = getAndIncrementNonce();
         
         if (nonce === null) {
@@ -50,13 +49,13 @@ async function multiPostRandomnessForGames(randomness) {
         const tx = {
             from: houseAccount.address,
             to: contractAddress,
-            value: web3.utils.toBN(stakeAmount).mul(web3.utils.toBN(randomness.length)).toString(),
+            value: totalBetAmount,
             gas: 1000000 + 500000 * randomness.length, // Fixed high gas limit for speed
             nonce: nonce,
             data: contract.methods.multiPostRandomness(randomness).encodeABI()
         };
         
-        console.log(`Sending multiPostRandomness transaction with nonce ${nonce}...`);
+        console.log(`Sending multiPostRandomness transaction with nonce ${nonce} and value ${totalBetAmount}...`);
         const signedTx = await web3.eth.accounts.signTransaction(tx, houseAccount.privateKey);
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
         
@@ -101,10 +100,11 @@ async function multiPostRandomnessForGames(randomness) {
 // Function to check for new games
 async function checkForNewGames() {
     try {
-        // Get backend state: last responded gameId and pending count
+        // Get backend state: last responded gameId, pending count, and pending bet amounts
         const backendState = await contract.methods.getBackendGameState().call({}, 'pending');
         const lastRandomnessPostedGameId = parseInt(backendState[0]);
         const pendingGameCount = parseInt(backendState[1]);
+        const pendingBetAmounts = backendState[2]; // Array of bet amounts for pending games
 
         if(pendingGameCount === 0) {
             return;
@@ -114,10 +114,18 @@ async function checkForNewGames() {
             return;
         }
         
+        // Calculate total ETH needed by summing all pending bet amounts
+        let totalBetAmount = web3.utils.toBN(0);
+        for (let i = 0; i < pendingBetAmounts.length; i++) {
+            totalBetAmount = totalBetAmount.add(web3.utils.toBN(pendingBetAmounts[i]));
+        }
+        
         lastProcessedGameId = lastRandomnessPostedGameId + pendingGameCount;
         console.log(`Found ${pendingGameCount} pending games (last processed: ${lastProcessedGameId}, current: ${lastRandomnessPostedGameId}), generating randomness...`);
+        console.log(`Total bet amount to send: ${totalBetAmount.toString()} wei`);
+        
         const randomness = Array.from({ length: pendingGameCount }, () => generateRandomHash());
-        await multiPostRandomnessForGames(randomness);
+        await multiPostRandomnessForGames(randomness, totalBetAmount.toString());
     } catch (error) {
         console.error('Error checking for new games:', error);
     }
@@ -125,9 +133,6 @@ async function checkForNewGames() {
 
 async function initialize() {
     try {
-        STAKE_AMOUNT = await contract.methods.STAKE_AMOUNT().call({}, 'pending');
-        console.log('Stake amount loaded:', STAKE_AMOUNT);
-        
         // Initialize nonce only once at startup
         currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
         console.log('Initial nonce:', currentNonce);

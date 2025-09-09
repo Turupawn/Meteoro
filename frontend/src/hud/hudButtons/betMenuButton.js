@@ -1,0 +1,130 @@
+import { getSelectedBetAmount, web3 } from '../../web3/blockchain_stuff.js';
+import { isLandscape } from '../../utils/utils.js';
+
+export class BetMenuButton {
+    constructor(scene, betMenu) {
+        this.scene = scene;
+        this.betMenu = betMenu;
+        this.createButton();
+    }
+
+    createButton() {
+        const isLandscapeMode = isLandscape();
+        const buttonFontSize = isLandscapeMode
+            ? Math.max(20, this.scene.screenWidth / 50)
+            : Math.max(24, this.scene.screenWidth / 25);
+        
+        // Position at the same height as social links but on the right side
+        const bottomMargin = isLandscapeMode ? 50 : 300;
+        const rightMargin = isLandscapeMode ? 50 : 45;
+        const x = this.scene.screenWidth - rightMargin;
+        const y = this.scene.screenHeight - bottomMargin;
+        
+        const currentBetAmount = getSelectedBetAmount();
+        const displayText = this.getDisplayText(currentBetAmount);
+        
+        this.buttonBg = this.scene.add.rectangle(
+            x - 140,
+            y - 10,
+            280,
+            80,
+            0x0066CC,
+            0.4
+        );
+        this.buttonBg.setStrokeStyle(2, 0x00FFFF);
+        this.buttonBg.setDepth(49);
+        this.buttonBg.setOrigin(0.5, 0.5);
+        
+        this.buttonBg.setInteractive();
+        
+        const betText = this.scene.add.text(x - 140, y - 20, "BET", {
+            font: `bold ${buttonFontSize + 8}px Orbitron`,
+            fill: '#E0F6FF',
+            stroke: '#0066CC',
+            strokeThickness: 2,
+            alpha: 0.95,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#003366',
+                blur: 4,
+                fill: true
+            }
+        }).setOrigin(0.5, 0.5).setInteractive();
+
+        betText.setDepth(51);
+
+        const amountText = this.scene.add.text(x - 140, y + 15, this.getAmountText(currentBetAmount), {
+            font: `bold ${buttonFontSize - 8}px Orbitron`,
+            fill: '#E0F6FF',
+            stroke: '#0066CC',
+            strokeThickness: 2,
+            alpha: 0.95,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#003366',
+                blur: 4,
+                fill: true
+            }
+        }).setOrigin(0.5, 0.5).setInteractive();
+
+        amountText.setDepth(52);
+
+        this.button = betText;
+        this.amountText = amountText;
+
+        betText.on('pointerdown', () => this.betMenu.toggleMenu());
+        amountText.on('pointerdown', () => this.betMenu.toggleMenu());
+    }
+
+    getDisplayText(betAmount) {
+        if (!betAmount) {
+            return "Loading...";
+        }
+
+        try {
+            const ethAmount = web3.utils.fromWei(betAmount, 'ether');
+            return `BET\n${parseFloat(ethAmount).toFixed(6)} ETH`;
+        } catch (error) {
+            console.error('Error converting bet amount:', error);
+            return "BET\nError";
+        }
+    }
+
+    getAmountText(betAmount) {
+        if (!betAmount) {
+            return "Loading...";
+        }
+        
+        try {
+            const ethAmount = web3.utils.fromWei(betAmount, 'ether');
+            return `${parseFloat(ethAmount).toFixed(6)} ETH`;
+        } catch (error) {
+            console.error('Error converting bet amount:', error);
+            return "Error";
+        }
+    }
+
+    updateDisplay() {
+        const currentBetAmount = getSelectedBetAmount();
+        if (this.amountText) {
+            this.amountText.setText(this.getAmountText(currentBetAmount));
+        } else {
+            const displayText = this.getDisplayText(currentBetAmount);
+            this.button.setText(displayText);
+        }
+    }
+
+    destroy() {
+        if (this.buttonBg) {
+            this.buttonBg.destroy();
+        }
+        if (this.button) {
+            this.button.destroy();
+        }
+        if (this.amountText) {
+            this.amountText.destroy();
+        }
+    }
+} 

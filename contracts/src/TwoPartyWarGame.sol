@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract TwoPartyWarGame {
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {GachaToken} from "./GachaToken.sol";
+
+contract TwoPartyWarGame is Ownable {
     enum State { NotStarted, Committed, HashPosted, Revealed, Forfeited }
 
     struct Game {
@@ -10,6 +13,7 @@ contract TwoPartyWarGame {
         address playerAddress;
         bytes32 playerCommit;
         uint commitTimestamp;
+        uint betAmount;
 
         bytes32 houseHash;
         uint houseHashTimestamp;
@@ -17,45 +21,46 @@ contract TwoPartyWarGame {
         bytes32 playerSecret;
         uint playerCard;
         uint houseCard;
-        address winner;
         uint revealTimestamp;
     }
 
     mapping(uint gameId => Game) public games;
     mapping(address player => uint[] gameIds) playerGames;
     
+    // Whitelisted bet amounts
+    mapping(uint betAmount => bool) public whitelistedBetAmounts;
+    uint[] public betAmountsArray;
+
     uint public constant MAX_RETURN_HISTORY = 10;
     uint public constant MAX_PENDING_GAMES = 20;
     
-    address public immutable house;
-    uint public constant STAKE_AMOUNT = 0.000001 ether;
+    address public immutable HOUSE;
     uint public nextGameId;
     uint public lastRandomnessPostedGameId;
     uint public pendingGameCount;
+    
+    GachaToken public gachaToken;
+    uint public tieRewardAmount = 100 ether;
 
     event GameForfeited(address indexed player, address house);
-    event GameCreated(address indexed player, bytes32 commitHash, uint gameId);
+    event GameCreated(address indexed player, bytes32 commitHash, uint gameId, uint betAmount);
+    event TieRewardMinted(address indexed player, uint amount, uint gameId);
+    event TieRewardAmountUpdated(uint newAmount);
+    event BetAmountsUpdated(uint[] newBetAmounts);
 
     modifier onlyHouse() {
-        require(msg.sender == house, "Not house");
+        require(msg.sender == HOUSE, "Not house");
         _;
     }
 
-    modifier hasStaked() {
-        require(msg.value == STAKE_AMOUNT, "Incorrect stake amount");
-        _;
+    constructor(address _house, address _gachaToken) Ownable(msg.sender) {
+        HOUSE = _house;
+        gachaToken = GachaToken(_gachaToken);
     }
 
-    modifier hasStakedForMultiple(uint count) {
-        require(msg.value == STAKE_AMOUNT * count, "Incorrect stake amount for multiple games");
-        _;
-    }
-
-    constructor(address _house) {
-        house = _house;
-    }
-
-    function commit(bytes32 _commitHash) external payable hasStaked {
+    // Public functions
+    function commit(bytes32 _commitHash) external payable {
+        require(whitelistedBetAmounts[msg.value], "Bet amount not whitelisted");
         require(pendingGameCount < MAX_PENDING_GAMES, "Too many pending games");
         Game memory playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.NotStarted ||
@@ -68,13 +73,13 @@ contract TwoPartyWarGame {
             playerAddress: msg.sender,
             playerCommit: _commitHash,
             commitTimestamp: block.timestamp,
+            betAmount: msg.value,
             
             houseHash: bytes32(0),
             houseHashTimestamp: 0,
             playerSecret: bytes32(0),
             playerCard: 0,
             houseCard: 0,
-            winner: address(0),
             revealTimestamp: 0
         });
 
@@ -82,23 +87,27 @@ contract TwoPartyWarGame {
         pendingGameCount++;
         games[nextGameId] = newGame;
         playerGames[msg.sender].push(nextGameId);
-        emit GameCreated(msg.sender, _commitHash, nextGameId);
+        emit GameCreated(msg.sender, _commitHash, nextGameId, msg.value);
     }
 
-    function multiPostRandomness(bytes32[] memory randomness) external payable hasStakedForMultiple(randomness.length) onlyHouse {
+    function multiPostRandomness(bytes32[] memory randomness) external payable onlyHouse {
         require(randomness.length > 0, "Should not be 0");
         require(randomness.length <= pendingGameCount, "Too many randomness values");
+        
+        uint totalExpectedValue = 0;
         for (uint i = 0; i < randomness.length; i++) {
             uint gameId = lastRandomnessPostedGameId + i + 1;
             Game storage playerGame = games[gameId];
-            if(playerGame.gameState != State.Forfeited)
-            {
+            if(playerGame.gameState != State.Forfeited) {
                 require(playerGame.gameState == State.Committed, "Game has to be commited");
+                totalExpectedValue += playerGame.betAmount;
                 playerGame.gameState = State.HashPosted;
                 playerGame.houseHash = randomness[i];
                 playerGame.houseHashTimestamp = block.timestamp;
             }
         }
+        require(msg.value == totalExpectedValue, "Incorrect total bet amount");
+        
         lastRandomnessPostedGameId += randomness.length;
         pendingGameCount -= randomness.length;
     }
@@ -111,22 +120,48 @@ contract TwoPartyWarGame {
         (uint playerCard, uint houseCard) = calculateGameCards(_secret, playerGame.houseHash);
 
         address winner;
+        bool isTie = false;
+        
         if (playerCard > houseCard) {
             winner = msg.sender;
+        } else if (houseCard > playerCard) {
+            winner = HOUSE;
         } else {
-            winner = house;
+            isTie = true;
+            winner = address(0);
         }
 
         playerGame.gameState = State.Revealed;
-
         playerGame.playerSecret = _secret;
         playerGame.playerCard = playerCard;
         playerGame.houseCard = houseCard;
-        playerGame.winner = winner;
         playerGame.revealTimestamp = block.timestamp;
 
-        uint totalStake = STAKE_AMOUNT * 2;
-        payable(winner).transfer(totalStake);
+        uint totalStake = playerGame.betAmount * 2;
+        if (isTie) {
+            gachaToken.mint(msg.sender, tieRewardAmount);
+            emit TieRewardMinted(msg.sender, tieRewardAmount, getCurrentGameId(msg.sender));
+            transferEth(payable(HOUSE), totalStake);
+        } else {
+            transferEth(payable(winner), totalStake);
+        }
+    }
+
+    function forfeit() external {
+        Game storage playerGame = games[getCurrentGameId(msg.sender)];
+        require(playerGame.gameState == State.HashPosted ||
+                playerGame.gameState == State.Committed
+                , "Game not in correct state to forfeit"
+        );
+        playerGame.gameState = State.Forfeited;
+        transferEth(payable(HOUSE), playerGame.betAmount);
+        emit GameForfeited(msg.sender, HOUSE);
+    }
+
+    // Helpers
+    function transferEth(address to, uint amount) internal {
+        (bool sent,) = payable(to).call{value: amount}("");
+        require(sent, "Failed ETH transfer");
     }
 
     function calculateGameCards(bytes32 secret, bytes32 houseHash) public pure returns (uint, uint) {
@@ -136,28 +171,10 @@ contract TwoPartyWarGame {
         return (playerCard, houseCard);
     }
 
-    function forfeit() external {
-        Game storage playerGame = games[getCurrentGameId(msg.sender)];
-        // AI: keep it commented out for now
-        require(playerGame.gameState == State.HashPosted ||
-                playerGame.gameState == State.Committed
-                , "Game not in correct state to forfeit"
-        );
-        playerGame.gameState = State.Forfeited;
-        payable(house).transfer(STAKE_AMOUNT);
-        emit GameForfeited(msg.sender, house);
-    }
-
-    // Add a function to withdraw stuck funds (only house)
-    function withdrawStuckFunds() external onlyHouse {
-        require(address(this).balance > 0, "No funds to withdraw");
-        (bool sent,) = payable(house).call{value: address(this).balance}("");
-        require(sent, "Failed to send Ether");
-    }
-
-    // Function to get game state and last 10 games for a specific player
-    function getGameState(address player) external view returns (
-        uint player_balance,
+    // View functions
+    function getFrontendGameState(address player) external view returns (
+        uint playerEthBalance,
+        uint playerGachaTokenBalance,
         State gameState,
         bytes32 playerCommit,
         bytes32 houseHash,
@@ -166,20 +183,19 @@ contract TwoPartyWarGame {
     ) {
         uint currentGameId = getCurrentGameId(player);
         Game storage playerGame = games[currentGameId];
-        
-        // Create a new array for the last 10 games
+
         uint historyLength = playerGames[player].length;
         uint returnLength = historyLength > MAX_RETURN_HISTORY ? MAX_RETURN_HISTORY : historyLength;
         recentHistory = new Game[](returnLength);
-        
-        // Copy the last 10 games (or all if less than 10)
+
         for (uint i = 0; i < returnLength; i++) {
             uint gameIdToAdd = playerGames[player][historyLength - returnLength + i];
             recentHistory[i] = games[gameIdToAdd];
         }
-        
+
         return (
             player.balance,
+            gachaToken.balanceOf(player),
             playerGame.gameState,
             playerGame.playerCommit,
             playerGame.houseHash,
@@ -188,12 +204,45 @@ contract TwoPartyWarGame {
         );
     }
 
-    // Function to get game state and last 10 games for a specific player
-    function getBackendGameState() external view returns (uint,uint) {
+    function getBackendGameState() external view returns (uint, uint, uint[] memory) {
+        uint[] memory pendingBetAmounts = new uint[](pendingGameCount);
+        uint pendingIndex = 0;
+        
+        for (uint i = lastRandomnessPostedGameId + 1; i <= nextGameId && pendingIndex < pendingGameCount; i++) {
+            Game storage game = games[i];
+            if (game.gameState == State.Committed) {
+                pendingBetAmounts[pendingIndex] = game.betAmount;
+                pendingIndex++;
+            }
+        }
+        
         return (
             lastRandomnessPostedGameId,
-            pendingGameCount
+            pendingGameCount,
+            pendingBetAmounts
         );
+    }
+
+    function getGames(uint offset, uint amount, bool ascendant) external view returns (Game[] memory) {
+        uint endIndex = offset + amount;
+        if (endIndex > nextGameId) {
+            endIndex = nextGameId;
+        }
+
+        uint actualAmount = endIndex - offset;
+        Game[] memory result = new Game[](actualAmount);
+
+        for (uint i = 0; i < actualAmount; i++) {
+            uint gameId;
+            if (ascendant) {
+                gameId = offset + i + 1; // +1 because game IDs start from 1
+            } else {
+                gameId = nextGameId - offset - i;
+            }
+            result[i] = games[gameId];
+        }
+        
+        return result;
     }
 
     function getCurrentGameId(address player) public view returns(uint) {
@@ -201,5 +250,37 @@ contract TwoPartyWarGame {
         if (gameAmount == 0)
             return 0;
         return playerGames[player][gameAmount-1];
+    }
+
+    function getBetAmountsArray() external view returns (uint[] memory) {
+        return betAmountsArray;
+    }
+
+    // Owner functions
+    function setBetAmounts(uint[] memory _betAmounts) external onlyOwner {
+        for (uint i = 0; i < betAmountsArray.length; i++) {
+            whitelistedBetAmounts[betAmountsArray[i]] = false;
+        }
+        
+        betAmountsArray = _betAmounts;
+        for (uint i = 0; i < _betAmounts.length; i++) {
+            whitelistedBetAmounts[_betAmounts[i]] = true;
+        }
+        
+        emit BetAmountsUpdated(_betAmounts);
+    }
+
+    function setTieRewardAmount(uint _newAmount) external onlyOwner {
+        tieRewardAmount = _newAmount;
+        emit TieRewardAmountUpdated(_newAmount);
+    }
+
+    function setGachaToken(address _gachaToken) external onlyOwner {
+        gachaToken = GachaToken(_gachaToken);
+    }
+
+    function withdrawStuckFunds() external onlyOwner {
+        require(address(this).balance > 0, "No funds to withdraw");
+        transferEth(payable(owner()), address(this).balance);
     }
 }
