@@ -1,11 +1,10 @@
-import { forfeit, withdrawFunds, getLocalWallet } from '../../blockchain_stuff.js';
-import { web3 } from '../../blockchain_stuff.js';
-import { isLandscape } from '../../utils.js';
-import { MenuButton } from './menuButton.js';
-import { MenuInput } from './menuInput.js';
-import { MenuText } from './menuText.js';
+import { forfeit, withdrawFunds, getLocalWallet, web3 } from '../../../blockchain_stuff.js';
+import { isLandscape } from '../../../utils.js';
+import { MenuButton } from '../menuElements/menuButton.js';
+import { MenuInput } from '../menuElements/menuInput.js';
+import { MenuText } from '../menuElements/menuText.js';
 
-export class Menu {
+export class MainMenu {
     constructor(scene) {
         this.scene = scene;
         this.menuElements = [];
@@ -24,9 +23,8 @@ export class Menu {
     openMenu() {
         this.isOpen = true;
         
-        // Disable insufficient balance screen if it exists
-        if (this.scene.insufficientBalanceScreen) {
-            this.scene.insufficientBalanceScreen.disable();
+        if (this.scene.insufficientBalanceMenu) {
+            this.scene.insufficientBalanceMenu.disable();
         }
         
         this.background = this.scene.add.rectangle(
@@ -546,9 +544,8 @@ export class Menu {
         
         this.isOpen = false;
         
-        // Re-enable insufficient balance screen if it exists
-        if (this.scene.insufficientBalanceScreen) {
-            this.scene.insufficientBalanceScreen.enable();
+        if (this.scene.insufficientBalanceMenu) {
+            this.scene.insufficientBalanceMenu.enable();
         }
         
         this.menuElements.forEach(element => {

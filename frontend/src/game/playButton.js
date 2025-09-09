@@ -76,9 +76,9 @@ export class PlayButton {
             const hasInsufficientBalance = await this.checkInsufficientBalance();
             
             if (hasInsufficientBalance) {
-                if (this.scene.insufficientBalanceScreen) {
-                    this.scene.insufficientBalanceScreen.show(true); // Force show when play button is clicked
-                    this.scene.insufficientBalanceScreen.triggerShakeAnimation();
+                if (this.scene.insufficientBalanceMenu) {
+                    this.scene.insufficientBalanceMenu.show(true); // Force show when play button is clicked
+                    this.scene.insufficientBalanceMenu.triggerShakeAnimation();
                 }
                 return;
             }

@@ -1,7 +1,7 @@
-import { getSelectedBetAmount, getBetAmountsArray, web3 } from '../../blockchain_stuff.js';
-import { isLandscape } from '../../utils.js';
+import { getSelectedBetAmount, web3 } from '../../../blockchain_stuff.js';
+import { isLandscape } from '../../../utils.js';
 
-export class BetAmountButton {
+export class BetMenuButton {
     constructor(scene, betMenu) {
         this.scene = scene;
         this.betMenu = betMenu;

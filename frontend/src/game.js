@@ -6,12 +6,12 @@ import { GachaTokenBalanceText } from './game/gachaTokenBalanceText.js';
 import { GameHistory } from './game/gameHistory.js';
 import { CardDisplay } from './game/cardDisplay.js';
 import { Background } from './game/background.js';
-import { Menu } from './game/menu/menu.js';
-import { BetMenu } from './game/betMenu/betMenu.js';
-import { BetAmountButton } from './game/betMenu/betAmountButton.js';
-import { OpenMenuButton } from './game/openMenuButton.js';
+import { MainMenu } from './game/menu/mainMenu/mainMenu.js';
+import { BetMenu } from './game/menu/betMenu/betMenu.js';
+import { BetMenuButton } from './game/menu/betMenu/betMenuButton.js';
+import { OpenMenuButton } from './game/menu/mainMenu/openMenuButton.js';
 import { SocialLinks } from './game/socialLinks.js';
-import { InsufficientBalanceScreen } from './game/insufficientBalanceScreen.js';
+import { InsufficientBalanceMenu } from './game/menu/unsufficientBalanceMenu/insufficientBalanceMenu.js';
 import { CosmicScene } from './game/cosmicScene.js';
 import { setGameScene } from './main.js';
 import { getMinimumPlayableBalance } from './blockchain_stuff.js';
@@ -47,14 +47,14 @@ class GameScene extends Phaser.Scene {
         this.gachaTokenBalanceText = new GachaTokenBalanceText(this);
         this.gameHistory = new GameHistory(this);
         this.playButton = new PlayButton(this);
-        this.menu = new Menu(this);
+        this.mainMenu = new MainMenu(this);
         this.betMenu = new BetMenu(this);
-        this.betAmountButton = new BetAmountButton(this, this.betMenu);
+        this.betMenuButton = new BetMenuButton(this, this.betMenu);
         this.openMenuButton = new OpenMenuButton(this, () => {
-            this.menu.toggleMenu();
+            this.mainMenu.toggleMenu();
         });
         this.socialLinks = new SocialLinks(this);
-        this.insufficientBalanceScreen = new InsufficientBalanceScreen(this);
+        this.insufficientBalanceMenu = new InsufficientBalanceMenu(this);
         // Removed cosmicButton
         
         // Set the game scene reference for main.js
@@ -68,8 +68,8 @@ class GameScene extends Phaser.Scene {
         this.cardDisplay.updateCurrentGameDisplay();
         this.gameHistory.updateGameHistory(recentHistory, playerAddress);
         
-        if (this.betAmountButton) {
-            this.betAmountButton.updateDisplay();
+        if (this.betMenuButton) {
+            this.betMenuButton.updateDisplay();
         }
         
         // Check if we should show the insufficient balance screen
@@ -88,12 +88,11 @@ class GameScene extends Phaser.Scene {
         try {
             const hasInsufficientBalance = BigInt(balance) < BigInt(getMinimumPlayableBalance());
             
-            // Only show insufficient balance screen on startup, not during gameplay
             if (hasInsufficientBalance && this.cardDisplay && 
                 (!this.cardDisplay.playerCardSprite || !this.cardDisplay.playerCardSprite.active)) {
-                this.insufficientBalanceScreen.show(false); // Normal show (startup only)
+                this.insufficientBalanceMenu.show(false);
             } else if (!hasInsufficientBalance) {
-                this.insufficientBalanceScreen.hide();
+                this.insufficientBalanceMenu.hide();
             }
         } catch (error) {
             console.error('Error checking insufficient balance:', error);
