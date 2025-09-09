@@ -1,7 +1,7 @@
-import { web3, getLocalWallet, getPlayerETHBalance, getRecommendedPlayableBalance, getMinimumPlayableBalance } from '../../web3/blockchain_stuff.js';
-import { isLandscape } from '../../utils/utils.js';
-import { MenuText } from '../menuElements/menuText.js';
-import { MenuInput } from '../menuElements/menuInput.js';
+import { web3, getLocalWallet, getPlayerETHBalance, getRecommendedPlayableBalance, getMinimumPlayableBalance } from '../web3/blockchain_stuff.js';
+import { isLandscape } from '../utils/utils.js';
+import { MenuText } from './menuElements/menuText.js';
+import { MenuInput } from './menuElements/menuInput.js';
 
 export class InsufficientBalanceMenu {
     constructor(scene) {

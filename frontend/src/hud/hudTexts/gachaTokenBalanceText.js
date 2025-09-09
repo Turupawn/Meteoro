@@ -1,6 +1,6 @@
 
-import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../utils/utils.js';
-import { web3 } from '../web3/blockchain_stuff.js';
+import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../../utils/utils.js';
+import { web3 } from '../../web3/blockchain_stuff.js';
 
 export class GachaTokenBalanceText {
     constructor(scene) {

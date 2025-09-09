@@ -1,19 +1,19 @@
 import Phaser from 'phaser';
-import { printLog } from './utils/utils.js';
-import { LoadingScreen } from './animations/loadingScreen.js';
-import { PlayButton } from './hud/playButton.js';
-import { ETHBalanceText } from './hud/ethBalanceText.js';
-import { GachaTokenBalanceText } from './hud/gachaTokenBalanceText.js';
-import { GameHistory } from './hud/gameHistory.js';
-import { CardDisplay } from './animations/cardDisplay.js';
 import { Background } from './animations/background.js';
-import { MainMenu } from './menu/mainMenu/mainMenu.js';
-import { BetMenu } from './menu/betMenu/betMenu.js';
-import { BetMenuButton } from './menu/betMenu/betMenuButton.js';
-import { OpenMenuButton } from './menu/mainMenu/openMenuButton.js';
-import { SocialLinks } from './hud/socialLinks.js';
-import { InsufficientBalanceMenu } from './menu/unsufficientBalanceMenu/insufficientBalanceMenu.js';
+import { CardDisplay } from './animations/cardDisplay.js';
+import { LoadingScreen } from './animations/loadingScreen.js';
+import { OpenMenuButton } from './hud/hudButtons/openMenuButton.js';
+import { BetMenuButton } from './hud/hudButtons/betMenuButton.js';
+import { PlayButton } from './hud/hudButtons/playButton.js';
+import { SocialLinks } from './hud/hudButtons/socialLinks.js';
+import { ETHBalanceText } from './hud/hudTexts/ethBalanceText.js';
+import { GachaTokenBalanceText } from './hud/hudTexts/gachaTokenBalanceText.js';
+import { GameHistory } from './hud/hudTexts/gameHistory.js';
+import { MainMenu } from './menus/mainMenu.js';
+import { BetMenu } from './menus/betMenu.js';
+import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
 import { setGameScene } from './main.js';
+import { printLog } from './utils/utils.js';
 import { getMinimumPlayableBalance } from './web3/blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {

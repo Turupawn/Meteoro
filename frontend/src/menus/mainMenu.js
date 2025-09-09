@@ -1,8 +1,8 @@
-import { forfeit, withdrawFunds, getLocalWallet, web3 } from '../../web3/blockchain_stuff.js';
-import { isLandscape } from '../../utils/utils.js';
-import { MenuButton } from '../menuElements/menuButton.js';
-import { MenuInput } from '../menuElements/menuInput.js';
-import { MenuText } from '../menuElements/menuText.js';
+import { forfeit, withdrawFunds, getLocalWallet, web3 } from '../web3/blockchain_stuff.js';
+import { isLandscape } from '../utils/utils.js';
+import { MenuButton } from './menuElements/menuButton.js';
+import { MenuInput } from './menuElements/menuInput.js';
+import { MenuText } from './menuElements/menuText.js';
 
 export class MainMenu {
     constructor(scene) {
