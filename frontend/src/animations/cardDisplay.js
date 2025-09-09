@@ -49,27 +49,36 @@ export class CardDisplay {
             
             this.createCardSprites(playerCard, houseCard);
             
-            const winner = playerCard > houseCard ? "Player" : "House";
-            
-            // Just update the text, no position change needed
-            
-            if(winner === "Player") {
-                this.currentGameText.setText(`You win!`);
-            }else{
-                this.currentGameText.setText(`House wins`);
-            }
-            
-            if (this.scene.background && this.scene.background.endBoostAnimation) {
-                this.scene.background.endBoostAnimation();
-            }
+            if (playerCard === houseCard) {
+                this.currentGameText.setText(`TIE!`);
+                if (this.scene.startCosmicScene) {
+                    this.scene.time.delayedCall(2000, () => {
+                        this.scene.startCosmicScene();
+                    });
+                } else {
+                    console.log("ERROR: Cosmic scene not found");
+                }
+            } else {
+                const winner = playerCard > houseCard ? "Player" : "House";
+                
+                if(winner === "Player") {
+                    this.currentGameText.setText(`You win!`);
+                } else {
+                    this.currentGameText.setText(`House wins`);
+                }
+                
+                if (this.scene.background && this.scene.background.endBoostAnimation) {
+                    this.scene.background.endBoostAnimation();
+                }
 
-            if (playerCard > houseCard) {
-                this.scene.time.delayedCall(1000, () => {
-                    // Add null check before triggering animation
-                    if (this.houseCardSprite && this.houseCardSprite.active) {
-                        this.triggerWinParticleAnimation();
-                    }
-                });
+                if (playerCard > houseCard) {
+                    this.scene.time.delayedCall(1000, () => {
+                        // Add null check before triggering animation
+                        if (this.houseCardSprite && this.houseCardSprite.active) {
+                            this.triggerWinParticleAnimation();
+                        }
+                    });
+                }
             }
         }
     }

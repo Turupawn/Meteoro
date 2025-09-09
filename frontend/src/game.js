@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { printLog } from './utils/utils.js';
 import { LoadingScreen } from './animations/loadingScreen.js';
 import { PlayButton } from './hud/playButton.js';
 import { ETHBalanceText } from './hud/ethBalanceText.js';
@@ -12,7 +13,6 @@ import { BetMenuButton } from './menu/betMenu/betMenuButton.js';
 import { OpenMenuButton } from './menu/mainMenu/openMenuButton.js';
 import { SocialLinks } from './hud/socialLinks.js';
 import { InsufficientBalanceMenu } from './menu/unsufficientBalanceMenu/insufficientBalanceMenu.js';
-import { CosmicScene } from './animations/cosmicScene.js';
 import { setGameScene } from './main.js';
 import { getMinimumPlayableBalance } from './web3/blockchain_stuff.js';
 
@@ -57,6 +57,11 @@ class GameScene extends Phaser.Scene {
         this.insufficientBalanceMenu = new InsufficientBalanceMenu(this);
         
         setGameScene(this);
+
+        this.time.delayedCall(1000, () => {
+            printLog(['profile'], "Started lazy loading at:" + new Date().toISOString());
+            this.lazyLoadCosmicScene();
+        });
     }
 
     updateDisplay(balance = null, gachaTokenBalance = null, recentHistory = null, playerAddress = null) {
@@ -95,6 +100,28 @@ class GameScene extends Phaser.Scene {
             console.error('Error checking insufficient balance:', error);
         }
     }
+
+    lazyLoadCosmicScene() {
+        if (!this.scene.get('CosmicScene')) {
+            import('./animations/cosmicScene.js').then(({ CosmicScene }) => {
+                this.scene.add('CosmicScene', CosmicScene, false);
+                printLog(['profile'], "CosmicScene loaded lazily at:" + new Date().toISOString());
+            }).catch(error => {
+                console.error('Failed to lazy load CosmicScene:', error);
+            });
+        }
+    }
+
+    startCosmicScene() {
+        if (!this.scene.get('CosmicScene')) {
+            this.lazyLoadCosmicScene();
+            this.time.delayedCall(100, () => {
+                this.scene.launch('CosmicScene');
+            });
+        } else {
+            this.scene.launch('CosmicScene');
+        }
+    }
 }
 
 const loadPhaser = async () => {
@@ -108,7 +135,7 @@ const loadPhaser = async () => {
         parent: container,
         width: width,
         height: height,
-        scene: [LoadingScreen, GameScene, CosmicScene],
+        scene: [LoadingScreen, GameScene],
         title: "War Game",
         version: "1.0",
         dom: {
