@@ -1,4 +1,4 @@
-import { isLandscape } from '../utils.js';
+import { isLandscape } from '../utils/utils.js';
 import { setLoadingScreenReady } from '../main.js';
 import { Background } from './background.js';
 

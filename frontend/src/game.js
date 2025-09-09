@@ -14,7 +14,7 @@ import { SocialLinks } from './hud/socialLinks.js';
 import { InsufficientBalanceMenu } from './menu/unsufficientBalanceMenu/insufficientBalanceMenu.js';
 import { CosmicScene } from './animations/cosmicScene.js';
 import { setGameScene } from './main.js';
-import { getMinimumPlayableBalance } from './blockchain_stuff.js';
+import { getMinimumPlayableBalance } from './web3/blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {

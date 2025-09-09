@@ -1,5 +1,5 @@
 import Web3 from 'web3';
-import { printLog } from './utils.js';
+import { printLog } from '../utils/utils.js';
 
 const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json";

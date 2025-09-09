@@ -1,5 +1,5 @@
 import { loadPhaser } from './game.js';
-import { generateRandomBytes32, calculateCards, printLog } from './utils.js';
+import { generateRandomBytes32, calculateCards, printLog } from './utils/utils.js';
 import { 
     initWeb3, 
     getLocalWallet, 
@@ -12,7 +12,7 @@ import {
     web3,
     getPlayerETHBalance,
     getMinimumPlayableBalance
-} from './blockchain_stuff.js';
+} from './web3/blockchain_stuff.js';
 
 import posthog from 'posthog-js'
 

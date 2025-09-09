@@ -1,6 +1,6 @@
 import { commitGame } from '../main.js';
-import { isLandscape } from '../utils.js';
-import { getPlayerETHBalance, getLocalWallet, getMinimumPlayableBalance } from '../blockchain_stuff.js';
+import { isLandscape } from '../utils/utils.js';
+import { getPlayerETHBalance, getLocalWallet, getMinimumPlayableBalance } from '../web3/blockchain_stuff.js';
 
 export class PlayButton {
     constructor(scene) {

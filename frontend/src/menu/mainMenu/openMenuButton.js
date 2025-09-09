@@ -1,4 +1,4 @@
-import { applyPerspectiveToQuadImageToDown, isLandscape } from '../../utils.js';
+import { applyPerspectiveToQuadImageToDown, isLandscape } from '../../utils/utils.js';
 
 export class OpenMenuButton {
     constructor(scene, onToggle) {
