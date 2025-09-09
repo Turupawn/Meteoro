@@ -24,21 +24,21 @@ export class BetMenuButton {
         const displayText = this.getDisplayText(currentBetAmount);
         
         this.buttonBg = this.scene.add.rectangle(
-            x,
-            y,
+            x - 140,
+            y - 10,
             280,
-            60,
+            80,
             0x0066CC,
             0.4
         );
         this.buttonBg.setStrokeStyle(2, 0x00FFFF);
-        this.buttonBg.setDepth(50); // Same depth as social links
-        this.buttonBg.setOrigin(1, 1); // Right-aligned, bottom-aligned
+        this.buttonBg.setDepth(49);
+        this.buttonBg.setOrigin(0.5, 0.5);
         
         this.buttonBg.setInteractive();
         
-        this.button = this.scene.add.text(x, y, displayText, {
-            font: `bold ${buttonFontSize}px Orbitron`,
+        const betText = this.scene.add.text(x - 140, y - 20, "BET", {
+            font: `bold ${buttonFontSize + 8}px Orbitron`,
             fill: '#E0F6FF',
             stroke: '#0066CC',
             strokeThickness: 2,
@@ -50,33 +50,70 @@ export class BetMenuButton {
                 blur: 4,
                 fill: true
             }
-        }).setOrigin(1, 1).setInteractive(); // Right-aligned, bottom-aligned
+        }).setOrigin(0.5, 0.5).setInteractive();
 
-        this.button.setDepth(51);
-        
-        // Make both background and text clickable
-        this.buttonBg.on('pointerdown', () => this.betMenu.toggleMenu());
-        this.button.on('pointerdown', () => this.betMenu.toggleMenu());
+        betText.setDepth(51);
+
+        const amountText = this.scene.add.text(x - 140, y + 15, this.getAmountText(currentBetAmount), {
+            font: `bold ${buttonFontSize - 8}px Orbitron`,
+            fill: '#E0F6FF',
+            stroke: '#0066CC',
+            strokeThickness: 2,
+            alpha: 0.95,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#003366',
+                blur: 4,
+                fill: true
+            }
+        }).setOrigin(0.5, 0.5).setInteractive();
+
+        amountText.setDepth(52);
+
+        this.button = betText;
+        this.amountText = amountText;
+
+        betText.on('pointerdown', () => this.betMenu.toggleMenu());
+        amountText.on('pointerdown', () => this.betMenu.toggleMenu());
     }
 
     getDisplayText(betAmount) {
         if (!betAmount) {
             return "Loading...";
         }
+
+        try {
+            const ethAmount = web3.utils.fromWei(betAmount, 'ether');
+            return `BET\n${parseFloat(ethAmount).toFixed(6)} ETH`;
+        } catch (error) {
+            console.error('Error converting bet amount:', error);
+            return "BET\nError";
+        }
+    }
+
+    getAmountText(betAmount) {
+        if (!betAmount) {
+            return "Loading...";
+        }
         
         try {
             const ethAmount = web3.utils.fromWei(betAmount, 'ether');
-            return `BET: ${parseFloat(ethAmount).toFixed(6)} ETH`;
+            return `${parseFloat(ethAmount).toFixed(6)} ETH`;
         } catch (error) {
             console.error('Error converting bet amount:', error);
-            return "BET: Error";
+            return "Error";
         }
     }
 
     updateDisplay() {
         const currentBetAmount = getSelectedBetAmount();
-        const displayText = this.getDisplayText(currentBetAmount);
-        this.button.setText(displayText);
+        if (this.amountText) {
+            this.amountText.setText(this.getAmountText(currentBetAmount));
+        } else {
+            const displayText = this.getDisplayText(currentBetAmount);
+            this.button.setText(displayText);
+        }
     }
 
     destroy() {
@@ -85,6 +122,9 @@ export class BetMenuButton {
         }
         if (this.button) {
             this.button.destroy();
+        }
+        if (this.amountText) {
+            this.amountText.destroy();
         }
     }
 } 
