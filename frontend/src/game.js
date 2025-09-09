@@ -1,18 +1,18 @@
 import Phaser from 'phaser';
-import { LoadingScreen } from './game/loadingScreen.js';
+import { LoadingScreen } from './game/animations/loadingScreen.js';
 import { PlayButton } from './game/hud/playButton.js';
 import { ETHBalanceText } from './game/hud/ethBalanceText.js';
 import { GachaTokenBalanceText } from './game/hud/gachaTokenBalanceText.js';
 import { GameHistory } from './game/hud/gameHistory.js';
-import { CardDisplay } from './game/cardDisplay.js';
-import { Background } from './game/background.js';
+import { CardDisplay } from './game/animations/cardDisplay.js';
+import { Background } from './game/animations/background.js';
 import { MainMenu } from './game/menu/mainMenu/mainMenu.js';
 import { BetMenu } from './game/menu/betMenu/betMenu.js';
 import { BetMenuButton } from './game/menu/betMenu/betMenuButton.js';
 import { OpenMenuButton } from './game/menu/mainMenu/openMenuButton.js';
 import { SocialLinks } from './game/hud/socialLinks.js';
 import { InsufficientBalanceMenu } from './game/menu/unsufficientBalanceMenu/insufficientBalanceMenu.js';
-import { CosmicScene } from './game/cosmicScene.js';
+import { CosmicScene } from './game/animations/cosmicScene.js';
 import { setGameScene } from './main.js';
 import { getMinimumPlayableBalance } from './blockchain_stuff.js';
 
@@ -55,9 +55,7 @@ class GameScene extends Phaser.Scene {
         });
         this.socialLinks = new SocialLinks(this);
         this.insufficientBalanceMenu = new InsufficientBalanceMenu(this);
-        // Removed cosmicButton
         
-        // Set the game scene reference for main.js
         setGameScene(this);
     }
 
@@ -72,7 +70,6 @@ class GameScene extends Phaser.Scene {
             this.betMenuButton.updateDisplay();
         }
         
-        // Check if we should show the insufficient balance screen
         this.checkInsufficientBalance(balance);
     }
 
