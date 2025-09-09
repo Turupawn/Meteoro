@@ -1,4 +1,3 @@
-// Fragment shader for cosmic effects
 const fragmentShader = `
 precision mediump float;
 

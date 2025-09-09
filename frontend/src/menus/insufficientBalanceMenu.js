@@ -1,9 +1,9 @@
-import { web3, getLocalWallet, getPlayerBalance, getRecommendedPlayableBalance, getMinimumPlayableBalance } from '../blockchain_stuff.js';
-import { isLandscape } from '../utils.js';
-import { MenuText } from './menu/menuText.js';
-import { MenuInput } from './menu/menuInput.js';
+import { web3, getLocalWallet, getPlayerETHBalance, getRecommendedPlayableBalance, getMinimumPlayableBalance } from '../web3/blockchain_stuff.js';
+import { isLandscape } from '../utils/utils.js';
+import { MenuText } from './menuElements/menuText.js';
+import { MenuInput } from './menuElements/menuInput.js';
 
-export class InsufficientBalanceScreen {
+export class InsufficientBalanceMenu {
     constructor(scene) {
         this.scene = scene;
         this.isVisible = false;
@@ -346,7 +346,7 @@ export class InsufficientBalanceScreen {
             const wallet = getLocalWallet();
             if (!wallet) return;
 
-            if (BigInt(getPlayerBalance()) >= BigInt(getMinimumPlayableBalance())) {
+            if (BigInt(getPlayerETHBalance()) >= BigInt(getMinimumPlayableBalance())) {
                 // User now has sufficient balance, hide the screen
                 this.hide();
             }

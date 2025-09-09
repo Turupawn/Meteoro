@@ -1,15 +1,14 @@
 
-import { applyPerspectiveToQuadImageToLeft } from '../utils.js';
-import { web3 } from '../blockchain_stuff.js';
-import { isLandscape } from '../utils.js';
+import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../../utils/utils.js';
+import { web3 } from '../../web3/blockchain_stuff.js';
 
-export class BalanceText {
+export class GachaTokenBalanceText {
     constructor(scene) {
         this.scene = scene;
-        this.createBalanceText();
+        this.createGachaTokenBalanceText();
     }
 
-    createBalanceText() {
+    createGachaTokenBalanceText() {
         // Create a render texture for the balance display - much bigger
         if(isLandscape()) {
             this.renderTexture = this.scene.add.renderTexture(0, 0, 1200, 1200);
@@ -18,7 +17,7 @@ export class BalanceText {
         }
         
         // Create the text content first - much bigger font
-        const balanceText = this.scene.add.text(0, 0, '0.000000 ETH', {
+        const gachaTokenBalanceText = this.scene.add.text(0, 0, '     0 GACHA', {
             font: 'bold 48px Orbitron',
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -32,24 +31,24 @@ export class BalanceText {
                 fill: true
             }
         });
-        balanceText.setVisible(false);
+        gachaTokenBalanceText.setVisible(false);
 
         // Draw text to render texture
         if(isLandscape()) {
-            this.renderTexture.draw(balanceText);
+            this.renderTexture.draw(gachaTokenBalanceText);
         } else {
-            this.renderTexture.draw(balanceText, 20, 30);
+            this.renderTexture.draw(gachaTokenBalanceText, 20, 30);
         }
-        balanceText.destroy();
+        gachaTokenBalanceText.destroy();
 
         // Save the texture
-        this.renderTexture.saveTexture('balanceTexture');
+        this.renderTexture.saveTexture('gachaTokenBalanceTexture');
 
         if(isLandscape()) {
             this.quadImage = this.scene.add.rexQuadImage({
                 x: this.scene.screenWidth - 40,
-                y: 500,
-                texture: 'balanceTexture',
+                y: 550,
+                texture: 'gachaTokenBalanceTexture',
                 ninePointMode: true,
             });
             this.quadImage.setScale(50,50);
@@ -60,8 +59,8 @@ export class BalanceText {
         } else {
             this.quadImage = this.scene.add.rexQuadImage(
                 this.scene.screenWidth - 5,
-                300,
-                'balanceTexture');            
+                350,
+                'gachaTokenBalanceTexture');            
             this.quadImage.setAlpha(1);
             this.quadImage.setScale(1.6,1.6);
             this.quadImage.topRight.x -= 100;
@@ -81,21 +80,21 @@ export class BalanceText {
         this.renderTexture.clear();
 
 
-        let balanceString = "0.000000 ETH";
+        let gachaTokenBalanceString = "     0 GACHA";
         if (balance !== null) {
             try {
                 if (web3 && web3.utils) {
                     const balanceInEth = web3.utils.fromWei(balance, 'ether');
-                    balanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
+                    gachaTokenBalanceString = `${parseFloat(balanceInEth).toFixed(0)} GACHA`;
                 } else {
-                    balanceString = `${balance} WEI`;
+                    gachaTokenBalanceString = `${balance} WEI`;
                 }
             } catch (error) {
-                balanceString = `${balance} WEI`;
+                gachaTokenBalanceString = `${balance} WEI`;
             }
         }
 
-        const balanceText = this.scene.add.text(0, 0, balanceString, {
+        const gachaTokenBalanceText = this.scene.add.text(0, 0, gachaTokenBalanceString, {
             font: 'bold 32px Orbitron',
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -109,17 +108,17 @@ export class BalanceText {
                 fill: true
             }
         });
-        balanceText.setVisible(false);
+        gachaTokenBalanceText.setVisible(false);
         if(isLandscape()) {
-            this.renderTexture.draw(balanceText, 320, 100);
+            this.renderTexture.draw(gachaTokenBalanceText, 320, 100);
         } else {
-            this.renderTexture.draw(balanceText, 20, 30);
+            this.renderTexture.draw(gachaTokenBalanceText, 20, 30);
         }
-        balanceText.destroy();
+        gachaTokenBalanceText.destroy();
 
         // Update the quad image texture
         if (this.quadImage) {
-            this.quadImage.setTexture('balanceTexture');
+            this.quadImage.setTexture('gachaTokenBalanceTexture');
             this.quadImage.setVisible(true);
         }
     }

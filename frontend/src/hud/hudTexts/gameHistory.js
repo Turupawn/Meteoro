@@ -1,5 +1,4 @@
-import { applyPerspectiveToQuadImageToRight } from '../utils.js';
-import { isLandscape } from '../utils.js';
+import { applyPerspectiveToQuadImageToRight, isLandscape } from '../../utils/utils.js';
 
 export class GameHistory {
     constructor(scene) {

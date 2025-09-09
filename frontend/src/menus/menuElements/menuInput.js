@@ -1,4 +1,4 @@
-import { isLandscape } from '../../utils.js';
+import { isLandscape } from '../../utils/utils.js';
 
 export class MenuInput {
     constructor(scene, x, y, placeholder, fontSize, options = {}) {

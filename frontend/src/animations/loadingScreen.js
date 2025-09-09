@@ -1,4 +1,4 @@
-import { isLandscape } from '../utils.js';
+import { isLandscape } from '../utils/utils.js';
 import { setLoadingScreenReady } from '../main.js';
 import { Background } from './background.js';
 
@@ -14,14 +14,12 @@ export class LoadingScreen extends Phaser.Scene {
         this.isComplete = false;
         this.loadingStartTime = Date.now();
         this.maxLoadingTime = 30000; // 30 seconds timeout
-        this.uiReady = false; // Track if UI elements are ready
+        this.uiReady = false;
     }
 
     preload() {
-        // Set up progress monitoring BEFORE loading assets
         this.setupProgressMonitoring();
         
-        // Load minimal assets needed for loading screen
         this.load.image("clover", "/cards/clover.png");
         this.load.image("diamond", "/cards/diamond.png");
         this.load.image("heart", "/cards/heart.png");
@@ -37,26 +35,20 @@ export class LoadingScreen extends Phaser.Scene {
         this.centerX = this.screenWidth / 2;
         this.centerY = this.screenHeight / 2;
 
-        // Use the same background as the main game
         this.background = new Background(this);
         
         this.createLoadingText();
         this.createProgressBar();
         this.createLoadingDetails();
         
-        // Mark UI as ready
         this.uiReady = true;
         
-        // Notify that loading screen is ready
         setLoadingScreenReady();
         
-        // Start additional monitoring (font, web3, game data)
         this.startAdditionalMonitoring();
         
-        // Start timeout monitoring
         this.startTimeoutMonitoring();
         
-        // Update progress once UI is ready
         this.updateProgress();
     }
 
@@ -66,7 +58,6 @@ export class LoadingScreen extends Phaser.Scene {
             this.updateProgress();
         });
         
-        // Also monitor when loading is complete
         this.load.on('complete', () => {
             this.loadingProgress.phaser = 1;
             this.updateProgress();
@@ -74,13 +65,8 @@ export class LoadingScreen extends Phaser.Scene {
     }
 
     startAdditionalMonitoring() {
-        // Monitor font loading
         this.monitorFontLoading();
-        
-        // Monitor Web3 initialization
-        this.monitorWeb3Loading();
-        
-        // Monitor game data loading
+        this.monitorWeb3Loading();        
         this.monitorGameDataLoading();
     }
 
@@ -109,7 +95,6 @@ export class LoadingScreen extends Phaser.Scene {
         const barWidth = isLandscapeMode ? 600 : 500;
         const barHeight = 20;
         
-        // Background bar
         this.progressBarBg = this.add.rectangle(
             this.centerX,
             this.centerY,
@@ -120,7 +105,6 @@ export class LoadingScreen extends Phaser.Scene {
         );
         this.progressBarBg.setStrokeStyle(2, 0x00FFFF);
         
-        // Progress bar
         this.progressBar = this.add.rectangle(
             this.centerX - barWidth/2,
             this.centerY,
@@ -131,7 +115,6 @@ export class LoadingScreen extends Phaser.Scene {
         );
         this.progressBar.setOrigin(0, 0.5);
         
-        // Progress text
         this.progressText = this.add.text(this.centerX, this.centerY + 40, "0%", {
             font: 'bold 24px Orbitron',
             fill: '#E0F6FF',
@@ -154,7 +137,6 @@ export class LoadingScreen extends Phaser.Scene {
     }
 
     startTimeoutMonitoring() {
-        // Check for timeout every second
         this.time.addEvent({
             delay: 1000,
             callback: this.checkTimeout,
@@ -185,18 +167,15 @@ export class LoadingScreen extends Phaser.Scene {
                 document.fonts.ready.then(() => {
                     this.loadingProgress.font = 1;
                     this.updateProgress();
-                    // Notify that fonts are ready globally
                     window.fontsReady = true;
                     if (window.onFontsReady) {
                         window.onFontsReady();
                     }
                 });
             } else {
-                // Fallback for browsers without Font Loading API
                 setTimeout(() => {
                     this.loadingProgress.font = 1;
                     this.updateProgress();
-                    // Notify that fonts are ready globally
                     window.fontsReady = true;
                     if (window.onFontsReady) {
                         window.onFontsReady();
@@ -205,13 +184,11 @@ export class LoadingScreen extends Phaser.Scene {
             }
         };
         
-        // Check immediately and after a short delay
         checkFont();
         setTimeout(checkFont, 500);
     }
 
     monitorWeb3Loading() {
-        // This will be updated by main.js when Web3 is ready
         window.updateWeb3Progress = (progress) => {
             this.loadingProgress.web3 = progress;
             this.updateProgress();
@@ -219,7 +196,6 @@ export class LoadingScreen extends Phaser.Scene {
     }
 
     monitorGameDataLoading() {
-        // This will be updated by main.js when game data is ready
         window.updateGameDataProgress = (progress) => {
             this.loadingProgress.gameData = progress;
             this.updateProgress();
@@ -227,7 +203,6 @@ export class LoadingScreen extends Phaser.Scene {
     }
 
     updateProgress() {
-        // Don't update UI if it's not ready yet
         if (!this.uiReady) {
             return;
         }
@@ -241,18 +216,15 @@ export class LoadingScreen extends Phaser.Scene {
         
         const progressPercent = Math.round(totalProgress * 100);
         
-        // Update progress bar (with null checks)
         if (this.progressBarBg && this.progressBar) {
             const barWidth = this.progressBarBg.width;
             this.progressBar.width = barWidth * totalProgress;
         }
         
-        // Update progress text (with null check)
         if (this.progressText) {
             this.progressText.setText(`${progressPercent}%`);
         }
         
-        // Update loading details (with null check)
         if (this.loadingDetails) {
             const details = [];
             if (this.loadingProgress.phaser < 1) details.push("Loading game assets...");
@@ -263,7 +235,6 @@ export class LoadingScreen extends Phaser.Scene {
             this.loadingDetails.setText(details.join(" • "));
         }
         
-        // Check if everything is loaded
         if (totalProgress >= 1 && !this.isComplete) {
             this.isComplete = true;
             this.completeLoading();
@@ -271,9 +242,7 @@ export class LoadingScreen extends Phaser.Scene {
     }
 
     completeLoading() {
-        // Add a small delay for smooth transition
         this.time.delayedCall(500, () => {
-            // Transition to main game scene
             this.scene.start('GameScene');
         });
     }

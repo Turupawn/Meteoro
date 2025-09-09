@@ -1,11 +1,10 @@
-import { forfeit, withdrawFunds, getLocalWallet } from '../../blockchain_stuff.js';
-import { web3 } from '../../blockchain_stuff.js';
-import { isLandscape } from '../../utils.js';
-import { MenuButton } from './menuButton.js';
-import { MenuInput } from './menuInput.js';
-import { MenuText } from './menuText.js';
+import { forfeit, withdrawFunds, getLocalWallet, web3 } from '../web3/blockchain_stuff.js';
+import { isLandscape } from '../utils/utils.js';
+import { MenuButton } from './menuElements/menuButton.js';
+import { MenuInput } from './menuElements/menuInput.js';
+import { MenuText } from './menuElements/menuText.js';
 
-export class Menu {
+export class MainMenu {
     constructor(scene) {
         this.scene = scene;
         this.menuElements = [];
@@ -24,9 +23,8 @@ export class Menu {
     openMenu() {
         this.isOpen = true;
         
-        // Disable insufficient balance screen if it exists
-        if (this.scene.insufficientBalanceScreen) {
-            this.scene.insufficientBalanceScreen.disable();
+        if (this.scene.insufficientBalanceMenu) {
+            this.scene.insufficientBalanceMenu.disable();
         }
         
         this.background = this.scene.add.rectangle(
@@ -342,24 +340,24 @@ export class Menu {
             { depth: 254 }
         );
 
-        let balanceString = "0.000000 ETH";
+        let ethBalanceString = "0.000000 ETH";
         if (this.scene.currentBalance) {
             try {
-                const balanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
-                balanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
+                const ethBalanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
+                ethBalanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
             } catch (error) {
                 console.error('Error converting balance:', error);
-                balanceString = `${this.scene.currentBalance} WEI`;
+                ethBalanceString = `${this.scene.currentBalance} WEI`;
             }
         } else {
             console.log('No balance available');
         }
         
-        this.balanceText = new MenuText(
+        this.ethBalanceText = new MenuText(
             this.scene,
             this.scene.centerX, 
             balanceY, 
-            `Balance: ${balanceString}`, 
+            `Balance: ${ethBalanceString}`, 
             titleFontSize - 2,
             { depth: 254 }
         );
@@ -393,7 +391,7 @@ export class Menu {
         this.submenuElements = [
             this.submenuContainer,
             this.submenuTitle,
-            this.balanceText,
+            this.ethBalanceText,
             this.addressLabel,
             this.addressInput,
             this.withdrawButton,
@@ -546,9 +544,8 @@ export class Menu {
         
         this.isOpen = false;
         
-        // Re-enable insufficient balance screen if it exists
-        if (this.scene.insufficientBalanceScreen) {
-            this.scene.insufficientBalanceScreen.enable();
+        if (this.scene.insufficientBalanceMenu) {
+            this.scene.insufficientBalanceMenu.enable();
         }
         
         this.menuElements.forEach(element => {

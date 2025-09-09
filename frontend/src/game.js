@@ -1,18 +1,20 @@
 import Phaser from 'phaser';
-import { LoadingScreen } from './game/loadingScreen.js';
-import { PlayButton } from './game/playButton.js';
-import { BalanceText } from './game/balanceText.js';
-import { GameHistory } from './game/gameHistory.js';
-import { CardDisplay } from './game/cardDisplay.js';
-import { Background } from './game/background.js';
-import { Menu } from './game/menu/menu.js';
-import { OpenMenuButton } from './game/openMenuButton.js';
-import { SocialLinks } from './game/socialLinks.js';
-import { InsufficientBalanceScreen } from './game/insufficientBalanceScreen.js';
-import { CosmicButton } from './game/cosmicButton.js';
-import { CosmicScene } from './game/cosmicScene.js';
+import { Background } from './animations/background.js';
+import { CardDisplay } from './animations/cardDisplay.js';
+import { LoadingScreen } from './animations/loadingScreen.js';
+import { OpenMenuButton } from './hud/hudButtons/openMenuButton.js';
+import { BetMenuButton } from './hud/hudButtons/betMenuButton.js';
+import { PlayButton } from './hud/hudButtons/playButton.js';
+import { SocialLinks } from './hud/hudButtons/socialLinks.js';
+import { ETHBalanceText } from './hud/hudTexts/ethBalanceText.js';
+import { GachaTokenBalanceText } from './hud/hudTexts/gachaTokenBalanceText.js';
+import { GameHistory } from './hud/hudTexts/gameHistory.js';
+import { MainMenu } from './menus/mainMenu.js';
+import { BetMenu } from './menus/betMenu.js';
+import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
 import { setGameScene } from './main.js';
-import { getMinimumPlayableBalance } from './blockchain_stuff.js';
+import { printLog } from './utils/utils.js';
+import { getMinimumPlayableBalance } from './web3/blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -28,6 +30,9 @@ class GameScene extends Phaser.Scene {
         if (this.menu) {
             this.menu.closeMenu();
         }
+        if (this.betMenu) {
+            this.betMenu.closeMenu();
+        }
     }
 
     create() {
@@ -38,28 +43,38 @@ class GameScene extends Phaser.Scene {
         
         this.background = new Background(this);
         this.cardDisplay = new CardDisplay(this);
-        this.balanceText = new BalanceText(this);
+        this.ethBalanceText = new ETHBalanceText(this);
+        this.gachaTokenBalanceText = new GachaTokenBalanceText(this);
         this.gameHistory = new GameHistory(this);
         this.playButton = new PlayButton(this);
-        this.menu = new Menu(this);
+        this.mainMenu = new MainMenu(this);
+        this.betMenu = new BetMenu(this);
+        this.betMenuButton = new BetMenuButton(this, this.betMenu);
         this.openMenuButton = new OpenMenuButton(this, () => {
-            this.menu.toggleMenu();
+            this.mainMenu.toggleMenu();
         });
         this.socialLinks = new SocialLinks(this);
-        this.insufficientBalanceScreen = new InsufficientBalanceScreen(this);
-        this.cosmicButton = new CosmicButton(this);
+        this.insufficientBalanceMenu = new InsufficientBalanceMenu(this);
         
-        // Set the game scene reference for main.js
         setGameScene(this);
+
+        this.time.delayedCall(1000, () => {
+            printLog(['profile'], "Started lazy loading at:" + new Date().toISOString());
+            this.lazyLoadCosmicScene();
+        });
     }
 
-    updateDisplay(balance = null, recentHistory = null, playerAddress = null) {
+    updateDisplay(balance = null, gachaTokenBalance = null, recentHistory = null, playerAddress = null) {
         this.currentBalance = balance;
-        this.balanceText.updateBalance(balance);
+        this.ethBalanceText.updateBalance(balance);
+        this.gachaTokenBalanceText.updateBalance(gachaTokenBalance);
         this.cardDisplay.updateCurrentGameDisplay();
         this.gameHistory.updateGameHistory(recentHistory, playerAddress);
         
-        // Check if we should show the insufficient balance screen
+        if (this.betMenuButton) {
+            this.betMenuButton.updateDisplay();
+        }
+        
         this.checkInsufficientBalance(balance);
     }
 
@@ -67,19 +82,44 @@ class GameScene extends Phaser.Scene {
         this.cardDisplay.updateCurrentGameDisplay(playerCard, houseCard);
     }
 
+    onBetAmountChanged(newBetAmount) {
+        console.log('Bet amount changed to:', newBetAmount);
+    }
+
     checkInsufficientBalance(balance) {
         try {
             const hasInsufficientBalance = BigInt(balance) < BigInt(getMinimumPlayableBalance());
             
-            // Only show insufficient balance screen on startup, not during gameplay
             if (hasInsufficientBalance && this.cardDisplay && 
                 (!this.cardDisplay.playerCardSprite || !this.cardDisplay.playerCardSprite.active)) {
-                this.insufficientBalanceScreen.show(false); // Normal show (startup only)
+                this.insufficientBalanceMenu.show(false);
             } else if (!hasInsufficientBalance) {
-                this.insufficientBalanceScreen.hide();
+                this.insufficientBalanceMenu.hide();
             }
         } catch (error) {
             console.error('Error checking insufficient balance:', error);
+        }
+    }
+
+    lazyLoadCosmicScene() {
+        if (!this.scene.get('CosmicScene')) {
+            import('./animations/cosmicScene.js').then(({ CosmicScene }) => {
+                this.scene.add('CosmicScene', CosmicScene, false);
+                printLog(['profile'], "CosmicScene loaded lazily at:" + new Date().toISOString());
+            }).catch(error => {
+                console.error('Failed to lazy load CosmicScene:', error);
+            });
+        }
+    }
+
+    startCosmicScene() {
+        if (!this.scene.get('CosmicScene')) {
+            this.lazyLoadCosmicScene();
+            this.time.delayedCall(100, () => {
+                this.scene.launch('CosmicScene');
+            });
+        } else {
+            this.scene.launch('CosmicScene');
         }
     }
 }
@@ -95,7 +135,7 @@ const loadPhaser = async () => {
         parent: container,
         width: width,
         height: height,
-        scene: [LoadingScreen, GameScene, CosmicScene],
+        scene: [LoadingScreen, GameScene],
         title: "War Game",
         version: "1.0",
         dom: {

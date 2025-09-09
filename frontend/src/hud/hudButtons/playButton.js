@@ -1,7 +1,6 @@
-import { commitGame } from '../main.js';
-import { isLandscape } from '../utils.js';
-import { web3, getPlayerBalance } from '../blockchain_stuff.js';
-import { getLocalWallet, getMinimumPlayableBalance, getStakeAmount } from '../blockchain_stuff.js';
+import { commitGame } from '../../main.js';
+import { isLandscape } from '../../utils/utils.js';
+import { getPlayerETHBalance, getLocalWallet, getMinimumPlayableBalance } from '../../web3/blockchain_stuff.js';
 
 export class PlayButton {
     constructor(scene) {
@@ -10,11 +9,9 @@ export class PlayButton {
     }
 
     createButton() {
-        // Check if fonts are already ready
         if (window.fontsReady) {
             this.createPlayButtonTexture();
         } else {
-            // Wait for fonts to be ready
             window.onFontsReady = () => {
                 this.createPlayButtonTexture();
             };
@@ -25,16 +22,15 @@ export class PlayButton {
         const isLandscapeMode = isLandscape();
         
         const x = this.scene.centerX;
-        // Position relative to bottom of screen, higher up in portrait to avoid mobile browser UI
+
         const bottomMargin = isLandscapeMode ? 120 : 500;
         const y = this.scene.screenHeight - bottomMargin;
         
-        // Much bigger font and button on portrait (mobile)
         const fontSize = isLandscapeMode ? Math.max(48, this.scene.screenWidth / 15) : Math.max(72, this.scene.screenWidth / 10);
         
         const playButtonText = "PLAY";
         const playButtonWidth = isLandscapeMode ? Math.max(600, playButtonText.length * 40) : Math.max(800, playButtonText.length * 60);
-        const playButtonHeight = isLandscapeMode ? 150 : 200;
+        const playButtonHeight = isLandscapeMode ? 200 : 280;
         
         this.buttonBg = this.scene.add.rectangle(
             x,
@@ -47,10 +43,9 @@ export class PlayButton {
         this.buttonBg.setStrokeStyle(3, 0x00FFFF);
         this.buttonBg.setDepth(199);
         
-        // Make the background clickable
         this.buttonBg.setInteractive();
         
-        this.button = this.scene.add.text(x, y - 20, "PLAY", {
+        this.button = this.scene.add.text(x, y, "PLAY", {
             font: `bold ${fontSize}px Orbitron`,
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -67,22 +62,17 @@ export class PlayButton {
 
         this.button.setDepth(200);
         
-        // Bigger hit area on portrait (mobile)
         const hitAreaWidth = isLandscapeMode ? this.button.width + 200 : this.button.width + 300;
         const hitAreaHeight = isLandscapeMode ? this.button.height + 100 : this.button.height + 150;
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
-        // Create stake amount display inside the button (below the PLAY text)
-        this.createStakeAmountDisplay(x, y + 50, isLandscapeMode);
-
-        // Add click handler to both background and text
         const clickHandler = async () => {
             const hasInsufficientBalance = await this.checkInsufficientBalance();
             
             if (hasInsufficientBalance) {
-                if (this.scene.insufficientBalanceScreen) {
-                    this.scene.insufficientBalanceScreen.show(true); // Force show when play button is clicked
-                    this.scene.insufficientBalanceScreen.triggerShakeAnimation();
+                if (this.scene.insufficientBalanceMenu) {
+                    this.scene.insufficientBalanceMenu.show(true); // Force show when play button is clicked
+                    this.scene.insufficientBalanceMenu.triggerShakeAnimation();
                 }
                 return;
             }
@@ -103,62 +93,18 @@ export class PlayButton {
         this.button.on('pointerdown', clickHandler);
     }
 
-    createStakeAmountDisplay(x, y, isLandscapeMode) {
-        // Convert stake amount from Wei to ETH
-        let stakeAmountText = "loading...";
-        try {
-            const stakeAmountEth = web3.utils.fromWei(getStakeAmount().toString(), 'ether');
-            stakeAmountText = `${parseFloat(stakeAmountEth).toFixed(6)} ETH per game`;
-        } catch (error) {
-            console.error('Error converting stake amount:', error);
-            stakeAmountText = `${getStakeAmount()} WEI per game`;
-        }
-
-        const stakeFontSize = isLandscapeMode ? Math.max(14, this.scene.screenWidth / 80) : Math.max(16, this.scene.screenWidth / 60);
-        
-        this.stakeAmountText = this.scene.add.text(x, y, stakeAmountText, {
-            font: `${stakeFontSize}px Orbitron`,
-            fill: '#E0F6FF',
-            stroke: '#0066CC',
-            strokeThickness: 1,
-            alpha: 0.8,
-            shadow: {
-                offsetX: 1,
-                offsetY: 1,
-                color: '#003366',
-                blur: 2,
-                fill: true
-            }
-        }).setOrigin(0.5);
-        
-        this.stakeAmountText.setDepth(201);
-    }
-
     async checkInsufficientBalance() {
         try {
             const wallet = getLocalWallet();
             if (!wallet) return false;
 
-            const balance = await getPlayerBalance();
+            const balance = await getPlayerETHBalance();
             const minBalanceWei = getMinimumPlayableBalance();
             
             return BigInt(balance) < BigInt(minBalanceWei);
         } catch (error) {
             console.error('Error checking balance:', error);
             return false;
-        }
-    }
-
-    // Add method to update stake amount display if needed
-    updateStakeAmountDisplay() {
-        if (this.stakeAmountText) {
-            try {
-                const stakeAmountEth = web3.utils.fromWei(getStakeAmount().toString(), 'ether');
-                const stakeAmountText = `${parseFloat(stakeAmountEth).toFixed(6)} ETH per game`;
-                this.stakeAmountText.setText(stakeAmountText);
-            } catch (error) {
-                console.error('Error updating stake amount display:', error);
-            }
         }
     }
 }
