@@ -50,7 +50,7 @@ async function multiPostRandomnessForGames(randomness, totalBetAmount) {
             from: houseAccount.address,
             to: contractAddress,
             value: totalBetAmount,
-            gas: 1000000 + 500000 * randomness.length, // Fixed high gas limit for speed
+            gas: 100000 + 50000 * randomness.length, // Fixed high gas limit for speed
             nonce: nonce,
             data: contract.methods.multiPostRandomness(randomness).encodeABI()
         };
@@ -135,6 +135,7 @@ async function initialize() {
     try {
         // Initialize nonce only once at startup
         currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
+        console.log('nonce initialized:', currentNonce);
         console.log('Initial nonce:', currentNonce);
         
         setInterval(checkForNewGames, POLL_INTERVAL);

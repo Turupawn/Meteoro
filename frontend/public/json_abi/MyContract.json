@@ -83,7 +83,7 @@
         "internalType": "bytes32"
       },
       {
-        "name": "houseHash",
+        "name": "houseRandomness",
         "type": "bytes32",
         "internalType": "bytes32"
       }
@@ -172,12 +172,12 @@
         "internalType": "uint256"
       },
       {
-        "name": "houseHash",
+        "name": "houseRandomness",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "houseHashTimestamp",
+        "name": "houseRandomnessTimestamp",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -291,7 +291,7 @@
         "internalType": "bytes32"
       },
       {
-        "name": "houseHash",
+        "name": "houseRandomness",
         "type": "bytes32",
         "internalType": "bytes32"
       },
@@ -331,12 +331,12 @@
             "internalType": "uint256"
           },
           {
-            "name": "houseHash",
+            "name": "houseRandomness",
             "type": "bytes32",
             "internalType": "bytes32"
           },
           {
-            "name": "houseHashTimestamp",
+            "name": "houseRandomnessTimestamp",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -417,12 +417,12 @@
             "internalType": "uint256"
           },
           {
-            "name": "houseHash",
+            "name": "houseRandomness",
             "type": "bytes32",
             "internalType": "bytes32"
           },
           {
-            "name": "houseHashTimestamp",
+            "name": "houseRandomnessTimestamp",
             "type": "uint256",
             "internalType": "uint256"
           },

@@ -88,7 +88,7 @@ export async function checkGameState() {
             playerGachaTokenBalance: gameStateTemp.playerGachaTokenBalance,
             gameState: gameStateTemp.gameState,
             playerCommit: gameStateTemp.playerCommit,
-            houseHash: gameStateTemp.houseHash,
+            houseRandomness: gameStateTemp.houseRandomness,
             gameId: gameStateTemp.gameId,
             recentHistory: gameStateTemp.recentHistory
         };

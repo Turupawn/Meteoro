@@ -261,7 +261,7 @@ async function gameLoop() {
 
         // Handle case where game is revealed (state 2n) and there's a pending commit
         if (gameState && gameState.gameState === 2n && pendingCommit) {
-            const result = calculateCards(pendingCommit.secret, gameState.houseHash);
+            const result = calculateCards(pendingCommit.secret, gameState.houseRandomness);
             
             if (commitStartTime) {
                 const endTime = Date.now();
