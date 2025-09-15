@@ -1,7 +1,7 @@
 ## Compile
 
 ```bash
-source .env && forge script TwoPartyWarGameScript --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY
+source .env && forge script TwoPartyWarGameScript --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy
 ```
 
 ## Update ABIs

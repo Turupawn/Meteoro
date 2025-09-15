@@ -23,7 +23,7 @@ posthog.init('phc_3vofleZVJy4GKoykZPb4bOEc7gjl6do5YoFDLB6NVYl',
     }
 )
 
-const POLL_INTERVAL = 150
+const POLL_INTERVAL = parseInt(import.meta.env.POLL_INTERVAL) || 1000
 
 var game
 var gameScene = null; // Reference to the main game scene

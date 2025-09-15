@@ -76,7 +76,7 @@ export class PlayButton {
                 }
                 return;
             }
-            
+
             // Proceed with normal game flow
             if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {
                 this.scene.cardDisplay.currentGameText.setText(`Please wait...`);

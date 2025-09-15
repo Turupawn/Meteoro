@@ -21,6 +21,10 @@ export class BetMenu {
     openMenu() {
         this.isOpen = true;
         
+        if (this.scene.insufficientBalanceMenu) {
+            this.scene.insufficientBalanceMenu.disable();
+        }
+
         this.background = this.scene.add.rectangle(
             this.scene.centerX, 
             this.scene.centerY, 
@@ -164,6 +168,10 @@ export class BetMenu {
         
         this.isOpen = false;
         
+        if (this.scene.insufficientBalanceMenu) {
+            this.scene.insufficientBalanceMenu.enable();
+        }
+
         this.menuElements.forEach(element => {
             if (element && typeof element.destroy === 'function') {
                 element.destroy();
