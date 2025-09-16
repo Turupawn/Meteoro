@@ -2,9 +2,10 @@
 pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {GachaToken} from "./GachaToken.sol";
 
-contract TwoPartyWarGame is Ownable {
+contract TwoPartyWarGame is Ownable, Pausable {
     enum State { NotStarted, Committed, HashPosted, Revealed, Forfeited }
 
     struct Game {
@@ -55,7 +56,7 @@ contract TwoPartyWarGame is Ownable {
     }
 
     // Public functions
-    function commit(bytes32 _commitHash) external payable {
+    function commit(bytes32 _commitHash) external payable whenNotPaused {
         require(whitelistedBetAmounts[msg.value], "Bet amount not whitelisted");
         require(pendingGameCount < MAX_PENDING_GAMES, "Too many pending games");
         Game memory playerGame = games[getCurrentGameId(msg.sender)];
@@ -86,7 +87,7 @@ contract TwoPartyWarGame is Ownable {
         nextGameId++;
     }
 
-    function multiPostRandomness(bytes32[] memory randomness) external payable {
+    function multiPostRandomness(bytes32[] memory randomness) external payable whenNotPaused {
         require(msg.sender == HOUSE, "Not house");
         require(randomness.length > 0, "Should not be 0");
         require(randomness.length <= pendingGameCount, "Too many randomness values");
@@ -109,7 +110,7 @@ contract TwoPartyWarGame is Ownable {
         pendingGameCount -= randomness.length;
     }
 
-    function reveal(bytes32 _secret) external {
+    function reveal(bytes32 _secret) external whenNotPaused {
         Game storage playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.HashPosted, "Game not ready for reveal");
         require(keccak256(abi.encode(_secret)) == playerGame.playerCommit, "Player secret invalid");
@@ -144,7 +145,7 @@ contract TwoPartyWarGame is Ownable {
         }
     }
 
-    function forfeit() external {
+    function forfeit() external whenNotPaused {
         Game storage playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.HashPosted ||
                 playerGame.gameState == State.Committed
