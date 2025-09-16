@@ -281,4 +281,12 @@ contract TwoPartyWarGame is Ownable, Pausable {
         require(address(this).balance > 0, "No funds to withdraw");
         transferEth(payable(owner()), address(this).balance);
     }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 }
