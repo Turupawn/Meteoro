@@ -35,6 +35,11 @@ export class MenuText {
             }
         };
 
+        // Add custom color if specified
+        if (this.options.color) {
+            textStyle.fill = this.options.color;
+        }
+
         // Add link styling if specified
         if (this.options.isLink) {
             textStyle.fill = '#00BFFF'; // Bright blue for links

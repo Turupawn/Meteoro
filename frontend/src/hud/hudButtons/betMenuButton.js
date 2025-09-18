@@ -74,8 +74,11 @@ export class BetMenuButton {
         this.button = betText;
         this.amountText = amountText;
 
-        betText.on('pointerdown', () => this.betMenu.toggleMenu());
-        amountText.on('pointerdown', () => this.betMenu.toggleMenu());
+        const clickHandler = () => this.betMenu.toggleMenu();
+
+        this.buttonBg.on('pointerdown', clickHandler);
+        betText.on('pointerdown', clickHandler);
+        amountText.on('pointerdown', clickHandler);
     }
 
     getDisplayText(betAmount) {

@@ -3,7 +3,8 @@ const express = require('express');
 const Web3 = require('web3');
 const app = express();
 const port = process.env.PORT || 3000;
-const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL) || 500;
+const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL) || 1500;
+const MAX_CONSECUTIVE_FAILURES = parseInt(process.env.MAX_CONSECUTIVE_FAILURES) || 5;
 
 const web3 = new Web3(process.env.RPC_URL);
 const contractAddress = process.env.CONTRACT_ADDRESS;
@@ -22,6 +23,7 @@ let lastProcessedBlock = 0;
 const processingGameIds = new Set();
 let currentNonce = null;
 let lastProcessedGameId = null;
+let consecutiveFailures = 0;
 
 function generateRandomHash() {
     return web3.utils.randomHex(32);
@@ -43,6 +45,8 @@ async function multiPostRandomnessForGames(randomness, totalBetAmount) {
         
         if (nonce === null) {
             console.error('Failed to get nonce');
+            consecutiveFailures++;
+            checkForMaxFailures();
             return;
         }
         
@@ -50,7 +54,7 @@ async function multiPostRandomnessForGames(randomness, totalBetAmount) {
             from: houseAccount.address,
             to: contractAddress,
             value: totalBetAmount,
-            gas: 1000000 + 500000 * randomness.length, // Fixed high gas limit for speed
+            gas: 100000 + 50000 * randomness.length, // Fixed high gas limit for speed
             nonce: nonce,
             data: contract.methods.multiPostRandomness(randomness).encodeABI()
         };
@@ -67,20 +71,28 @@ async function multiPostRandomnessForGames(randomness, totalBetAmount) {
                     txHash: receipt.transactionHash
                 });
             });
+            // Reset failure counter on success
+            consecutiveFailures = 0;
         } else {
             console.error(`multiPostRandomness transaction failed:`, receipt);
             // Reset lastProcessedGameId on transaction failure
             lastProcessedGameId = null;
+            consecutiveFailures++;
+            checkForMaxFailures();
         }
     } catch (error) {
         console.error('Error in multiPostRandomnessForGames:', error);
         
         // Reset lastProcessedGameId on any error
         lastProcessedGameId = null;
+        consecutiveFailures++;
+        checkForMaxFailures();
         
         // If it's an "already known" error, the transaction was already sent
         if (error.message && error.message.includes('already known')) {
             console.log('Transaction already known, skipping...');
+            // Don't count "already known" as a failure
+            consecutiveFailures--;
         }
         // If it's a "nonce too low" error, reset the nonce
         else if (error.message && error.message.includes('nonce too low')) {
@@ -97,11 +109,19 @@ async function multiPostRandomnessForGames(randomness, totalBetAmount) {
     }
 }
 
+function checkForMaxFailures() {
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        console.error(`Maximum consecutive failures (${MAX_CONSECUTIVE_FAILURES}) reached. Exiting application.`);
+        process.exit(1);
+    }
+}
+
 // Function to check for new games
 async function checkForNewGames() {
     try {
         // Get backend state: last responded gameId, pending count, and pending bet amounts
         const backendState = await contract.methods.getBackendGameState().call({}, 'pending');
+        // console.log('Backend state:', backendState);
         const lastRandomnessPostedGameId = parseInt(backendState[0]);
         const pendingGameCount = parseInt(backendState[1]);
         const pendingBetAmounts = backendState[2]; // Array of bet amounts for pending games
@@ -135,6 +155,7 @@ async function initialize() {
     try {
         // Initialize nonce only once at startup
         currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
+        console.log('nonce initialized:', currentNonce);
         console.log('Initial nonce:', currentNonce);
         
         setInterval(checkForNewGames, POLL_INTERVAL);
@@ -154,6 +175,8 @@ app.get('/health', (req, res) => {
         processingGameIds: Array.from(processingGameIds),
         currentNonce: currentNonce,
         lastProcessedGameId: lastProcessedGameId,
+        consecutiveFailures: consecutiveFailures,
+        maxConsecutiveFailures: MAX_CONSECUTIVE_FAILURES,
     });
 });
 
