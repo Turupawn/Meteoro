@@ -37,8 +37,8 @@ contract TwoPartyWarGame is Ownable, Pausable {
     
     address public immutable HOUSE;
     uint public nextGameId;
-    uint public lastRandomnessPostedGameId;
-    uint public pendingGameCount;
+    // Packed storage: upper 128 bits = lastRandomnessPostedGameId, lower 128 bits = pendingGameCount
+    uint private packedGameState;
     
     GachaToken public gachaToken;
     uint public tieRewardAmount = 100 ether;
@@ -54,11 +54,10 @@ contract TwoPartyWarGame is Ownable, Pausable {
         gachaToken = GachaToken(_gachaToken);
         nextGameId = 1;
     }
-
     // Public functions
     function commit(bytes32 _commitHash) external payable whenNotPaused {
         require(whitelistedBetAmounts[msg.value], "Bet amount not whitelisted");
-        require(pendingGameCount < MAX_PENDING_GAMES, "Too many pending games");
+        require(pendingGameCount() < MAX_PENDING_GAMES, "Too many pending games");
         Game memory playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.NotStarted ||
                     playerGame.gameState == State.Revealed ||
@@ -80,7 +79,7 @@ contract TwoPartyWarGame is Ownable, Pausable {
             revealTimestamp: 0
         });
 
-        pendingGameCount++;
+        _incrementPendingGameCount();
         games[nextGameId] = newGame;
         playerGames[msg.sender].push(nextGameId);
         emit GameCreated(msg.sender, _commitHash, nextGameId, msg.value);
@@ -90,11 +89,11 @@ contract TwoPartyWarGame is Ownable, Pausable {
     function multiPostRandomness(bytes32[] memory randomness) external payable whenNotPaused {
         require(msg.sender == HOUSE, "Not house");
         require(randomness.length > 0, "Should not be 0");
-        require(randomness.length <= pendingGameCount, "Too many randomness values");
+        require(randomness.length <= pendingGameCount(), "Too many randomness values");
         
         uint totalExpectedValue = 0;
         for (uint i = 0; i < randomness.length; i++) {
-            uint gameId = lastRandomnessPostedGameId + i + 1;
+            uint gameId = lastRandomnessPostedGameId() + i + 1;
             Game storage playerGame = games[gameId];
             if(playerGame.gameState != State.Forfeited) {
                 require(playerGame.gameState == State.Committed, "Game has to be commited");
@@ -106,8 +105,8 @@ contract TwoPartyWarGame is Ownable, Pausable {
         }
         require(msg.value == totalExpectedValue, "Incorrect total bet amount");
         
-        lastRandomnessPostedGameId += randomness.length;
-        pendingGameCount -= randomness.length;
+        _decrementPendingGameCount(randomness.length);
+        _incrementLastRandomnessPostedGameId(randomness.length);
     }
 
     function reveal(bytes32 _secret) external whenNotPaused {
@@ -203,10 +202,11 @@ contract TwoPartyWarGame is Ownable, Pausable {
     }
 
     function getBackendGameState() external view returns (uint, uint, uint[] memory) {
-        uint[] memory pendingBetAmounts = new uint[](pendingGameCount);
+        uint currentPendingCount = pendingGameCount();
+        uint[] memory pendingBetAmounts = new uint[](currentPendingCount);
         uint pendingIndex = 0;
         
-        for (uint i = lastRandomnessPostedGameId + 1; i <= nextGameId && pendingIndex < pendingGameCount; i++) {
+        for (uint i = lastRandomnessPostedGameId() + 1; i <= nextGameId && pendingIndex < currentPendingCount; i++) {
             Game storage game = games[i];
             if (game.gameState == State.Committed) {
                 pendingBetAmounts[pendingIndex] = game.betAmount;
@@ -215,8 +215,8 @@ contract TwoPartyWarGame is Ownable, Pausable {
         }
         
         return (
-            lastRandomnessPostedGameId,
-            pendingGameCount,
+            lastRandomnessPostedGameId(),
+            currentPendingCount,
             pendingBetAmounts
         );
     }
@@ -289,4 +289,39 @@ contract TwoPartyWarGame is Ownable, Pausable {
     function unpause() external onlyOwner {
         _unpause();
     }
+
+    // Bit manipulation functions
+    function lastRandomnessPostedGameId() public view returns (uint) {
+        return packedGameState >> 128;
+    }
+
+    function pendingGameCount() public view returns (uint) {
+        return packedGameState & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+    }
+
+    function _setLastRandomnessPostedGameId(uint _value) private {
+        uint currentPendingCount = pendingGameCount();
+        packedGameState = (_value << 128) | currentPendingCount;
+    }
+
+    function _setPendingGameCount(uint _value) private {
+        uint currentLastPosted = lastRandomnessPostedGameId();
+        packedGameState = (currentLastPosted << 128) | _value;
+    }
+
+    function _incrementLastRandomnessPostedGameId(uint _increment) private {
+        uint currentValue = lastRandomnessPostedGameId();
+        _setLastRandomnessPostedGameId(currentValue + _increment);
+    }
+
+    function _incrementPendingGameCount() private {
+        uint currentValue = pendingGameCount();
+        _setPendingGameCount(currentValue + 1);
+    }
+
+    function _decrementPendingGameCount(uint _decrement) private {
+        uint currentValue = pendingGameCount();
+        _setPendingGameCount(currentValue - _decrement);
+    }
+    // End of bit manipulation functions
 }
