@@ -2,9 +2,10 @@
 pragma solidity ^0.8.20;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {GachaToken} from "./GachaToken.sol";
 
-contract TwoPartyWarGame is Ownable {
+contract TwoPartyWarGame is Ownable, Pausable {
     enum State { NotStarted, Committed, HashPosted, Revealed, Forfeited }
 
     struct Game {
@@ -15,8 +16,8 @@ contract TwoPartyWarGame is Ownable {
         uint commitTimestamp;
         uint betAmount;
 
-        bytes32 houseHash;
-        uint houseHashTimestamp;
+        bytes32 houseRandomness;
+        uint houseRandomnessTimestamp;
 
         bytes32 playerSecret;
         uint playerCard;
@@ -36,8 +37,8 @@ contract TwoPartyWarGame is Ownable {
     
     address public immutable HOUSE;
     uint public nextGameId;
-    uint public lastRandomnessPostedGameId;
-    uint public pendingGameCount;
+    // Packed storage: upper 128 bits = lastRandomnessPostedGameId, lower 128 bits = pendingGameCount
+    uint private packedGameState;
     
     GachaToken public gachaToken;
     uint public tieRewardAmount = 100 ether;
@@ -48,20 +49,15 @@ contract TwoPartyWarGame is Ownable {
     event TieRewardAmountUpdated(uint newAmount);
     event BetAmountsUpdated(uint[] newBetAmounts);
 
-    modifier onlyHouse() {
-        require(msg.sender == HOUSE, "Not house");
-        _;
-    }
-
     constructor(address _house, address _gachaToken) Ownable(msg.sender) {
         HOUSE = _house;
         gachaToken = GachaToken(_gachaToken);
+        nextGameId = 1;
     }
-
     // Public functions
-    function commit(bytes32 _commitHash) external payable {
+    function commit(bytes32 _commitHash) external payable whenNotPaused {
         require(whitelistedBetAmounts[msg.value], "Bet amount not whitelisted");
-        require(pendingGameCount < MAX_PENDING_GAMES, "Too many pending games");
+        require(pendingGameCount() < MAX_PENDING_GAMES, "Too many pending games");
         Game memory playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.NotStarted ||
                     playerGame.gameState == State.Revealed ||
@@ -75,49 +71,50 @@ contract TwoPartyWarGame is Ownable {
             commitTimestamp: block.timestamp,
             betAmount: msg.value,
             
-            houseHash: bytes32(0),
-            houseHashTimestamp: 0,
+            houseRandomness: bytes32(0),
+            houseRandomnessTimestamp: 0,
             playerSecret: bytes32(0),
             playerCard: 0,
             houseCard: 0,
             revealTimestamp: 0
         });
 
-        nextGameId++;
-        pendingGameCount++;
+        _incrementPendingGameCount();
         games[nextGameId] = newGame;
         playerGames[msg.sender].push(nextGameId);
         emit GameCreated(msg.sender, _commitHash, nextGameId, msg.value);
+        nextGameId++;
     }
 
-    function multiPostRandomness(bytes32[] memory randomness) external payable onlyHouse {
+    function multiPostRandomness(bytes32[] memory randomness) external payable whenNotPaused {
+        require(msg.sender == HOUSE, "Not house");
         require(randomness.length > 0, "Should not be 0");
-        require(randomness.length <= pendingGameCount, "Too many randomness values");
+        require(randomness.length <= pendingGameCount(), "Too many randomness values");
         
         uint totalExpectedValue = 0;
         for (uint i = 0; i < randomness.length; i++) {
-            uint gameId = lastRandomnessPostedGameId + i + 1;
+            uint gameId = lastRandomnessPostedGameId() + i + 1;
             Game storage playerGame = games[gameId];
             if(playerGame.gameState != State.Forfeited) {
                 require(playerGame.gameState == State.Committed, "Game has to be commited");
                 totalExpectedValue += playerGame.betAmount;
                 playerGame.gameState = State.HashPosted;
-                playerGame.houseHash = randomness[i];
-                playerGame.houseHashTimestamp = block.timestamp;
+                playerGame.houseRandomness = randomness[i];
+                playerGame.houseRandomnessTimestamp = block.timestamp;
             }
         }
         require(msg.value == totalExpectedValue, "Incorrect total bet amount");
         
-        lastRandomnessPostedGameId += randomness.length;
-        pendingGameCount -= randomness.length;
+        _decrementPendingGameCount(randomness.length);
+        _incrementLastRandomnessPostedGameId(randomness.length);
     }
 
-    function reveal(bytes32 _secret) external {
+    function reveal(bytes32 _secret) external whenNotPaused {
         Game storage playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.HashPosted, "Game not ready for reveal");
         require(keccak256(abi.encode(_secret)) == playerGame.playerCommit, "Player secret invalid");
         
-        (uint playerCard, uint houseCard) = calculateGameCards(_secret, playerGame.houseHash);
+        (uint playerCard, uint houseCard) = calculateGameCards(_secret, playerGame.houseRandomness);
 
         address winner;
         bool isTie = false;
@@ -147,7 +144,7 @@ contract TwoPartyWarGame is Ownable {
         }
     }
 
-    function forfeit() external {
+    function forfeit() external whenNotPaused {
         Game storage playerGame = games[getCurrentGameId(msg.sender)];
         require(playerGame.gameState == State.HashPosted ||
                 playerGame.gameState == State.Committed
@@ -164,8 +161,8 @@ contract TwoPartyWarGame is Ownable {
         require(sent, "Failed ETH transfer");
     }
 
-    function calculateGameCards(bytes32 secret, bytes32 houseHash) public pure returns (uint, uint) {
-        uint xorResult = uint(secret) ^ uint(houseHash);
+    function calculateGameCards(bytes32 secret, bytes32 houseRandomness) public pure returns (uint, uint) {
+        uint xorResult = uint(secret) ^ uint(houseRandomness);
         uint playerCard = ((xorResult >> 128) % 13) + 1;
         uint houseCard = ((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) % 13) + 1;
         return (playerCard, houseCard);
@@ -177,7 +174,7 @@ contract TwoPartyWarGame is Ownable {
         uint playerGachaTokenBalance,
         State gameState,
         bytes32 playerCommit,
-        bytes32 houseHash,
+        bytes32 houseRandomness,
         uint gameId,
         Game[] memory recentHistory
     ) {
@@ -198,17 +195,18 @@ contract TwoPartyWarGame is Ownable {
             gachaToken.balanceOf(player),
             playerGame.gameState,
             playerGame.playerCommit,
-            playerGame.houseHash,
+            playerGame.houseRandomness,
             currentGameId,
             recentHistory
         );
     }
 
     function getBackendGameState() external view returns (uint, uint, uint[] memory) {
-        uint[] memory pendingBetAmounts = new uint[](pendingGameCount);
+        uint currentPendingCount = pendingGameCount();
+        uint[] memory pendingBetAmounts = new uint[](currentPendingCount);
         uint pendingIndex = 0;
         
-        for (uint i = lastRandomnessPostedGameId + 1; i <= nextGameId && pendingIndex < pendingGameCount; i++) {
+        for (uint i = lastRandomnessPostedGameId() + 1; i <= nextGameId && pendingIndex < currentPendingCount; i++) {
             Game storage game = games[i];
             if (game.gameState == State.Committed) {
                 pendingBetAmounts[pendingIndex] = game.betAmount;
@@ -217,8 +215,8 @@ contract TwoPartyWarGame is Ownable {
         }
         
         return (
-            lastRandomnessPostedGameId,
-            pendingGameCount,
+            lastRandomnessPostedGameId(),
+            currentPendingCount,
             pendingBetAmounts
         );
     }
@@ -283,4 +281,47 @@ contract TwoPartyWarGame is Ownable {
         require(address(this).balance > 0, "No funds to withdraw");
         transferEth(payable(owner()), address(this).balance);
     }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    // Bit manipulation functions
+    function lastRandomnessPostedGameId() public view returns (uint) {
+        return packedGameState >> 128;
+    }
+
+    function pendingGameCount() public view returns (uint) {
+        return packedGameState & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+    }
+
+    function _setLastRandomnessPostedGameId(uint _value) private {
+        uint currentPendingCount = pendingGameCount();
+        packedGameState = (_value << 128) | currentPendingCount;
+    }
+
+    function _setPendingGameCount(uint _value) private {
+        uint currentLastPosted = lastRandomnessPostedGameId();
+        packedGameState = (currentLastPosted << 128) | _value;
+    }
+
+    function _incrementLastRandomnessPostedGameId(uint _increment) private {
+        uint currentValue = lastRandomnessPostedGameId();
+        _setLastRandomnessPostedGameId(currentValue + _increment);
+    }
+
+    function _incrementPendingGameCount() private {
+        uint currentValue = pendingGameCount();
+        _setPendingGameCount(currentValue + 1);
+    }
+
+    function _decrementPendingGameCount(uint _decrement) private {
+        uint currentValue = pendingGameCount();
+        _setPendingGameCount(currentValue - _decrement);
+    }
+    // End of bit manipulation functions
 }

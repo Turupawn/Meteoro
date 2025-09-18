@@ -6,10 +6,10 @@ export function generateRandomBytes32() {
     return Web3.utils.randomHex(32);
 }
 
-export function calculateCards(secret, houseHash) {
+export function calculateCards(secret, houseRandomness) {
     const secretBig = BigInt(secret);
-    const houseHashBig = BigInt(houseHash);
-    const xorResult = secretBig ^ houseHashBig;
+    const houseRandomnessBig = BigInt(houseRandomness);
+    const xorResult = secretBig ^ houseRandomnessBig;
     const playerCard = Number((xorResult >> 128n) % 13n) + 1;
     const houseCard = Number((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn) % 13n) + 1;
     let winner;

@@ -44,11 +44,11 @@ export class InsufficientBalanceMenu {
             : Math.max(24, this.scene.screenWidth / 30); // Smaller on portrait
         
         // Closer Y positioning - reduced spacing between elements
-        const titleY = this.scene.centerY - this.screenHeight/2 + 200;
-        const addressY = this.scene.centerY - (isLandscapeMode ? 60 : 50);
-        const warningY = this.scene.centerY + (isLandscapeMode ? 40 : 30);
-        const faucetTextY = this.scene.centerY + (isLandscapeMode ? 120 : 100);
-        const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 160 : 140);
+        const titleY = this.scene.centerY - (isLandscapeMode ? 130 : 250);
+        const addressY = this.scene.centerY - (isLandscapeMode ? 60 : 180);
+        const warningY = this.scene.centerY + (isLandscapeMode ? 40 : -60);
+        const faucetTextY = this.scene.centerY + (isLandscapeMode ? 120 : 60);
+        const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 160 : 100);
         
         // Title - now shows the instruction text instead of "INSUFFICIENT BALANCE"
         this.title = new MenuText(
@@ -85,12 +85,13 @@ export class InsufficientBalanceMenu {
             this.scene.centerX,
             warningY, 
             "This is your local storage wallet, do not clear browser data nor deposit large amounts.\nClick to learn more.", 
-            isLandscapeMode ? titleFontSize - 20 : titleFontSize - 18,
+            isLandscapeMode ? titleFontSize - 20 : titleFontSize - 4,
             { 
                 depth: 302,
                 wordWrap: { width: this.screenWidth - 100 },
                 align: 'center',
                 interactive: true,
+                color: '#00ff00',
                 onClick: () => window.open('https://dev.to/filosofiacodigoen/how-local-storage-wallets-on-ethereum-work-4c0p', '_blank')
             }
         );

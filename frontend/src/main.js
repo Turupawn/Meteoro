@@ -23,7 +23,7 @@ posthog.init('phc_3vofleZVJy4GKoykZPb4bOEc7gjl6do5YoFDLB6NVYl',
     }
 )
 
-const POLL_INTERVAL = 150
+const POLL_INTERVAL = parseInt(import.meta.env.POLL_INTERVAL) || 1000
 
 var game
 var gameScene = null; // Reference to the main game scene
@@ -261,7 +261,7 @@ async function gameLoop() {
 
         // Handle case where game is revealed (state 2n) and there's a pending commit
         if (gameState && gameState.gameState === 2n && pendingCommit) {
-            const result = calculateCards(pendingCommit.secret, gameState.houseHash);
+            const result = calculateCards(pendingCommit.secret, gameState.houseRandomness);
             
             if (commitStartTime) {
                 const endTime = Date.now();

@@ -26,7 +26,7 @@ export class MainMenu {
         if (this.scene.insufficientBalanceMenu) {
             this.scene.insufficientBalanceMenu.disable();
         }
-        
+
         this.background = this.scene.add.rectangle(
             this.scene.centerX, 
             this.scene.centerY, 
@@ -547,7 +547,7 @@ export class MainMenu {
         if (this.scene.insufficientBalanceMenu) {
             this.scene.insufficientBalanceMenu.enable();
         }
-        
+
         this.menuElements.forEach(element => {
             if (element && typeof element.destroy === 'function') {
                 element.destroy();
