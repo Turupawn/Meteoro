@@ -121,7 +121,7 @@ async function checkForNewGames() {
     try {
         // Get backend state: last responded gameId, pending count, and pending bet amounts
         const backendState = await contract.methods.getBackendGameState().call({}, 'pending');
-        console.log('Backend state:', backendState);
+        // console.log('Backend state:', backendState);
         const lastRandomnessPostedGameId = parseInt(backendState[0]);
         const pendingGameCount = parseInt(backendState[1]);
         const pendingBetAmounts = backendState[2]; // Array of bet amounts for pending games
