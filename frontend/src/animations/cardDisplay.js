@@ -520,7 +520,7 @@ export class CardDisplay {
     }
 
     getCardDisplay(cardValue) {
-        if (cardValue === 1) return "A";
+        if (cardValue === 14) return "A";  // Ace is now 14 (strongest)
         if (cardValue === 11) return "J";
         if (cardValue === 12) return "Q";
         if (cardValue === 13) return "K";
