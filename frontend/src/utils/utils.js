@@ -10,8 +10,8 @@ export function calculateCards(secret, houseRandomness) {
     const secretBig = BigInt(secret);
     const houseRandomnessBig = BigInt(houseRandomness);
     const xorResult = secretBig ^ houseRandomnessBig;
-    const playerCard = Number((xorResult >> 128n) % 13n) + 1;
-    const houseCard = Number((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn) % 13n) + 1;
+    const playerCard = Number((xorResult >> 128n) % 13n) + 2;
+    const houseCard = Number((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn) % 13n) + 2;
     let winner;
     if (playerCard > houseCard) {
         winner = 'Player';

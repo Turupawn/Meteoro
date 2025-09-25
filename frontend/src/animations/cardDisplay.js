@@ -1,4 +1,5 @@
 import { isLandscape } from '../utils/utils.js';
+import { TieSequence } from './tieSequence.js';
 
 export class CardDisplay {
     constructor(scene) {
@@ -16,6 +17,9 @@ export class CardDisplay {
         const isLandscapeMode = isLandscape();
         this.cardFontSize = isLandscapeMode ? 160 : 160;
         this.baseScale = 0.7;
+        this.gameCount = 0;
+        this.playerIndicator = null;
+        this.houseIndicator = null;
     }
 
     createCardDisplay() {
@@ -40,6 +44,9 @@ export class CardDisplay {
 
     updateCurrentGameDisplay(playerCard = null, houseCard = null) {
         if (playerCard !== null && houseCard !== null) {
+            // Increment game count
+            this.gameCount++;
+            
             // Clear any existing animations before creating new ones
             this.clearCardSprites();
             
@@ -51,12 +58,12 @@ export class CardDisplay {
             
             if (playerCard === houseCard) {
                 this.currentGameText.setText(`TIE!`);
-                if (this.scene.startCosmicScene) {
+                if (this.scene.tieSequence) {
                     this.scene.time.delayedCall(2000, () => {
-                        this.scene.startCosmicScene();
+                        this.scene.tieSequence.startTieSequence();
                     });
                 } else {
-                    console.log("ERROR: Cosmic scene not found");
+                    console.log("ERROR: TieSequence not found");
                 }
             } else {
                 const winner = playerCard > houseCard ? "Player" : "House";
@@ -146,6 +153,151 @@ export class CardDisplay {
         this.animateCardsFromSpace();
     }
 
+    createCardIndicators() {
+        // Get card positions from current card data
+        const leftCardX = this.playerCardData ? this.playerCardData.finalX : this.scene.centerX - 200;
+        const rightCardX = this.houseCardData ? this.houseCardData.finalX : this.scene.centerX + 200;
+        const cardY = this.playerCardData ? this.playerCardData.finalY : this.scene.centerY - 100;
+        
+        const isLandscapeMode = isLandscape();
+        const indicatorFontSize = isLandscapeMode ? 36 : 42; // Made bigger
+        const arrowSize = isLandscapeMode ? 28 : 32; // Made bigger
+        const indicatorY = cardY - 200; // Moved higher up (was -150)
+        
+        // Player indicator (left card)
+        this.playerIndicator = this.scene.add.text(leftCardX, indicatorY, "YOU", {
+            font: `bold ${indicatorFontSize}px Orbitron`,
+            fill: "#00FF00",
+            stroke: "#000000",
+            strokeThickness: 3,
+            alpha: 0.9,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#003300',
+                blur: 4,
+                fill: true
+            }
+        }).setOrigin(0.5);
+        
+        // Player arrow pointing down
+        const playerArrow = this.scene.add.text(leftCardX, indicatorY + 30, "↓", {
+            font: `${arrowSize}px Arial`,
+            fill: "#00FF00",
+            stroke: "#000000",
+            strokeThickness: 2
+        }).setOrigin(0.5);
+        
+        // House indicator (right card)
+        this.houseIndicator = this.scene.add.text(rightCardX, indicatorY, "HOUSE", {
+            font: `bold ${indicatorFontSize}px Orbitron`,
+            fill: "#FF4444",
+            stroke: "#000000",
+            strokeThickness: 3,
+            alpha: 0.9,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#330000',
+                blur: 4,
+                fill: true
+            }
+        }).setOrigin(0.5);
+        
+        // House arrow pointing down
+        const houseArrow = this.scene.add.text(rightCardX, indicatorY + 30, "↓", {
+            font: `${arrowSize}px Arial`,
+            fill: "#FF4444",
+            stroke: "#000000",
+            strokeThickness: 2
+        }).setOrigin(0.5);
+        
+        // Store arrows for cleanup
+        this.playerArrow = playerArrow;
+        this.houseArrow = houseArrow;
+        
+        // Add blinking animations
+        this.addBlinkingAnimation(this.playerIndicator);
+        this.addBlinkingAnimation(this.houseIndicator);
+        this.addBlinkingAnimation(this.playerArrow);
+        this.addBlinkingAnimation(this.houseArrow);
+    }
+
+    addBlinkingAnimation(element) {
+        if (element) {
+            this.scene.tweens.add({
+                targets: element,
+                alpha: 0.3,
+                duration: 200, // Made even faster (was 400)
+                ease: 'Power2',
+                yoyo: true,
+                repeat: -1
+            });
+        }
+    }
+
+    hideIndicators() {
+        if (this.playerIndicator) {
+            this.scene.tweens.add({
+                targets: this.playerIndicator,
+                alpha: 0,
+                duration: 300,
+                ease: 'Power2',
+                onComplete: () => {
+                    if (this.playerIndicator) {
+                        this.playerIndicator.destroy();
+                        this.playerIndicator = null;
+                    }
+                }
+            });
+        }
+        
+        if (this.houseIndicator) {
+            this.scene.tweens.add({
+                targets: this.houseIndicator,
+                alpha: 0,
+                duration: 300,
+                ease: 'Power2',
+                onComplete: () => {
+                    if (this.houseIndicator) {
+                        this.houseIndicator.destroy();
+                        this.houseIndicator = null;
+                    }
+                }
+            });
+        }
+        
+        if (this.playerArrow) {
+            this.scene.tweens.add({
+                targets: this.playerArrow,
+                alpha: 0,
+                duration: 300,
+                ease: 'Power2',
+                onComplete: () => {
+                    if (this.playerArrow) {
+                        this.playerArrow.destroy();
+                        this.playerArrow = null;
+                    }
+                }
+            });
+        }
+        
+        if (this.houseArrow) {
+            this.scene.tweens.add({
+                targets: this.houseArrow,
+                alpha: 0,
+                duration: 300,
+                ease: 'Power2',
+                onComplete: () => {
+                    if (this.houseArrow) {
+                        this.houseArrow.destroy();
+                        this.houseArrow = null;
+                    }
+                }
+            });
+        }
+    }
+
     animateCardsFromSpace() {
         const animationDuration = 600;
         const steps = 20;
@@ -207,6 +359,11 @@ export class CardDisplay {
     }
 
     showCardNumbers() {
+        // Show indicators when card numbers appear (for first 3 games)
+        if (this.gameCount <= 3) {
+            this.createCardIndicators();
+        }
+        
         // Add null checks before creating tweens
         if (this.playerCardText && this.playerCardText.active) {
             this.scene.tweens.add({
@@ -510,6 +667,28 @@ export class CardDisplay {
             this.houseCardText = null;
         }
         
+        // Clean up indicators
+        if (this.playerIndicator) {
+            this.scene.tweens.killTweensOf(this.playerIndicator);
+            this.playerIndicator.destroy();
+            this.playerIndicator = null;
+        }
+        if (this.houseIndicator) {
+            this.scene.tweens.killTweensOf(this.houseIndicator);
+            this.houseIndicator.destroy();
+            this.houseIndicator = null;
+        }
+        if (this.playerArrow) {
+            this.scene.tweens.killTweensOf(this.playerArrow);
+            this.playerArrow.destroy();
+            this.playerArrow = null;
+        }
+        if (this.houseArrow) {
+            this.scene.tweens.killTweensOf(this.houseArrow);
+            this.houseArrow.destroy();
+            this.houseArrow = null;
+        }
+        
         if (this.particleEmitter) {
             this.particleEmitter.destroy();
             this.particleEmitter = null;
@@ -520,7 +699,7 @@ export class CardDisplay {
     }
 
     getCardDisplay(cardValue) {
-        if (cardValue === 1) return "A";
+        if (cardValue === 14) return "A";  // Ace is now 14 (strongest)
         if (cardValue === 11) return "J";
         if (cardValue === 12) return "Q";
         if (cardValue === 13) return "K";

@@ -163,8 +163,8 @@ contract TwoPartyWarGame is Ownable, Pausable {
 
     function calculateGameCards(bytes32 secret, bytes32 houseRandomness) public pure returns (uint, uint) {
         uint xorResult = uint(secret) ^ uint(houseRandomness);
-        uint playerCard = ((xorResult >> 128) % 13) + 1;
-        uint houseCard = ((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) % 13) + 1;
+        uint playerCard = ((xorResult >> 128) % 13) + 2;
+        uint houseCard = ((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) % 13) + 2;
         return (playerCard, houseCard);
     }
 
