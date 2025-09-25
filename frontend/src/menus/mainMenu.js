@@ -343,7 +343,7 @@ export class MainMenu {
         let ethBalanceString = "0.000000 ETH";
         if (this.scene.currentBalance) {
             try {
-                const ethBalanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
+                const balanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
                 ethBalanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
             } catch (error) {
                 console.error('Error converting balance:', error);
