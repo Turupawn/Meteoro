@@ -1,4 +1,5 @@
 import { isLandscape } from '../utils/utils.js';
+import { TieSequence } from './tieSequence.js';
 
 export class CardDisplay {
     constructor(scene) {
@@ -51,12 +52,12 @@ export class CardDisplay {
             
             if (playerCard === houseCard) {
                 this.currentGameText.setText(`TIE!`);
-                if (this.scene.startCosmicScene) {
+                if (this.scene.tieSequence) {
                     this.scene.time.delayedCall(2000, () => {
-                        this.scene.startCosmicScene();
+                        this.scene.tieSequence.startTieSequence();
                     });
                 } else {
-                    console.log("ERROR: Cosmic scene not found");
+                    console.log("ERROR: TieSequence not found");
                 }
             } else {
                 const winner = playerCard > houseCard ? "Player" : "House";
