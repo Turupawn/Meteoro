@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Background } from './animations/background.js';
 import { CardDisplay } from './animations/cardDisplay.js';
+import { TieSequence } from './animations/tieSequence.js';
 import { LoadingScreen } from './animations/loadingScreen.js';
 import { OpenMenuButton } from './hud/hudButtons/openMenuButton.js';
 import { BetMenuButton } from './hud/hudButtons/betMenuButton.js';
@@ -43,6 +44,7 @@ class GameScene extends Phaser.Scene {
         
         this.background = new Background(this);
         this.cardDisplay = new CardDisplay(this);
+        this.tieSequence = new TieSequence(this);
         this.ethBalanceText = new ETHBalanceText(this);
         this.gachaTokenBalanceText = new GachaTokenBalanceText(this);
         this.gameHistory = new GameHistory(this);
@@ -61,6 +63,7 @@ class GameScene extends Phaser.Scene {
         this.time.delayedCall(1000, () => {
             printLog(['profile'], "Started lazy loading at:" + new Date().toISOString());
             this.lazyLoadCosmicScene();
+            this.lazyLoadStoryImages();
         });
     }
 
@@ -109,6 +112,15 @@ class GameScene extends Phaser.Scene {
             }).catch(error => {
                 console.error('Failed to lazy load CosmicScene:', error);
             });
+        }
+    }
+
+    async lazyLoadStoryImages() {
+        try {
+            await TieSequence.preloadStoryImages(this);
+            printLog(['profile'], "Story images loaded lazily at:" + new Date().toISOString());
+        } catch (error) {
+            console.error('Failed to lazy load story images:', error);
         }
     }
 

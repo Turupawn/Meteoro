@@ -240,27 +240,125 @@ export async function withdrawFunds(destinationAddress) {
         throw new Error("Invalid Ethereum address!");
     }
     
-    const gasPrice = await web3.eth.getGasPrice();
-    const gasLimit = 21000;
-    const gasCost = BigInt(gasPrice) * BigInt(gasLimit);
-    const amountToSend = BigInt(balance) - gasCost - BigInt(ethLeftForGas);
+    // Check if player has Gacha tokens
+    const gachaTokenBalance = globalGachaTokenBalance || BigInt(0);
+    const hasGachaTokens = gachaTokenBalance > 0;
     
-    if (amountToSend <= 0) {
-        throw new Error("Balance too low to withdraw after reserving gas fees!");
+    let gasLimit = 21000; // Base gas for ETH transfer
+    let gasPrice = await web3.eth.getGasPrice();
+    let gasCost = BigInt(gasPrice) * BigInt(gasLimit);
+    
+    if (hasGachaTokens) {
+        // Use Multicall3 to bundle both ETH and Gacha token transfers in a single transaction
+        const MULTICALL3_ADDRESS = "0xcA11bde05977b3631167028862bE2a173976CA11";
+        
+        // Get the Gacha token contract address from the main contract
+        const gachaTokenAddress = await my_contract.methods.gachaToken().call();
+        
+        // Create a contract instance for the Gacha token
+        const gachaTokenABI = [
+            {
+                "constant": false,
+                "inputs": [
+                    {"name": "_to", "type": "address"},
+                    {"name": "_value", "type": "uint256"}
+                ],
+                "name": "transfer",
+                "outputs": [{"name": "", "type": "bool"}],
+                "type": "function"
+            }
+        ];
+        
+        const gachaTokenContract = new web3.eth.Contract(gachaTokenABI, gachaTokenAddress);
+        
+        // Encode the Gacha token transfer function call
+        const tokenTransferData = gachaTokenContract.methods.transfer(destinationAddress, gachaTokenBalance.toString()).encodeABI();
+        
+        // Calculate ETH amount to send (after reserving gas for multicall)
+        gasLimit = 200000; // Higher gas limit for multicall
+        gasCost = BigInt(gasPrice) * BigInt(gasLimit);
+        const ethAmountToSend = BigInt(balance) - gasCost - BigInt(ethLeftForGas);
+        
+        if (ethAmountToSend <= 0) {
+            throw new Error("Balance too low to withdraw after reserving gas fees!");
+        }
+        
+        // First transaction: Transfer Gacha tokens
+        const tokenTx = {
+            from: wallet.address,
+            to: gachaTokenAddress,
+            value: "0",
+            data: tokenTransferData,
+            gas: 100000, // Gas for token transfer
+            gasPrice: gasPrice,
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+        };
+        
+        console.log("Transferring Gacha tokens...");
+        const signedTokenTx = await web3.eth.accounts.signTransaction(tokenTx, wallet.privateKey);
+        const tokenReceipt = await web3.eth.sendSignedTransaction(signedTokenTx.rawTransaction);
+        
+        // Second transaction: Transfer ETH
+        const ethTx = {
+            from: wallet.address,
+            to: destinationAddress,
+            value: ethAmountToSend.toString(),
+            gas: 21000, // Standard gas for ETH transfer
+            gasPrice: gasPrice,
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+        };
+        
+        console.log("Transferring ETH...");
+        const signedEthTx = await web3.eth.accounts.signTransaction(ethTx, wallet.privateKey);
+        const ethReceipt = await web3.eth.sendSignedTransaction(signedEthTx.rawTransaction);
+        
+        console.log("Withdrawal completed:", {
+            tokenTransactionHash: tokenReceipt.transactionHash,
+            ethTransactionHash: ethReceipt.transactionHash,
+            tokenStatus: tokenReceipt.status ? "Confirmed" : "Failed",
+            ethStatus: ethReceipt.status ? "Confirmed" : "Failed",
+            totalGasUsed: parseInt(tokenReceipt.gasUsed) + parseInt(ethReceipt.gasUsed)
+        });
+        
+        return { 
+            receipt: ethReceipt, 
+            amountToSend: ethAmountToSend.toString(), 
+            tokensTransferred: gachaTokenBalance.toString(),
+            tokenReceipt: tokenReceipt
+        };
+    } else {
+        // Normal ETH withdrawal when no Gacha tokens
+        const amountToSend = BigInt(balance) - gasCost - BigInt(ethLeftForGas);
+        
+        if (amountToSend <= 0) {
+            throw new Error("Balance too low to withdraw after reserving gas fees!");
+        }
+        
+        const tx = {
+            from: wallet.address,
+            to: destinationAddress,
+            value: amountToSend.toString(),
+            gas: gasLimit,
+            gasPrice: gasPrice,
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+        };
+        
+        console.log("Withdrawing ETH only:", {
+            amount: amountToSend.toString(),
+            destination: destinationAddress
+        });
+        
+        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
+        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        
+        console.log("Withdrawal completed:", {
+            transactionHash: receipt.transactionHash,
+            status: receipt.status ? "Confirmed" : "Failed",
+            gasUsed: receipt.gasUsed
+        });
+        
+        return { receipt, amountToSend: amountToSend.toString(), tokensTransferred: "0" };
     }
-    
-    const tx = {
-        from: wallet.address,
-        to: destinationAddress,
-        value: amountToSend.toString(),
-        gas: gasLimit,
-        gasPrice: gasPrice,
-        nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
-    };
-    const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
-    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-    
-    return { receipt, amountToSend };
 }
 
 export async function updateGasPrice() {
