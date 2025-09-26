@@ -57,7 +57,7 @@ export class CardDisplay {
             this.createCardSprites(playerCard, houseCard);
             
             if (playerCard === houseCard) {
-                this.currentGameText.setText(`TIE!`);
+                this.currentGameText.setText(`You earned GACHA tokens!`);
                 if (this.scene.tieSequence) {
                     this.scene.time.delayedCall(2000, () => {
                         this.scene.tieSequence.startTieSequence();
