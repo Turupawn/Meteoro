@@ -1,5 +1,6 @@
 import Web3 from 'web3';
 import { printLog } from '../utils/utils.js';
+import { captureBlockchainError } from '../session_tracking.js';
 
 const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json";
@@ -95,6 +96,13 @@ export async function checkGameState() {
         return gameState;
     } catch (error) {
         console.error("Error checking game state:", error);
+        
+        // Capture error with wallet context
+        captureBlockchainError(error, 'checkGameState', {
+            contract_address: MY_CONTRACT_ADDRESS,
+            error_type: 'blockchain_call_failed'
+        });
+        
         return null;
     }
 }
@@ -102,7 +110,11 @@ export async function checkGameState() {
 export async function commit(commitHash) {
     const wallet = getLocalWallet();
     if (!wallet) {
-        throw new Error("No local wallet found!");
+        const error = new Error("No local wallet found!");
+        captureBlockchainError(error, 'commit', {
+            error_type: 'wallet_not_found'
+        });
+        throw error;
     }
 
     if (!globalSelectedBetAmount) {
@@ -113,13 +125,23 @@ export async function commit(commitHash) {
         data = my_contract.methods.commit(commitHash).encodeABI();
     } catch (error) {
         console.error("Error encoding commit ABI:", error);
+        captureBlockchainError(error, 'commit', {
+            error_type: 'abi_encoding_failed',
+            commit_hash: commitHash
+        });
         throw error;
     }
     const nonce = getAndIncrementNonce();
     const gasPrice = await getCurrentGasPrice();
     
     if (nonce === null || !gasPrice) {
-        throw new Error("Failed to get nonce or gas price");
+        const error = new Error("Failed to get nonce or gas price");
+        captureBlockchainError(error, 'commit', {
+            error_type: 'gas_or_nonce_failed',
+            nonce: nonce,
+            gas_price: gasPrice
+        });
+        throw error;
     }
     
     const tx = {
@@ -132,17 +154,31 @@ export async function commit(commitHash) {
         data: data
     };
 
-    const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
-    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-    
-    printLog(['debug'], "Commit Transaction Receipt:", {
-        transactionHash: receipt.transactionHash,
-        blockNumber: receipt.blockNumber,
-        status: receipt.status ? "Confirmed" : "Failed",
-        gasUsed: receipt.gasUsed
-    });
-    
-    return receipt;
+    try {
+        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
+        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        
+        printLog(['debug'], "Commit Transaction Receipt:", {
+            transactionHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber,
+            status: receipt.status ? "Confirmed" : "Failed",
+            gasUsed: receipt.gasUsed
+        });
+        
+        return receipt;
+    } catch (error) {
+        console.error("Error in commit transaction:", error);
+        captureBlockchainError(error, 'commit', {
+            error_type: 'transaction_failed',
+            transaction_data: {
+                to: MY_CONTRACT_ADDRESS,
+                value: globalSelectedBetAmount?.toString(),
+                gas: GAS_LIMIT,
+                nonce: nonce
+            }
+        });
+        throw error;
+    }
 }
 
 export async function forfeit() {
@@ -190,7 +226,13 @@ export async function performReveal(secret) {
         const gasPrice = await getCurrentGasPrice();
         
         if (nonce === null || !gasPrice) {
-            throw new Error("Failed to get nonce or gas price");
+            const error = new Error("Failed to get nonce or gas price");
+            captureBlockchainError(error, 'performReveal', {
+                error_type: 'gas_or_nonce_failed',
+                nonce: nonce,
+                gas_price: gasPrice
+            });
+            throw error;
         }
         
         const tx = {
@@ -216,6 +258,10 @@ export async function performReveal(secret) {
         return receipt;
     } catch (error) {
         printLog(['error'], "Error in reveal:", error);
+        captureBlockchainError(error, 'performReveal', {
+            error_type: 'reveal_transaction_failed',
+            secret_provided: !!secret
+        });
         throw error;
     }
 }
