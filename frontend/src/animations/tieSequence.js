@@ -149,7 +149,7 @@ export class TieSequence {
         const buttonX = this.scene.centerX;
         const buttonY = isLandscapeMode 
             ? this.scene.centerY + (this.scene.screenHeight * 0.35) // Original positioning for landscape
-            : this.scene.screenHeight - 100; // Near bottom for portrait mode
+            : 50 + (this.scene.screenHeight * 0.4) + (this.scene.screenHeight * 0.3); // Below the image in portrait mode
         
         // Button background
         this.nextButtonBg = this.scene.add.rectangle(

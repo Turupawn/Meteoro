@@ -27,7 +27,7 @@ export class CardDisplay {
         const y = this.scene.centerY + 150; // Position below the cards from the start
         
         this.currentGameText = this.scene.add.text(x, y, "", {
-            font: `bold 80px Orbitron`, // Changed to match other UI elements
+            font: `bold 70px Orbitron`, // Changed to match other UI elements
             fill: "#E0F6FF", // Changed to match other text colors
             stroke: "#0066CC", // Changed to match other text strokes
             strokeThickness: 3, // Changed to match other text strokes
@@ -57,7 +57,7 @@ export class CardDisplay {
             this.createCardSprites(playerCard, houseCard);
             
             if (playerCard === houseCard) {
-                this.currentGameText.setText(`You earned GACHA tokens!`);
+                this.currentGameText.setText(`You earned GACHA!`);
                 if (this.scene.tieSequence) {
                     this.scene.time.delayedCall(2000, () => {
                         this.scene.tieSequence.startTieSequence();
