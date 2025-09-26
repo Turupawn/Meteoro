@@ -14,14 +14,12 @@ import {
     getMinimumPlayableBalance
 } from './web3/blockchain_stuff.js';
 
-import posthog from 'posthog-js'
-
-posthog.init('phc_3vofleZVJy4GKoykZPb4bOEc7gjl6do5YoFDLB6NVYl',
-    {
-        api_host: 'https://us.i.posthog.com',
-        person_profiles: 'always' // or 'always' to create profiles for anonymous users as well
-    }
-)
+import { 
+    captureError, 
+    captureEvent, 
+    captureGameEvent,
+    setWalletAddressGetter,
+} from './session_tracking.js';
 
 const POLL_INTERVAL = parseInt(import.meta.env.POLL_INTERVAL) || 1000
 
@@ -49,8 +47,11 @@ let lastTransactionHash = null;
 
 async function loadDapp() {
   try {
+    // Set up wallet address getter for error tracking
+    setWalletAddressGetter(() => getLocalWallet()?.address || 'unknown');
+    
     // Track app initialization
-    posthog.capture('app_initialized', { 
+    captureEvent('app_initialized', { 
       timestamp: Date.now() 
     });
     
@@ -71,6 +72,7 @@ async function loadDapp() {
     posthog.capture('app_initialization_error', { 
       error: error.message 
     });
+    captureError(error, { function: 'loadDapp' });
   }
 }
 
@@ -98,10 +100,9 @@ async function initWeb3WithProgress() {
     console.log("Web3 initialization completed successfully");
     
     // Track successful Web3 initialization
-    posthog.capture('web3_initialized', { 
+    captureEvent('web3_initialized', { 
       timestamp: Date.now() 
     });
-    
   } catch (error) {
     console.error("Error initializing Web3:", error);
     // Mark as complete even if failed to prevent infinite loading
@@ -110,9 +111,10 @@ async function initWeb3WithProgress() {
     updateWeb3Progress(1);
     
     // Track Web3 initialization error
-    posthog.capture('web3_initialization_error', { 
+    captureEvent('web3_initialization_error', { 
       error: error.message 
     });
+    captureError(error, { function: 'initWeb3WithProgress' });
   }
 }
 
@@ -173,6 +175,7 @@ async function loadGameData() {
     gameDataLoadingProgress = 1;
     isGameDataReady = true;
     updateGameDataProgress(1);
+    captureError(error, { function: 'loadGameData' });
   }
 }
 
@@ -274,7 +277,7 @@ async function gameLoop() {
                 commitStartTime = null;
                 
                 // Track game completion performance
-                posthog.capture('game_completed', {
+                captureGameEvent('game_completed', {
                     game_id: gameState.gameId?.toString(),
                     player_card: result.playerCard,
                     house_card: result.houseCard,
@@ -298,7 +301,7 @@ async function gameLoop() {
                 printLog(['debug'], "Reveal transaction completed successfully");
                 
                 // Track successful reveal
-                posthog.capture('reveal_transaction_success', {
+                captureGameEvent('reveal_transaction_success', {
                     game_id: gameState.gameId?.toString(),
                     player_card: result.playerCard,
                     house_card: result.houseCard
@@ -308,7 +311,7 @@ async function gameLoop() {
                 printLog(['error'], "Reveal failed:", error);
                 
                 // Track reveal failure
-                posthog.capture('reveal_transaction_failed', {
+                captureGameEvent('reveal_transaction_failed', {
                     game_id: gameState.gameId?.toString(),
                     error: error.message
                 });
@@ -355,19 +358,19 @@ async function gameLoop() {
                 shouldProcessCommit = false;
                 
                 // Track attempt to start game with pending commit
-                posthog.capture('game_start_blocked_pending_commit', {
+                captureGameEvent('game_start_blocked_pending_commit', {
                     game_id: gameState.gameId?.toString()
                 });
                 
             } else if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
-                posthog.capture('game_start_failed_uninitialized_state');
+                captureGameEvent('game_start_failed_uninitialized_state');
                 
             } else if (BigInt(getPlayerETHBalance()) < BigInt(getMinimumPlayableBalance())) {
                 printLog(['debug'], "Insufficient balance detected, UI will handle display");
                 shouldProcessCommit = false;
-                posthog.capture('game_start_blocked_insufficient_balance', {
+                captureGameEvent('game_start_blocked_insufficient_balance', {
                     player_balance: getPlayerETHBalance(),
                     minimum_balance: getMinimumPlayableBalance()
                 });
@@ -384,7 +387,7 @@ async function gameLoop() {
                 printLog(['debug'], "Processing commit request...");
                 
                 // Track game start attempt
-                posthog.capture('game_start_attempted', {
+                captureGameEvent('game_start_attempted', {
                     game_id: gameState.gameId?.toString(),
                     player_balance: gameState.playerETHBalance?.toString(),
                     game_state: gameState.gameState?.toString()
@@ -399,7 +402,7 @@ async function gameLoop() {
                     printLog(['debug'], "Commit transaction completed successfully");
                     
                     // Track successful commit
-                    posthog.capture('commit_transaction_success', {
+                    captureGameEvent('commit_transaction_success', {
                         game_id: gameState.gameId?.toString(),
                         player_balance: gameState.playerETHBalance?.toString()
                     });
@@ -409,7 +412,7 @@ async function gameLoop() {
                     shouldProcessCommit = false;
                     
                     // Track commit failure
-                    posthog.capture('commit_transaction_failed', {
+                    captureGameEvent('commit_transaction_failed', {
                         game_id: gameState.gameId?.toString(),
                         error: error.message
                     });
@@ -432,9 +435,10 @@ async function gameLoop() {
         isTransactionInProgress = false;
         
         // Track game loop error
-        posthog.capture('game_loop_error', {
+        captureGameEvent('game_loop_error', {
             error: error.message
         });
+        captureError(error, { function: 'gameLoop' });
     }
 }
 
@@ -513,7 +517,7 @@ export async function commitGame() {
     shouldProcessCommit = true;
     
     // Track manual commit request
-    posthog.capture('commit_game_called', {
+    captureGameEvent('commit_game_called', {
         timestamp: Date.now()
     });
 }
