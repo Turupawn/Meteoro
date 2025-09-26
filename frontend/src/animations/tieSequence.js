@@ -106,11 +106,14 @@ export class TieSequence {
         const imageKey = `story_${this.betLevel}_${(this.currentImageIndex + 1).toString().padStart(2, '0')}`;
         
         if (this.scene.textures.exists(imageKey)) {
-            const image = this.scene.add.image(
-                this.scene.centerX,
-                this.scene.centerY,
-                imageKey
-            );
+            // Calculate position based on orientation
+            const isLandscapeMode = isLandscape();
+            const imageX = this.scene.centerX;
+            const imageY = isLandscapeMode 
+                ? this.scene.centerY 
+                : 50 + (this.scene.screenHeight * 0.4); // 50px from top + 40% of screen height for better positioning
+            
+            const image = this.scene.add.image(imageX, imageY, imageKey);
             
             // Scale image to fit screen while maintaining aspect ratio
             const scale = this.calculateImageScale(image);
@@ -142,9 +145,11 @@ export class TieSequence {
         const buttonWidth = isLandscapeMode ? 200 : 250;
         const buttonHeight = isLandscapeMode ? 60 : 80;
         
-        // Position button at bottom center
+        // Position button based on orientation
         const buttonX = this.scene.centerX;
-        const buttonY = this.scene.centerY + (this.scene.screenHeight * 0.35);
+        const buttonY = isLandscapeMode 
+            ? this.scene.centerY + (this.scene.screenHeight * 0.35) // Original positioning for landscape
+            : this.scene.screenHeight - 100; // Near bottom for portrait mode
         
         // Button background
         this.nextButtonBg = this.scene.add.rectangle(
