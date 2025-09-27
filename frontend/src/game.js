@@ -13,6 +13,7 @@ import { GameHistory } from './hud/hudTexts/gameHistory.js';
 import { MainMenu } from './menus/mainMenu.js';
 import { BetMenu } from './menus/betMenu.js';
 import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
+import { setErrorModal, ErrorModal } from './menus/errorModal.js';
 import { setGameScene } from './main.js';
 import { printLog } from './utils/utils.js';
 import { getMinimumPlayableBalance } from './web3/blockchain_stuff.js';
@@ -33,6 +34,9 @@ class GameScene extends Phaser.Scene {
         }
         if (this.betMenu) {
             this.betMenu.closeMenu();
+        }
+        if (this.errorModal) {
+            this.errorModal.closeModal();
         }
     }
 
@@ -57,7 +61,9 @@ class GameScene extends Phaser.Scene {
         });
         this.socialLinks = new SocialLinks(this);
         this.insufficientBalanceMenu = new InsufficientBalanceMenu(this);
-        
+        this.errorModal = new ErrorModal(this);
+
+        setErrorModal(this.errorModal);
         setGameScene(this);
 
         this.time.delayedCall(1000, () => {
@@ -156,6 +162,9 @@ const loadPhaser = async () => {
         scale: {
             mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
+        },
+        audio: {
+            disableWebAudio: true
         }
     };
 

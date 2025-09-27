@@ -530,6 +530,8 @@ export class MainMenu {
             this.closeMenu();
         } catch (error) {
             console.error("Error executing forfeit:", error);
+        } finally {
+            window.location.reload();
         }
     }
 

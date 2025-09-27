@@ -1,6 +1,7 @@
 import Web3 from 'web3';
 import { printLog } from '../utils/utils.js';
 import { captureBlockchainError } from '../session_tracking.js';
+import { showErrorModal } from '../menus/errorModal.js';
 
 const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json";
@@ -65,6 +66,7 @@ export async function initWeb3() {
         return { web3, my_contract, wallet };
       } catch (error) {
         console.error("Error initializing contract:", error);
+        showErrorModal("Failed to initialize contract: " + error.message + " (code " + (error.code || 'unknown') + ")");
         throw error;
       }
     };
@@ -96,8 +98,7 @@ export async function checkGameState() {
         return gameState;
     } catch (error) {
         console.error("Error checking game state:", error);
-        
-        // Capture error with wallet context
+        showErrorModal("Failed to check game state: " + error.message + " (code " + (error.code || 'unknown') + ")");
         captureBlockchainError(error, 'checkGameState', {
             contract_address: MY_CONTRACT_ADDRESS,
             error_type: 'blockchain_call_failed'
@@ -111,6 +112,7 @@ export async function commit(commitHash) {
     const wallet = getLocalWallet();
     if (!wallet) {
         const error = new Error("No local wallet found!");
+        showErrorModal(error.message);
         captureBlockchainError(error, 'commit', {
             error_type: 'wallet_not_found'
         });
@@ -124,7 +126,7 @@ export async function commit(commitHash) {
     try {
         data = my_contract.methods.commit(commitHash).encodeABI();
     } catch (error) {
-        console.error("Error encoding commit ABI:", error);
+        showErrorModal("Failed to encode commit ABI: " + error.message + " (code " + (error.code || 'unknown') + ")");
         captureBlockchainError(error, 'commit', {
             error_type: 'abi_encoding_failed',
             commit_hash: commitHash
@@ -136,6 +138,7 @@ export async function commit(commitHash) {
     
     if (nonce === null || !gasPrice) {
         const error = new Error("Failed to get nonce or gas price");
+        showErrorModal("Failed to get nonce or gas price: " + error.message + " (code " + (error.code || 'unknown') + ")");
         captureBlockchainError(error, 'commit', {
             error_type: 'gas_or_nonce_failed',
             nonce: nonce,
@@ -167,7 +170,7 @@ export async function commit(commitHash) {
         
         return receipt;
     } catch (error) {
-        console.error("Error in commit transaction:", error);
+        showErrorModal("Failed to commit: " + error.message + " (code " + (error.code || 'unknown') + ")");
         captureBlockchainError(error, 'commit', {
             error_type: 'transaction_failed',
             transaction_data: {
@@ -227,6 +230,7 @@ export async function performReveal(secret) {
         
         if (nonce === null || !gasPrice) {
             const error = new Error("Failed to get nonce or gas price");
+            showErrorModal("Failed to get nonce or gas price: " + error.message + " (code " + (error.code || 'unknown') + ")");
             captureBlockchainError(error, 'performReveal', {
                 error_type: 'gas_or_nonce_failed',
                 nonce: nonce,
@@ -258,6 +262,7 @@ export async function performReveal(secret) {
         return receipt;
     } catch (error) {
         printLog(['error'], "Error in reveal:", error);
+        showErrorModal("Failed to reveal: " + error.message + " (code " + (error.code || 'unknown') + ")");
         captureBlockchainError(error, 'performReveal', {
             error_type: 'reveal_transaction_failed',
             secret_provided: !!secret
