@@ -156,6 +156,9 @@ const loadPhaser = async () => {
         scale: {
             mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
+        },
+        audio: {
+            disableWebAudio: true
         }
     };
 
