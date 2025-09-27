@@ -21,6 +21,9 @@ import {
     setWalletAddressGetter,
 } from './session_tracking.js';
 
+import { showErrorModal } from './menus/errorModal.js';
+import { captureBlockchainError } from './session_tracking.js';
+
 const POLL_INTERVAL = parseInt(import.meta.env.POLL_INTERVAL) || 1000
 
 var game
@@ -354,7 +357,8 @@ async function gameLoop() {
             const storedCommit = getStoredCommit();
             if (storedCommit) {
                 printLog(['debug'], "Found pending commit from previous game:", storedCommit);
-                alert("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
+                showErrorModal("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
+                captureError(new Error("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete."), { function: 'gameLoop' });
                 shouldProcessCommit = false;
                 
                 // Track attempt to start game with pending commit
