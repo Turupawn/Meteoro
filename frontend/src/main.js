@@ -168,11 +168,19 @@ async function loadGameData() {
     console.log("Checking game state...")
     gameState = await checkGameState();
 
-    console.log("Initial game state from getFrontendGameState:", gameState);
+    console.log("Initial game state from getFrontendGameState:", JSON.stringify(gameState, null, 2));
 
     const pendingReveal = getPendingReveal();
     if (pendingReveal) {
-        console.log("Pending reveal found:", pendingReveal);
+        console.log("Pending reveal found:", JSON.stringify(pendingReveal, null, 2));
+        try {
+            console.log("Attempting to reveal pending secret...");
+            await performReveal(pendingReveal.secret);
+            console.log("Reveal completed successfully");
+        } catch (error) {
+            console.log("Reveal failed:", error.message);
+            captureError(error, { function: 'loadGameData attempt to reveal pending secret' });
+        }
     } else {
         console.log("No pending reveal found");
     }
