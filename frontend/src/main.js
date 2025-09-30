@@ -168,7 +168,12 @@ async function loadGameData() {
     console.log("Checking game state...")
     gameState = await checkGameState();
 
-    console.log("Initial game state from getFrontendGameState:", JSON.stringify(gameState, null, 2));
+    // Convert BigInt values to strings for readable output
+    const gameStateForLog = {};
+    for (const [key, value] of Object.entries(gameState)) {
+        gameStateForLog[key] = typeof value === 'bigint' ? value.toString() : value;
+    }
+    console.log("Initial game state from getFrontendGameState:", JSON.stringify(gameStateForLog, null, 2));
 
     const pendingReveal = getPendingReveal();
     if (pendingReveal) {
