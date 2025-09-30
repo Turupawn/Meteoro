@@ -166,7 +166,17 @@ async function loadGameData() {
     gameDataLoadingProgress = 0.9;
     updateGameDataProgress(0.9);
     console.log("Checking game state...")
-    await checkGameState();
+    gameState = await checkGameState();
+
+    console.log("Initial game state from getFrontendGameState:", gameState);
+
+    const pendingReveal = getPendingReveal();
+    if (pendingReveal) {
+        console.log("Pending reveal found:", pendingReveal);
+    } else {
+        console.log("No pending reveal found");
+    }
+
     await new Promise(resolve => setTimeout(resolve, 150));    
     gameDataLoadingProgress = 1;
     isGameDataReady = true;
@@ -265,8 +275,7 @@ async function gameLoop() {
         printLog(['debug'], "Pending commit:", pendingCommit);
         printLog(['debug'], "Pending reveal:", pendingReveal);
 
-        // Handle case where game is revealed (state 2n) and there's a pending commit
-        if (gameState && gameState.gameState === 2n && pendingCommit) {
+        if (gameState && gameState.gameState === 2n /* HashPosted */ && pendingCommit) {
             const result = calculateCards(pendingCommit.secret, gameState.houseRandomness);
             
             if (commitStartTime) {
