@@ -41,13 +41,15 @@ contract TwoPartyWarGame is Ownable, Pausable {
     uint private packedGameState;
     
     GachaToken public gachaToken;
-    uint public tieRewardAmount = 100 ether;
+    uint public tieRewardMultiplier = 10 ether; // Base multiplier per card value
+    mapping(uint betAmount => uint multiplier) public betAmountMultipliers; // Bet amount to reward multiplier
 
     event GameForfeited(address indexed player, address house);
     event GameCreated(address indexed player, bytes32 commitHash, uint gameId, uint betAmount);
     event TieRewardMinted(address indexed player, uint amount, uint gameId);
-    event TieRewardAmountUpdated(uint newAmount);
     event BetAmountsUpdated(uint[] newBetAmounts);
+    event TieRewardMultiplierUpdated(uint newMultiplier);
+    event BetAmountMultiplierUpdated(uint betAmount, uint multiplier);
 
     constructor(address _house, address _gachaToken) Ownable(msg.sender) {
         HOUSE = _house;
@@ -136,8 +138,13 @@ contract TwoPartyWarGame is Ownable, Pausable {
 
         uint totalStake = playerGame.betAmount * 2;
         if (isTie) {
-            gachaToken.mint(msg.sender, tieRewardAmount);
-            emit TieRewardMinted(msg.sender, tieRewardAmount, getCurrentGameId(msg.sender));
+            uint betMultiplier = betAmountMultipliers[playerGame.betAmount];
+            if (betMultiplier == 0) {
+                betMultiplier = 1; // Default 1x if no multiplier set
+            }
+            uint tieReward = playerCard * tieRewardMultiplier * betMultiplier;
+            gachaToken.mint(msg.sender, tieReward);
+            emit TieRewardMinted(msg.sender, tieReward, getCurrentGameId(msg.sender));
             transferEth(payable(HOUSE), totalStake);
         } else {
             transferEth(payable(winner), totalStake);
@@ -268,9 +275,14 @@ contract TwoPartyWarGame is Ownable, Pausable {
         emit BetAmountsUpdated(_betAmounts);
     }
 
-    function setTieRewardAmount(uint _newAmount) external onlyOwner {
-        tieRewardAmount = _newAmount;
-        emit TieRewardAmountUpdated(_newAmount);
+    function setTieRewardMultiplier(uint _newMultiplier) external onlyOwner {
+        tieRewardMultiplier = _newMultiplier;
+        emit TieRewardMultiplierUpdated(_newMultiplier);
+    }
+
+    function setBetAmountMultiplier(uint _betAmount, uint _multiplier) external onlyOwner {
+        betAmountMultipliers[_betAmount] = _multiplier;
+        emit BetAmountMultiplierUpdated(_betAmount, _multiplier);
     }
 
     function setGachaToken(address _gachaToken) external onlyOwner {

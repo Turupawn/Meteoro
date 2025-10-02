@@ -55,7 +55,7 @@ export class InsufficientBalanceMenu {
             this.scene,
             this.scene.centerX, 
             titleY, 
-            `Deposit ${parseFloat(recommendedAmountEth).toFixed(6)} ETH to start playing.`, 
+            "Deposit ETH to start playing. (Gas fees applies)",
             titleFontSize,
             { depth: 302 }
         );

@@ -74,12 +74,12 @@ export class ETHBalanceText {
 
         this.renderTexture.clear();
 
-        let ethBalanceString = "0.000000 ETH";
+        let ethBalanceString = "0.00000 ETH";
         if (balance !== null) {
             try {
                 if (web3 && web3.utils) {
                     const balanceInEth = web3.utils.fromWei(balance, 'ether');
-                    ethBalanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
+                    ethBalanceString = `${parseFloat(balanceInEth).toFixed(5)} ETH`;
                 } else {
                     ethBalanceString = `${balance} WEI`;
                 }

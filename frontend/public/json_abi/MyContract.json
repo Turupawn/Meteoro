@@ -584,10 +584,10 @@
   },
   {
     "type": "function",
-    "name": "setTieRewardAmount",
+    "name": "setTieRewardMultiplier",
     "inputs": [
       {
-        "name": "_newAmount",
+        "name": "_newMultiplier",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -597,7 +597,7 @@
   },
   {
     "type": "function",
-    "name": "tieRewardAmount",
+    "name": "tieRewardMultiplier",
     "inputs": [],
     "outputs": [
       {
@@ -751,19 +751,6 @@
   },
   {
     "type": "event",
-    "name": "TieRewardAmountUpdated",
-    "inputs": [
-      {
-        "name": "newAmount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "TieRewardMinted",
     "inputs": [
       {
@@ -780,6 +767,19 @@
       },
       {
         "name": "gameId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TieRewardMultiplierUpdated",
+    "inputs": [
+      {
+        "name": "newMultiplier",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
