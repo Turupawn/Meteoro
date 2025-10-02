@@ -6,6 +6,7 @@ import { showErrorModal } from '../menus/errorModal.js';
 const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json";
 const GAS_LIMIT = 300000;
+const GAS_FEE_BUFFER_ETH = 0.00001;
 
 let web3;
 let my_contract;
@@ -515,7 +516,8 @@ export function getMinimumPlayableBalance() {
     if (!globalSelectedBetAmount) {
         throw new Error("Bet amount not initialized");
     }
-    return BigInt(globalSelectedBetAmount) + BigInt(globalSelectedBetAmount);
+    const gasFeeBufferWei = web3.utils.toWei(GAS_FEE_BUFFER_ETH.toString(), 'ether');
+    return BigInt(globalSelectedBetAmount) + BigInt(gasFeeBufferWei);
 }
 
 export function getRecommendedPlayableBalance() {
