@@ -1,4 +1,4 @@
-import { applyPerspectiveToQuadImageToRight, isLandscape } from '../../utils/utils.js';
+import { applyPerspectiveToQuadImageToRight, isLandscape, getCardDisplay } from '../../utils/utils.js';
 
 export class GameHistory {
     constructor(scene) {
@@ -130,7 +130,7 @@ export class GameHistory {
                 }
             }
             
-            const score = `${this.getCardDisplay(game.playerCard)}-${this.getCardDisplay(game.houseCard)}`;
+            const score = `${getCardDisplay(game.playerCard)}-${getCardDisplay(game.houseCard)}`;
             
             const textColor = isWin ? '#00FF00' : '#FF4444';
             const gameText = this.scene.add.text(0, 0, score, {
@@ -151,14 +151,5 @@ export class GameHistory {
             this.quadImage.setTexture('gameHistoryTexture');
             this.quadImage.setVisible(true);
         }
-    }
-
-    getCardDisplay(cardValue) {
-        if (cardValue === 14n) return "A";
-        if (cardValue === 11n) return "J";
-        if (cardValue === 12n) return "Q";
-        if (cardValue === 13n) return "K";
-        if (cardValue === 0n) return "?";
-        return cardValue.toString();
     }
 }

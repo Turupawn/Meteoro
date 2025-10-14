@@ -56,6 +56,25 @@
   },
   {
     "type": "function",
+    "name": "betAmountMultipliers",
+    "inputs": [
+      {
+        "name": "betAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "multiplier",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "betAmountsArray",
     "inputs": [
       {
@@ -299,9 +318,33 @@
         "name": "gameId",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getGames",
+    "inputs": [
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "recentHistory",
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "ascendant",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
         "type": "tuple[]",
         "internalType": "struct TwoPartyWarGame.Game[]",
         "components": [
@@ -367,27 +410,47 @@
   },
   {
     "type": "function",
-    "name": "getGames",
+    "name": "getInitialFrontendGameState",
     "inputs": [
       {
-        "name": "offset",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "ascendant",
-        "type": "bool",
-        "internalType": "bool"
+        "name": "player",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "playerEthBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "playerGachaTokenBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gameState",
+        "type": "uint8",
+        "internalType": "enum TwoPartyWarGame.State"
+      },
+      {
+        "name": "playerCommit",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "houseRandomness",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "gameId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "recentHistory",
         "type": "tuple[]",
         "internalType": "struct TwoPartyWarGame.Game[]",
         "components": [
@@ -558,6 +621,24 @@
   },
   {
     "type": "function",
+    "name": "setBetAmountMultiplier",
+    "inputs": [
+      {
+        "name": "_betAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_multiplier",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setBetAmounts",
     "inputs": [
       {
@@ -653,6 +734,25 @@
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "BetAmountMultiplierUpdated",
+    "inputs": [
+      {
+        "name": "betAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "multiplier",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
