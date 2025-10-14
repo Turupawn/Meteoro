@@ -1,5 +1,5 @@
 import Web3 from 'web3';
-import { printLog } from '../utils/utils.js';
+import { printLog, getCardDisplay } from '../utils/utils.js';
 import { captureBlockchainError } from '../session_tracking.js';
 import { showErrorModal } from '../menus/errorModal.js';
 
@@ -16,6 +16,7 @@ let globalGasPrice = null;
 let globalNonce = null;
 let globalETHBalance = null;
 let globalGachaTokenBalance = null;
+let globalRecentHistory = null;
 let lastGasPriceUpdate = 0;
 const GAS_PRICE_UPDATE_INTERVAL = 60000;
 
@@ -77,6 +78,39 @@ export async function initWeb3() {
   
 }
 
+export async function checkInitialGameState() {
+    try {
+        const wallet = getLocalWallet();
+        if (!wallet) {
+            return null;
+        }
+        
+        const gameStateTemp = await my_contract.methods.getInitialFrontendGameState(wallet.address).call({}, 'pending');
+        globalETHBalance = gameStateTemp.playerEthBalance;
+        globalGachaTokenBalance = gameStateTemp.playerGachaTokenBalance;
+        globalRecentHistory = gameStateTemp.recentHistory;
+        const gameState = {
+            playerETHBalance: gameStateTemp.playerEthBalance,
+            playerGachaTokenBalance: gameStateTemp.playerGachaTokenBalance,
+            gameState: gameStateTemp.gameState,
+            playerCommit: gameStateTemp.playerCommit,
+            houseRandomness: gameStateTemp.houseRandomness,
+            gameId: gameStateTemp.gameId,
+            recentHistory: gameStateTemp.recentHistory
+        };
+        return gameState;
+    } catch (error) {
+        console.error("Error checking initial game state:", error);
+        showErrorModal("Failed to check initial game state: " + error.message + " (code " + (error.code || 'unknown') + ")");
+        captureBlockchainError(error, 'checkInitialGameState', {
+            contract_address: MY_CONTRACT_ADDRESS,
+            error_type: 'blockchain_call_failed'
+        });
+        
+        return null;
+    }
+}
+
 export async function checkGameState() {
     try {
         const wallet = getLocalWallet();
@@ -94,7 +128,7 @@ export async function checkGameState() {
             playerCommit: gameStateTemp.playerCommit,
             houseRandomness: gameStateTemp.houseRandomness,
             gameId: gameStateTemp.gameId,
-            recentHistory: gameStateTemp.recentHistory
+            recentHistory: globalRecentHistory
         };
         return gameState;
     } catch (error) {
@@ -533,6 +567,48 @@ export function getPlayerETHBalance() {
 
 export function getPlayerGachaTokenBalance() {
     return globalGachaTokenBalance;
+}
+
+export function addPendingGameToHistory() {
+    if (!globalRecentHistory) {
+        globalRecentHistory = [];
+    }
+    
+    const newGame = {
+        gameState: 1, // Committed state
+        playerAddress: getLocalWallet()?.address || "0x0",
+        playerCommit: "0x0",
+        commitTimestamp: Math.floor(Date.now() / 1000),
+        betAmount: globalSelectedBetAmount || "0",
+        houseRandomness: "0x0",
+        houseRandomnessTimestamp: 0,
+        playerSecret: "0x0",
+        playerCard: "?", // Placeholder
+        houseCard: "?", // Placeholder
+        revealTimestamp: 0
+    };
+    
+    // Add to the beginning of the array (most recent first)
+    globalRecentHistory.unshift(newGame);
+    
+    // Keep only the last 10 games (MAX_RETURN_HISTORY)
+    if (globalRecentHistory.length > 10) {
+        globalRecentHistory = globalRecentHistory.slice(0, 10);
+    }
+}
+
+export function updateLastGameInHistory(playerCard, houseCard) {
+    if (!globalRecentHistory || globalRecentHistory.length === 0) {
+        return;
+    }
+    
+    // Update the first (most recent) game with the actual results
+    const lastGame = globalRecentHistory[0];
+    if (lastGame && lastGame.playerCard === "?" && lastGame.houseCard === "?") {
+        lastGame.playerCard = getCardDisplay(playerCard);
+        lastGame.houseCard = getCardDisplay(houseCard);
+        lastGame.revealTimestamp = Math.floor(Date.now() / 1000);
+    }
 }
 
 export { web3, my_contract }; 

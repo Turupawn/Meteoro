@@ -176,7 +176,7 @@ contract TwoPartyWarGame is Ownable, Pausable {
     }
 
     // View functions
-    function getFrontendGameState(address player) external view returns (
+    function getInitialFrontendGameState(address player) external view returns (
         uint playerEthBalance,
         uint playerGachaTokenBalance,
         State gameState,
@@ -205,6 +205,26 @@ contract TwoPartyWarGame is Ownable, Pausable {
             playerGame.houseRandomness,
             currentGameId,
             recentHistory
+        );
+    }
+
+    function getFrontendGameState(address player) external view returns (
+        uint playerEthBalance,
+        uint playerGachaTokenBalance,
+        State gameState,
+        bytes32 playerCommit,
+        bytes32 houseRandomness,
+        uint gameId
+    ) {
+        uint currentGameId = getCurrentGameId(player);
+        Game storage playerGame = games[currentGameId];
+        return (
+            player.balance,
+            gachaToken.balanceOf(player),
+            playerGame.gameState,
+            playerGame.playerCommit,
+            playerGame.houseRandomness,
+            currentGameId
         );
     }
 

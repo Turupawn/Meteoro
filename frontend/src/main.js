@@ -4,6 +4,7 @@ import {
     initWeb3, 
     getLocalWallet, 
     checkGameState, 
+    checkInitialGameState,
     commit,
     performReveal, 
     updateGasPrice,
@@ -11,7 +12,8 @@ import {
     initializeBetAmount,
     web3,
     getPlayerETHBalance,
-    getMinimumPlayableBalance
+    getMinimumPlayableBalance,
+    addPendingGameToHistory
 } from './web3/blockchain_stuff.js';
 
 import { 
@@ -165,8 +167,8 @@ async function loadGameData() {
     await initializeNonce();
     gameDataLoadingProgress = 0.9;
     updateGameDataProgress(0.9);
-    console.log("Checking game state...")
-    gameState = await checkGameState();
+    console.log("Checking initial game state...")
+    gameState = await checkInitialGameState();
 
     // Convert BigInt values to strings for readable output (recursive)
     const convertBigIntToString = (obj) => {
@@ -184,7 +186,7 @@ async function loadGameData() {
     };
     
     const gameStateForLog = convertBigIntToString(gameState);
-    console.log("Initial game state from getFrontendGameState:", JSON.stringify(gameStateForLog, null, 2));
+    console.log("Initial game state from getInitialFrontendGameState:", JSON.stringify(gameStateForLog, null, 2));
 
     const pendingReveal = getPendingReveal();
     if (pendingReveal) {
@@ -231,6 +233,11 @@ window.addEventListener('gameReady', () => {
   updateGameState();
 });
 
+// Listen for when cards are displayed to update game state
+window.addEventListener('cardsDisplayed', () => {
+  updateGameState();
+});
+
 loadDapp()
 
 const onContractInitCallback = async () => {
@@ -265,14 +272,6 @@ function clearStoredSecret() {
     localStorage.removeItem('playerSecret');
     clearStoredCommit()
     clearPendingReveal()
-}
-
-function getCardDisplay(cardValue) {
-    if (cardValue === 14) return "A";  // Ace is now 14 (strongest)
-    if (cardValue === 11) return "J";
-    if (cardValue === 12) return "Q";
-    if (cardValue === 13) return "K";
-    return cardValue.toString();
 }
 
 async function gameLoop() {
@@ -328,6 +327,8 @@ async function gameLoop() {
             if (gameScene) {
                 gameScene.updateCardDisplay(result.playerCard, result.houseCard);
             }
+            
+
             printLog(['debug'], "Conditions met for reveal, attempting...");
             
             // Mark transaction as in progress
@@ -552,6 +553,10 @@ function clearPendingReveal() {
 export async function commitGame() {
     gameScene.cardDisplay.clearCardSprites();
     shouldProcessCommit = true;
+    
+    // Add pending game to history immediately when play button is hit
+    addPendingGameToHistory();
+    updateGameState(); // Update the display to show the new history entry
     
     // Track manual commit request
     captureGameEvent('commit_game_called', {

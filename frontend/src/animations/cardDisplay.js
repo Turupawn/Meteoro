@@ -1,5 +1,6 @@
-import { isLandscape } from '../utils/utils.js';
+import { isLandscape, getCardDisplay } from '../utils/utils.js';
 import { TieSequence } from './tieSequence.js';
+import { updateLastGameInHistory } from '../web3/blockchain_stuff.js';
 
 export class CardDisplay {
     constructor(scene) {
@@ -44,6 +45,10 @@ export class CardDisplay {
 
     updateCurrentGameDisplay(playerCard = null, houseCard = null) {
         if (playerCard !== null && houseCard !== null) {
+            // Store the card values for later use
+            this.currentPlayerCard = playerCard;
+            this.currentHouseCard = houseCard;
+            
             // Increment game count
             this.gameCount++;
             
@@ -114,14 +119,14 @@ export class CardDisplay {
             .setOrigin(0.5)
             .setAlpha(0);
         
-        this.playerCardText = this.scene.add.text(leftCardX, cardY, this.getCardDisplay(playerCard), {
+        this.playerCardText = this.scene.add.text(leftCardX, cardY, getCardDisplay(playerCard), {
             font: `${this.cardFontSize}px Orbitron`, // Changed from Arial to Orbitron
             fill: "#FFFFFF",
             stroke: "#000000",
             strokeThickness: 8 // Increased from 5 to 8 for better visibility
         }).setOrigin(0.5).setAlpha(0);
         
-        this.houseCardText = this.scene.add.text(rightCardX, cardY, this.getCardDisplay(houseCard), {
+        this.houseCardText = this.scene.add.text(rightCardX, cardY, getCardDisplay(houseCard), {
             font: `${this.cardFontSize}px Orbitron`, // Changed from Arial to Orbitron
             fill: "#FFFFFF",
             stroke: "#000000",
@@ -383,6 +388,13 @@ export class CardDisplay {
                 ease: 'Power2'
             });
         }
+        
+        // Update game history after the delay when both card numbers are fully visible
+        this.scene.time.delayedCall(400, () => {
+            updateLastGameInHistory(this.currentPlayerCard, this.currentHouseCard);
+            // Dispatch event to trigger UI update
+            window.dispatchEvent(new CustomEvent('cardsDisplayed'));
+        });
     }
 
     triggerWinParticleAnimation() {
@@ -696,13 +708,5 @@ export class CardDisplay {
         
         this.playerCardData = null;
         this.houseCardData = null;
-    }
-
-    getCardDisplay(cardValue) {
-        if (cardValue === 14) return "A";  // Ace is now 14 (strongest)
-        if (cardValue === 11) return "J";
-        if (cardValue === 12) return "Q";
-        if (cardValue === 13) return "K";
-        return cardValue.toString();
     }
 }
