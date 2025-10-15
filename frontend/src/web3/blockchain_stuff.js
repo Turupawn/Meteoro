@@ -12,6 +12,8 @@ let web3;
 let my_contract;
 let globalSelectedBetAmount = null;
 let globalBetAmountsArray = null;
+let globalBetAmountMultipliers = null;
+let globalTieRewardMultiplier = null;
 let globalGasPrice = null;
 let globalNonce = null;
 let globalETHBalance = null;
@@ -89,6 +91,12 @@ export async function checkInitialGameState() {
         globalETHBalance = gameStateTemp.playerEthBalance;
         globalGachaTokenBalance = gameStateTemp.playerGachaTokenBalance;
         globalRecentHistory = gameStateTemp.recentHistory;
+        
+        // Store bet amounts and multipliers globally
+        globalBetAmountsArray = gameStateTemp.betAmounts;
+        globalBetAmountMultipliers = gameStateTemp.betAmountMultipliersArray;
+        globalTieRewardMultiplier = gameStateTemp.tieRewardMultiplierValue;
+        
         const gameState = {
             playerETHBalance: gameStateTemp.playerEthBalance,
             playerGachaTokenBalance: gameStateTemp.playerGachaTokenBalance,
@@ -96,7 +104,10 @@ export async function checkInitialGameState() {
             playerCommit: gameStateTemp.playerCommit,
             houseRandomness: gameStateTemp.houseRandomness,
             gameId: gameStateTemp.gameId,
-            recentHistory: gameStateTemp.recentHistory
+            recentHistory: gameStateTemp.recentHistory,
+            tieRewardMultiplier: gameStateTemp.tieRewardMultiplierValue,
+            betAmounts: gameStateTemp.betAmounts,
+            betAmountMultipliers: gameStateTemp.betAmountMultipliersArray
         };
         return gameState;
     } catch (error) {
@@ -535,6 +546,21 @@ export async function initializeBetAmount() {
 export function getBetAmountsArray() {
     return globalBetAmountsArray;
 }
+
+export function getBetAmountMultiplier(betAmount) {
+    if (!globalBetAmountsArray || !globalBetAmountMultipliers) {
+        return 1; // Default to 1x if not available
+    }
+    
+    const index = globalBetAmountsArray.indexOf(betAmount);
+    if (index === -1) {
+        return 1; // Default to 1x if bet amount not found
+    }
+    
+    return globalBetAmountMultipliers[index] || 1;
+}
+
+
 
 export function setSelectedBetAmount(betAmount) {
     globalSelectedBetAmount = betAmount;

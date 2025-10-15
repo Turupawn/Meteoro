@@ -486,7 +486,7 @@ async function updateGameState() {
         const wallet = getLocalWallet()
         // Use the game scene reference instead of hardcoded index
         if (gameScene) {
-            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, gameState.recentHistory, wallet.address);
+            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, gameState.recentHistory, wallet.address, gameState);
         }
     } catch (error) {
         console.error("Error updating game state:", error);

@@ -183,7 +183,10 @@ contract TwoPartyWarGame is Ownable, Pausable {
         bytes32 playerCommit,
         bytes32 houseRandomness,
         uint gameId,
-        Game[] memory recentHistory
+        Game[] memory recentHistory,
+        uint tieRewardMultiplierValue,
+        uint[] memory betAmounts,
+        uint[] memory betAmountMultipliersArray
     ) {
         uint currentGameId = getCurrentGameId(player);
         Game storage playerGame = games[currentGameId];
@@ -197,6 +200,14 @@ contract TwoPartyWarGame is Ownable, Pausable {
             recentHistory[i] = games[gameIdToAdd];
         }
 
+        betAmounts = betAmountsArray;
+        betAmountMultipliersArray = new uint[](betAmountsArray.length);
+        
+        for (uint i = 0; i < betAmountsArray.length; i++) {
+            uint multiplier = betAmountMultipliers[betAmountsArray[i]];
+            betAmountMultipliersArray[i] = multiplier == 0 ? 1 : multiplier;
+        }
+
         return (
             player.balance,
             gachaToken.balanceOf(player),
@@ -204,7 +215,10 @@ contract TwoPartyWarGame is Ownable, Pausable {
             playerGame.playerCommit,
             playerGame.houseRandomness,
             currentGameId,
-            recentHistory
+            recentHistory,
+            tieRewardMultiplier,
+            betAmounts,
+            betAmountMultipliersArray
         );
     }
 

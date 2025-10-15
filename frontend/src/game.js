@@ -73,12 +73,17 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    updateDisplay(balance = null, gachaTokenBalance = null, recentHistory = null, playerAddress = null) {
+    updateDisplay(balance = null, gachaTokenBalance = null, recentHistory = null, playerAddress = null, gameState = null) {
         this.currentBalance = balance;
         this.ethBalanceText.updateBalance(balance);
         this.gachaTokenBalanceText.updateBalance(gachaTokenBalance);
         this.cardDisplay.updateCurrentGameDisplay();
         this.gameHistory.updateGameHistory(recentHistory, playerAddress);
+        
+        // Update TieSequence with game state
+        if (this.tieSequence && gameState) {
+            this.tieSequence.gameState = gameState;
+        }
         
         if (this.betMenuButton) {
             this.betMenuButton.updateDisplay();

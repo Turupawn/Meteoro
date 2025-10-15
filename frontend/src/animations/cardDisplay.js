@@ -65,7 +65,7 @@ export class CardDisplay {
                 this.currentGameText.setText(`You earned GACHA!`);
                 if (this.scene.tieSequence) {
                     this.scene.time.delayedCall(2000, () => {
-                        this.scene.tieSequence.startTieSequence();
+                        this.scene.tieSequence.startTieSequence(playerCard, houseCard);
                     });
                 } else {
                     console.log("ERROR: TieSequence not found");
