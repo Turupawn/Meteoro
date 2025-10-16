@@ -447,7 +447,7 @@ async function gameLoop() {
     }
 }
 
-async function updateGameState() {
+export async function updateGameState() {
     try {
         if (!gameState) return;
         const wallet = getLocalWallet()
@@ -463,9 +463,6 @@ async function updateGameState() {
 function startGameLoop() {
     gameLoop();
     setInterval(gameLoop, POLL_INTERVAL);
-}
-
-const onWalletConnectedCallback = async () => {
 }
 
 function storeCommit(secret) {

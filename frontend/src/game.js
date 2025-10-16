@@ -14,7 +14,7 @@ import { MainMenu } from './menus/mainMenu.js';
 import { BetMenu } from './menus/betMenu.js';
 import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
 import { setErrorModal, ErrorModal } from './menus/errorModal.js';
-import { setGameScene } from './main.js';
+import { setGameScene, updateGameState } from './main.js';
 import { printLog } from './utils/utils.js';
 import { getMinimumPlayableBalance } from './web3/blockchain_stuff.js';
 
@@ -98,6 +98,8 @@ class GameScene extends Phaser.Scene {
 
     onBetAmountChanged(newBetAmount) {
         console.log('Bet amount changed to:', newBetAmount);
+        // Update the UI immediately when bet amount changes
+        updateGameState();
     }
 
     checkInsufficientBalance(balance) {
