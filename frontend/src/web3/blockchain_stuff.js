@@ -497,7 +497,8 @@ export async function withdrawFunds(destinationAddress) {
 export async function updateGasPrice() {
     try {
         const startTime = Date.now();
-        globalGasPrice = await web3.eth.getGasPrice('pending');
+        const gasPriceString = await web3.eth.getGasPrice('pending');
+        globalGasPrice = BigInt(gasPriceString);
         lastGasPriceUpdate = startTime;
         printLog(['profile'], "=== GAS PRICE UPDATE ===");
         printLog(['profile'], "New gas price:", globalGasPrice);
@@ -513,7 +514,12 @@ export async function getCurrentGasPrice() {
     if (!globalGasPrice || (now - lastGasPriceUpdate) > GAS_PRICE_UPDATE_INTERVAL) {
         await updateGasPrice();
     }
-    return globalGasPrice*2n;
+    
+    if (!globalGasPrice) {
+        throw new Error("Failed to get gas price");
+    }
+    
+    return globalGasPrice * 2n;
 }
 
 export async function initializeNonce() {
