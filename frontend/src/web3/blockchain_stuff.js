@@ -81,6 +81,7 @@ export async function initWeb3() {
 }
 
 export async function checkInitialGameState() {
+    const startTime = Date.now();
     try {
         const wallet = getLocalWallet();
         if (!wallet) {
@@ -133,8 +134,19 @@ export async function checkInitialGameState() {
             betAmounts: gameStateTemp.betAmounts,
             betAmountMultipliers: gameStateTemp.betAmountMultipliersArray
         };
+        
+        printLog(['profile'], "=== INITIAL GAME STATE LOAD ===");
+        printLog(['profile'], "Game state loaded successfully");
+        printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
+        printLog(['profile'], "=============================");
+        
         return gameState;
     } catch (error) {
+        printLog(['profile'], "=== INITIAL GAME STATE LOAD ===");
+        printLog(['profile'], "Game state load failed");
+        printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
+        printLog(['profile'], "=============================");
+        
         console.error("Error checking initial game state:", error);
         showErrorModal("Failed to check initial game state: " + error.message + " (code " + (error.code || 'unknown') + ")");
         captureBlockchainError(error, 'checkInitialGameState', {
@@ -412,7 +424,7 @@ export async function withdrawFunds(destinationAddress) {
             data: tokenTransferData,
             gas: 100000, // Gas for token transfer
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Transferring Gacha tokens...");
@@ -426,7 +438,7 @@ export async function withdrawFunds(destinationAddress) {
             value: ethAmountToSend.toString(),
             gas: 21000, // Standard gas for ETH transfer
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Transferring ETH...");
@@ -461,7 +473,7 @@ export async function withdrawFunds(destinationAddress) {
             value: amountToSend.toString(),
             gas: gasLimit,
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Withdrawing ETH only:", {
@@ -485,7 +497,7 @@ export async function withdrawFunds(destinationAddress) {
 export async function updateGasPrice() {
     try {
         const startTime = Date.now();
-        globalGasPrice = await web3.eth.getGasPrice();
+        globalGasPrice = await web3.eth.getGasPrice('pending');
         lastGasPriceUpdate = startTime;
         printLog(['profile'], "=== GAS PRICE UPDATE ===");
         printLog(['profile'], "New gas price:", globalGasPrice);
@@ -510,7 +522,7 @@ export async function initializeNonce() {
         if (!wallet) return;
         
         const startTime = Date.now();
-        globalNonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
+        globalNonce = await web3.eth.getTransactionCount(wallet.address, 'pending');
         printLog(['profile'], "=== NONCE INITIALIZATION ===");
         printLog(['profile'], "Initial nonce:", globalNonce);
         printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");

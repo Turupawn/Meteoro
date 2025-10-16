@@ -66,6 +66,10 @@ class GameScene extends Phaser.Scene {
         setErrorModal(this.errorModal);
         setGameScene(this);
 
+        this.time.delayedCall(100, () => {
+            updateGameState();
+        });
+
         this.time.delayedCall(1000, () => {
             printLog(['profile'], "Started lazy loading at:" + new Date().toISOString());
             this.lazyLoadCosmicScene();
