@@ -97,6 +97,30 @@ export async function checkInitialGameState() {
         globalBetAmountMultipliers = gameStateTemp.betAmountMultipliersArray;
         globalTieRewardMultiplier = gameStateTemp.tieRewardMultiplierValue;
         
+        printLog(['debug'], "Bet amounts array from contract:", gameStateTemp.betAmounts);
+        
+        if (gameStateTemp.betAmounts.length === 0) {
+            throw new Error("No bet amounts configured in contract");
+        }
+        
+        const storedBetAmount = localStorage.getItem('selectedBetAmount');
+        printLog(['debug'], "storedBetAmount", storedBetAmount);
+        
+        if (storedBetAmount) {
+            const storedBetAmountBigInt = BigInt(storedBetAmount);
+            const isValidBetAmount = gameStateTemp.betAmounts.includes(storedBetAmountBigInt);
+            if (isValidBetAmount) {
+                setSelectedBetAmount(storedBetAmountBigInt);
+                printLog(['debug'], "Using stored bet amount:", globalSelectedBetAmount);
+            } else {
+                setSelectedBetAmount(gameStateTemp.betAmounts[0]);
+                printLog(['debug'], "Stored bet amount no longer valid, selected first:", globalSelectedBetAmount);
+            }
+        } else {
+            setSelectedBetAmount(gameStateTemp.betAmounts[0]);
+            printLog(['debug'], "No stored bet amount, selected first:", globalSelectedBetAmount);
+        }
+        
         const gameState = {
             playerETHBalance: gameStateTemp.playerEthBalance,
             playerGachaTokenBalance: gameStateTemp.playerGachaTokenBalance,
@@ -504,44 +528,6 @@ export function getAndIncrementNonce() {
     return globalNonce++;
 }
 
-export async function initializeBetAmount() {
-    try {
-        // Get the bet amounts array in a single call
-        const betAmountsArray = await my_contract.methods.getBetAmountsArray().call();
-        globalBetAmountsArray = betAmountsArray;
-        printLog(['debug'], "Bet amounts array from contract:", betAmountsArray);
-
-        console.log("betAmountsArray", betAmountsArray);
-        
-        if (betAmountsArray.length === 0) {
-            throw new Error("No bet amounts configured in contract");
-        }
-        
-        const storedBetAmount = localStorage.getItem('selectedBetAmount');
-
-        printLog(['debug'], "storedBetAmount", storedBetAmount);
-        printLog(['debug'], "betAmountsArray", betAmountsArray);
-        
-        if (storedBetAmount) {
-            const storedBetAmountBigInt = BigInt(storedBetAmount);
-            const isValidBetAmount = betAmountsArray.includes(storedBetAmountBigInt);
-            if (isValidBetAmount) {
-                setSelectedBetAmount(storedBetAmountBigInt);
-                printLog(['debug'], "Using stored bet amount:", globalSelectedBetAmount);
-            } else {
-                setSelectedBetAmount(betAmountsArray[0]);
-                printLog(['debug'], "Stored bet amount no longer valid, selected first:", globalSelectedBetAmount);
-            }
-        } else {
-            setSelectedBetAmount(betAmountsArray[0]);
-            printLog(['debug'], "No stored bet amount, selected first:", globalSelectedBetAmount);
-        }
-        printLog(['debug'], "Bet amount initialized:", globalSelectedBetAmount);
-    } catch (error) {
-        printLog(['error'], "Error initializing bet amount:", error);
-        throw error;
-    }
-}
 
 export function getBetAmountsArray() {
     return globalBetAmountsArray;
@@ -559,8 +545,6 @@ export function getBetAmountMultiplier(betAmount) {
     
     return globalBetAmountMultipliers[index] || 1;
 }
-
-
 
 export function setSelectedBetAmount(betAmount) {
     globalSelectedBetAmount = betAmount;
@@ -580,19 +564,8 @@ export function getMinimumPlayableBalance() {
     return BigInt(globalSelectedBetAmount) + BigInt(gasFeeBufferWei);
 }
 
-export function getRecommendedPlayableBalance() {
-    if (!globalSelectedBetAmount) {
-        throw new Error("Bet amount not initialized");
-    }
-    return BigInt(globalSelectedBetAmount) * 10n;
-}
-
 export function getPlayerETHBalance() {
     return globalETHBalance;
-}
-
-export function getPlayerGachaTokenBalance() {
-    return globalGachaTokenBalance;
 }
 
 export function addPendingGameToHistory() {

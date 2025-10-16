@@ -9,7 +9,6 @@ import {
     performReveal, 
     updateGasPrice,
     initializeNonce,
-    initializeBetAmount,
     web3,
     getPlayerETHBalance,
     getMinimumPlayableBalance,
@@ -152,13 +151,6 @@ async function loadGameData() {
     while (!isWeb3Ready) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    gameDataLoadingProgress = 0.5;
-    updateGameDataProgress(0.5);
-    console.log("Initializing bet amount...")
-    await initializeBetAmount();
-    console.log("Updating gas price...")
-    await new Promise(resolve => setTimeout(resolve, 150));
-    gameDataLoadingProgress = 0.7;
     updateGameDataProgress(0.7);
     console.log("Updating gas price...")
     await updateGasPrice();
@@ -228,37 +220,12 @@ export function setLoadingScreenReady() {
     loadingScreenReady = true;
 }
 
-// Wait for game to be ready before starting
-window.addEventListener('gameReady', () => {
-  updateGameState();
-});
-
 // Listen for when cards are displayed to update game state
 window.addEventListener('cardsDisplayed', () => {
   updateGameState();
 });
 
 loadDapp()
-
-const onContractInitCallback = async () => {
-  try {
-    await initializeBetAmount();
-    
-    await updateGasPrice();
-    await initializeNonce();
-    
-    await checkGameState();
-    
-    updateGameState();
-    startGameLoop();
-        
-    window.dispatchEvent(new CustomEvent('gameReady'));
-    
-  } catch (error) {
-    console.error("Error in contract initialization:", error);
-
-  }
-}
 
 function getStoredSecret() {
     const secretData = localStorage.getItem('playerSecret');
