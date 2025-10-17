@@ -18,7 +18,6 @@ let globalGasPrice = null;
 let globalNonce = null;
 let globalETHBalance = null;
 let globalGachaTokenBalance = null;
-let globalRecentHistory = null;
 let lastGasPriceUpdate = 0;
 const GAS_PRICE_UPDATE_INTERVAL = 60000;
 
@@ -91,7 +90,6 @@ export async function checkInitialGameState() {
         const gameStateTemp = await my_contract.methods.getInitialFrontendGameState(wallet.address).call({}, 'pending');
         globalETHBalance = gameStateTemp.playerEthBalance;
         globalGachaTokenBalance = gameStateTemp.playerGachaTokenBalance;
-        globalRecentHistory = gameStateTemp.recentHistory;
         
         // Store bet amounts and multipliers globally
         globalBetAmountsArray = gameStateTemp.betAmounts;
@@ -174,8 +172,7 @@ export async function checkGameState() {
             gameState: gameStateTemp.gameState,
             playerCommit: gameStateTemp.playerCommit,
             houseRandomness: gameStateTemp.houseRandomness,
-            gameId: gameStateTemp.gameId,
-            recentHistory: globalRecentHistory
+            gameId: gameStateTemp.gameId
         };
         return gameState;
     } catch (error) {
@@ -584,48 +581,6 @@ export function getMinimumPlayableBalance() {
 
 export function getPlayerETHBalance() {
     return globalETHBalance;
-}
-
-export function addPendingGameToHistory() {
-    if (!globalRecentHistory) {
-        globalRecentHistory = [];
-    }
-    
-    const newGame = {
-        gameState: 1, // Committed state
-        playerAddress: getLocalWallet()?.address || "0x0",
-        playerCommit: "0x0",
-        commitTimestamp: Math.floor(Date.now() / 1000),
-        betAmount: globalSelectedBetAmount || "0",
-        houseRandomness: "0x0",
-        houseRandomnessTimestamp: 0,
-        playerSecret: "0x0",
-        playerCard: "?", // Placeholder
-        houseCard: "?", // Placeholder
-        revealTimestamp: 0
-    };
-    
-    // Add to the beginning of the array (most recent first)
-    globalRecentHistory.unshift(newGame);
-    
-    // Keep only the last 10 games (MAX_RETURN_HISTORY)
-    if (globalRecentHistory.length > 10) {
-        globalRecentHistory = globalRecentHistory.slice(0, 10);
-    }
-}
-
-export function updateLastGameInHistory(playerCard, houseCard) {
-    if (!globalRecentHistory || globalRecentHistory.length === 0) {
-        return;
-    }
-    
-    // Update the first (most recent) game with the actual results
-    const lastGame = globalRecentHistory[0];
-    if (lastGame && lastGame.playerCard === "?" && lastGame.houseCard === "?") {
-        lastGame.playerCard = getCardDisplay(playerCard);
-        lastGame.houseCard = getCardDisplay(houseCard);
-        lastGame.revealTimestamp = Math.floor(Date.now() / 1000);
-    }
 }
 
 export { web3, my_contract }; 

@@ -11,8 +11,7 @@ import {
     initializeNonce,
     web3,
     getPlayerETHBalance,
-    getMinimumPlayableBalance,
-    addPendingGameToHistory
+    getMinimumPlayableBalance
 } from './web3/blockchain_stuff.js';
 
 import { 
@@ -49,6 +48,7 @@ let loadingScreenReady = false;
 let isTransactionInProgress = false;
 let lastTransactionHash = null;
 
+let initialRecentHistory = [];
 async function loadDapp() {
   try {
     // Set up wallet address getter for error tracking
@@ -161,6 +161,7 @@ async function loadGameData() {
     updateGameDataProgress(0.9);
     console.log("Checking initial game state...")
     gameState = await checkInitialGameState();
+    initialRecentHistory = gameState.recentHistory;
 
     // Convert BigInt values to strings for readable output (recursive)
     const convertBigIntToString = (obj) => {
@@ -213,6 +214,7 @@ async function loadGameData() {
 // Function to set the game scene reference
 export function setGameScene(scene) {
     gameScene = scene;
+    gameScene.gameHistory.initializeHistory(initialRecentHistory);
 }
 
 // Function to notify that loading screen is ready
@@ -453,7 +455,7 @@ export async function updateGameState() {
         const wallet = getLocalWallet()
         // Use the game scene reference instead of hardcoded index
         if (gameScene) {
-            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, gameState.recentHistory, wallet.address, gameState);
+            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, wallet.address, gameState);
         }
     } catch (error) {
         console.error("Error updating game state:", error);
@@ -519,8 +521,12 @@ export async function commitGame() {
     shouldProcessCommit = true;
     
     // Add pending game to history immediately when play button is hit
-    addPendingGameToHistory();
-    updateGameState(); // Update the display to show the new history entry
+    gameScene.gameHistory.addPendingGameToHistory();
+    
+    // Add a small delay to prevent race conditions with the game loop
+    setTimeout(() => {
+        updateGameState(); // Update the display to show the new history entry
+    }, 100);
     
     // Track manual commit request
     captureGameEvent('commit_game_called', {

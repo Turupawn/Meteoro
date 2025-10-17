@@ -12,6 +12,7 @@ export class BigWinAnimation {
         this.collectButtonBg = null;
         this.zoomTween = null;
         this.pulseTween = null;
+        this.countingTimer = null;
     }
 
     startBigWinAnimation(winAmount, showBigWinText = true) {
@@ -91,8 +92,8 @@ export class BigWinAnimation {
         }).setOrigin(0.5);
         this.numberText.setDepth(401);
         
-        // Convert win amount from wei to ether for display
-        this.targetAmount = winAmount / 1e18;
+        // Use win amount directly (already in the correct units)
+        this.targetAmount = winAmount;
     }
 
     createGachaText() {
@@ -219,9 +220,15 @@ export class BigWinAnimation {
         let currentValue = 0;
         let step = 0;
         
-        const countingTimer = this.scene.time.addEvent({
+        this.countingTimer = this.scene.time.addEvent({
             delay: stepDuration,
             callback: () => {
+                // Check if numberText still exists before trying to update it
+                if (!this.numberText) {
+                    this.countingTimer.destroy();
+                    return;
+                }
+                
                 currentValue += increment;
                 step++;
                 
@@ -231,7 +238,7 @@ export class BigWinAnimation {
                     // Format the number to show up to 4 decimal places
                     const formattedValue = currentValue.toFixed(4).replace(/\.?0+$/, '');
                     this.numberText.setText(formattedValue);
-                    countingTimer.destroy();
+                    this.countingTimer.destroy();
                 } else {
                     // Format the number to show up to 4 decimal places
                     const formattedValue = currentValue.toFixed(4).replace(/\.?0+$/, '');
@@ -245,7 +252,7 @@ export class BigWinAnimation {
     closeBigWinAnimation() {
         this.isActive = false;
         
-        // Stop all animations
+        // Stop all animations and timers
         if (this.zoomTween) {
             this.zoomTween.stop();
             this.zoomTween = null;
@@ -253,6 +260,10 @@ export class BigWinAnimation {
         if (this.pulseTween) {
             this.pulseTween.stop();
             this.pulseTween = null;
+        }
+        if (this.countingTimer) {
+            this.countingTimer.destroy();
+            this.countingTimer = null;
         }
         
         // Destroy all elements

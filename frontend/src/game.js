@@ -51,7 +51,7 @@ class GameScene extends Phaser.Scene {
         this.tieSequence = new TieSequence(this);
         this.ethBalanceText = new ETHBalanceText(this);
         this.gachaTokenBalanceText = new GachaTokenBalanceText(this);
-        this.gameHistory = new GameHistory(this);
+        this.gameHistory = new GameHistory(this, );
         this.playButton = new PlayButton(this);
         this.mainMenu = new MainMenu(this);
         this.betMenu = new BetMenu(this);
@@ -77,12 +77,12 @@ class GameScene extends Phaser.Scene {
         });
     }
 
-    updateDisplay(balance = null, gachaTokenBalance = null, recentHistory = null, playerAddress = null, gameState = null) {
+    updateDisplay(balance = null, gachaTokenBalance = null, gameState = null) {
         this.currentBalance = balance;
         this.ethBalanceText.updateBalance(balance);
         this.gachaTokenBalanceText.updateBalance(gachaTokenBalance);
         this.cardDisplay.updateCurrentGameDisplay();
-        this.gameHistory.updateGameHistory(recentHistory, playerAddress);
+        this.gameHistory.updateGameHistory();
         
         // Update TieSequence with game state
         if (this.tieSequence && gameState) {
