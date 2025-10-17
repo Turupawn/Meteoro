@@ -175,6 +175,15 @@ export class GameHistory {
     }
 
     addPendingGameToHistory() {
+        // Check if there's already a pending game (most recent game with ?-?)
+        if (this.recentHistory.length > 0) {
+            const mostRecentGame = this.recentHistory[0];
+            if (mostRecentGame && mostRecentGame.playerCard === "?" && mostRecentGame.houseCard === "?") {
+                // Already have a pending game, don't add another one
+                return;
+            }
+        }
+        
         const newGame = {
             gameState: 1, // Committed state
             playerAddress: "0x0", // Will be updated when we have access to wallet

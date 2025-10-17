@@ -520,6 +520,11 @@ export async function commitGame() {
     gameScene.cardDisplay.clearCardSprites();
     shouldProcessCommit = true;
     
+    // Update the previous game's history with actual card values if they exist
+    if (gameScene.cardDisplay.currentPlayerCard !== null && gameScene.cardDisplay.currentHouseCard !== null) {
+        gameScene.gameHistory.updateLastGameInHistory(gameScene.cardDisplay.currentPlayerCard, gameScene.cardDisplay.currentHouseCard);
+    }
+    
     // Add pending game to history immediately when play button is hit
     gameScene.gameHistory.addPendingGameToHistory();
     

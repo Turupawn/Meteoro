@@ -67,9 +67,15 @@ export class PlayButton {
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
         const clickHandler = async () => {
+            // Immediately disable the button to prevent rapid clicking
+            this.disableButton();
+            
             const hasInsufficientBalance = await this.checkInsufficientBalance();
             
             if (hasInsufficientBalance) {
+                // Re-enable button if insufficient balance
+                this.enableButton();
+                
                 if (this.scene.insufficientBalanceMenu) {
                     this.scene.insufficientBalanceMenu.show(true); // Force show when play button is clicked
                     this.scene.insufficientBalanceMenu.triggerShakeAnimation();
@@ -106,5 +112,15 @@ export class PlayButton {
             console.error('Error checking balance:', error);
             return false;
         }
+    }
+    
+    enableButton() {
+        this.button.setInteractive(true);
+        this.buttonBg.setInteractive(true);
+    }
+    
+    disableButton() {
+        this.button.setInteractive(false);
+        this.buttonBg.setInteractive(false);
     }
 }
