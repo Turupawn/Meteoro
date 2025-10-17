@@ -235,14 +235,12 @@ export class BigWinAnimation {
                 // Ensure we don't go over the target
                 if (currentValue >= this.targetAmount) {
                     currentValue = this.targetAmount;
-                    // Format the number to show up to 4 decimal places
                     const formattedValue = currentValue.toFixed(4).replace(/\.?0+$/, '');
                     this.numberText.setText(formattedValue);
                     this.countingTimer.destroy();
                 } else {
-                    // Format the number to show up to 4 decimal places
-                    const formattedValue = currentValue.toFixed(4).replace(/\.?0+$/, '');
-                    this.numberText.setText(formattedValue);
+                    const integerValue = Math.floor(currentValue);
+                    this.numberText.setText(integerValue.toString());
                 }
             },
             loop: true
