@@ -4,6 +4,7 @@ import { captureBlockchainError } from '../session_tracking.js';
 import { showErrorModal } from '../menus/errorModal.js';
 
 const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
+const RPC_URL = import.meta.env.RPC_URL;
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json";
 const GAS_LIMIT = 300000;
 const GAS_FEE_BUFFER_ETH = 0.00001;
@@ -31,7 +32,7 @@ export function getLocalWallet() {
 
 export const getWeb3 = async () => {
   return new Promise((resolve, reject) => {
-    const provider = new Web3.providers.HttpProvider("https://carrot.megaeth.com/rpc");
+    const provider = new Web3.providers.HttpProvider(RPC_URL);
     const web3 = new Web3(provider);
     resolve(web3);
   });
