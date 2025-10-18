@@ -81,6 +81,7 @@ export class CardDisplay {
                 
                 if (this.scene.background && this.scene.background.endBoostAnimation) {
                     this.scene.background.endBoostAnimation();
+                    this.scene.portraitDisplay.endAnimation();
                 }
 
                 if (playerCard > houseCard) {

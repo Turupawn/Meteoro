@@ -3,6 +3,7 @@ import { Background } from './animations/background.js';
 import { CardDisplay } from './animations/cardDisplay.js';
 import { TieSequence } from './animations/tieSequence.js';
 import { LoadingScreen } from './animations/loadingScreen.js';
+import { PortraitDisplay } from './animations/portraitDisplay.js';
 import { OpenMenuButton } from './hud/hudButtons/openMenuButton.js';
 import { BetMenuButton } from './hud/hudButtons/betMenuButton.js';
 import { PlayButton } from './hud/hudButtons/playButton.js';
@@ -15,7 +16,7 @@ import { BetMenu } from './menus/betMenu.js';
 import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
 import { setErrorModal, ErrorModal } from './menus/errorModal.js';
 import { setGameScene, updateGameState } from './main.js';
-import { printLog } from './utils/utils.js';
+import { printLog, isLandscape } from './utils/utils.js';
 import { getMinimumPlayableBalance } from './web3/blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
@@ -49,6 +50,7 @@ class GameScene extends Phaser.Scene {
         this.background = new Background(this);
         this.cardDisplay = new CardDisplay(this);
         this.tieSequence = new TieSequence(this);
+        this.portraitDisplay = new PortraitDisplay(this);
         this.ethBalanceText = new ETHBalanceText(this);
         this.gachaTokenBalanceText = new GachaTokenBalanceText(this);
         this.gameHistory = new GameHistory(this, );
@@ -82,7 +84,17 @@ class GameScene extends Phaser.Scene {
         this.ethBalanceText.updateBalance(balance);
         this.gachaTokenBalanceText.updateBalance(gachaTokenBalance);
         this.cardDisplay.updateCurrentGameDisplay();
-        this.gameHistory.updateGameHistory();
+        
+        this.portraitDisplay.updatePortrait();
+        
+        if (isLandscape()) {
+            this.gameHistory.updateGameHistory();
+        } else {
+            // In portrait mode, ensure game history is completely hidden
+            if (this.gameHistory.quadImage) {
+                this.gameHistory.quadImage.setVisible(false);
+            }
+        }
         
         // Update TieSequence with game state
         if (this.tieSequence && gameState) {
@@ -110,7 +122,7 @@ class GameScene extends Phaser.Scene {
 
     onBetAmountChanged(newBetAmount) {
         console.log('Bet amount changed to:', newBetAmount);
-        // Update the UI immediately when bet amount changes
+        this.portraitDisplay.updatePortrait();
         updateGameState();
     }
 

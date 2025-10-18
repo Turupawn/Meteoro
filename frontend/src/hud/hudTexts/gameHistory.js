@@ -55,6 +55,7 @@ export class GameHistory {
 
         this.renderTexture.saveTexture('gameHistoryTexture');
 
+        // Only create quadImage in landscape mode
         if(isLandscape()) {
             this.quadImage = this.scene.add.rexQuadImage({
                 x: 236+50,
@@ -71,21 +72,20 @@ export class GameHistory {
             let perspectiveY = this.quadImage.topLeft.y + 300;
 
             applyPerspectiveToQuadImageToRight(this.quadImage, perspectiveX, perspectiveY);
+            this.quadImage.setVisible(false);
         } else {
-            this.quadImage = this.scene.add.rexQuadImage({
-                x: 236+50,
-                y: 350,
-                texture: 'gameHistoryTexture',
-                ninePointMode: false
-            
-            });
-            this.quadImage.setScale(16,16);
+            // In portrait mode, don't create the quadImage at all
+            this.quadImage = null;
         }
-        this.quadImage.setVisible(false);
     }
 
     updateGameHistory(playerAddress = null) {
         if (!this.renderTexture) {
+            return;
+        }
+        
+        // Don't update game history in portrait mode
+        if (!isLandscape()) {
             return;
         }
 
@@ -175,6 +175,11 @@ export class GameHistory {
     }
 
     addPendingGameToHistory() {
+        // Don't add to history in portrait mode
+        if (!isLandscape()) {
+            return;
+        }
+        
         // Check if there's already a pending game (most recent game with ?-?)
         if (this.recentHistory.length > 0) {
             const mostRecentGame = this.recentHistory[0];
@@ -211,6 +216,11 @@ export class GameHistory {
     }
     
     updateLastGameInHistory(playerCard, houseCard) {
+        // Don't update history in portrait mode
+        if (!isLandscape()) {
+            return;
+        }
+        
         if (!this.recentHistory || this.recentHistory.length === 0) {
             return;
         }
