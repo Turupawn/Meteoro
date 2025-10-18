@@ -340,11 +340,11 @@ export class MainMenu {
             { depth: 254 }
         );
 
-        let ethBalanceString = "0.000000 ETH";
+        let ethBalanceString = "0.00000 ETH";
         if (this.scene.currentBalance) {
             try {
                 const balanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
-                ethBalanceString = `${parseFloat(balanceInEth).toFixed(6)} ETH`;
+                ethBalanceString = `${parseFloat(balanceInEth).toFixed(5)} ETH`;
             } catch (error) {
                 console.error('Error converting balance:', error);
                 ethBalanceString = `${this.scene.currentBalance} WEI`;
@@ -530,6 +530,8 @@ export class MainMenu {
             this.closeMenu();
         } catch (error) {
             console.error("Error executing forfeit:", error);
+        } finally {
+            window.location.reload();
         }
     }
 

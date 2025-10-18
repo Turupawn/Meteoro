@@ -21,6 +21,18 @@ export function calculateCards(secret, houseRandomness) {
     return { playerCard, houseCard, winner };
 }
 
+export function getCardDisplay(cardValue) {
+    // Handle BigInt values
+    const numValue = typeof cardValue === 'bigint' ? Number(cardValue) : cardValue;
+    
+    if (numValue === 14) return "A";
+    if (numValue === 11) return "J";
+    if (numValue === 12) return "Q";
+    if (numValue === 13) return "K";
+    if (numValue === 0) return "?";
+    return numValue.toString();
+}
+
 export function printLog(levels, ...args) {
     if (!Array.isArray(levels)) levels = [levels];
     const shouldPrint = levels.some(level => PRINT_LEVELS.includes(level));

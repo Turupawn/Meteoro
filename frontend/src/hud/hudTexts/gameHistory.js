@@ -1,6 +1,8 @@
-import { applyPerspectiveToQuadImageToRight, isLandscape } from '../../utils/utils.js';
+import { applyPerspectiveToQuadImageToRight, isLandscape, getCardDisplay } from '../../utils/utils.js';
 
 export class GameHistory {
+    recentHistory = [];
+    
     constructor(scene) {
         this.scene = scene;
         this.createGameHistory();
@@ -53,6 +55,7 @@ export class GameHistory {
 
         this.renderTexture.saveTexture('gameHistoryTexture');
 
+        // Only create quadImage in landscape mode
         if(isLandscape()) {
             this.quadImage = this.scene.add.rexQuadImage({
                 x: 236+50,
@@ -69,25 +72,20 @@ export class GameHistory {
             let perspectiveY = this.quadImage.topLeft.y + 300;
 
             applyPerspectiveToQuadImageToRight(this.quadImage, perspectiveX, perspectiveY);
+            this.quadImage.setVisible(false);
         } else {
-            this.quadImage = this.scene.add.rexQuadImage({
-                x: 236+50,
-                y: 350,
-                texture: 'gameHistoryTexture',
-                ninePointMode: false
-            
-            });
-            this.quadImage.setScale(16,16);
+            // In portrait mode, don't create the quadImage at all
+            this.quadImage = null;
         }
-        this.quadImage.setVisible(false);
     }
 
-    updateGameHistory(recentHistory = null, playerAddress = null) {
+    updateGameHistory(playerAddress = null) {
         if (!this.renderTexture) {
             return;
         }
-
-        if (!recentHistory || recentHistory.length === 0) {
+        
+        // Don't update game history in portrait mode
+        if (!isLandscape()) {
             return;
         }
 
@@ -114,25 +112,44 @@ export class GameHistory {
         }
         
         let yOffset = 40;
-        recentHistory.forEach((game, index) => {
+        this.recentHistory.forEach((game, index) => {
             let isWin = false;
-            if (game.result === 'WIN' || game.result === 'win' || game.result === 1 || game.result === true) {
-                isWin = true;
-            } else if (game.result === 'LOSS' || game.result === 'loss' || game.result === 0 || game.result === false) {
-                isWin = false;
-            } else {
-                if (game.playerCard && game.houseCard) {
-                    const playerCard = parseInt(game.playerCard);
-                    const houseCard = parseInt(game.houseCard);
-                    if (!isNaN(playerCard) && !isNaN(houseCard)) {
-                        isWin = playerCard > houseCard;
-                    }
+            let isTie = false;
+            let isPending = false;
+
+            if (game.playerCard === "?" && game.houseCard === "?") {
+                isPending = true;
+            } else if (game.playerCard && game.houseCard) {
+                let playerCard = game.playerCard;
+                let houseCard = game.houseCard;
+                if (playerCard === houseCard) {
+                    isTie = true;
+                } else {
+                    if (playerCard == "J") playerCard = 11;
+                    else if (playerCard == "Q") playerCard = 12;
+                    else if (playerCard == "K") playerCard = 13;
+                    else if (playerCard == "A") playerCard = 14;
+                    else playerCard = parseInt(playerCard);
+
+                    if (houseCard == "J") houseCard = 11;
+                    else if (houseCard == "Q") houseCard = 12;
+                    else if (houseCard == "K") houseCard = 13;
+                    else if (houseCard == "A") houseCard = 14;
+                    else houseCard = parseInt(houseCard);
+
+                    isWin = playerCard > houseCard;
                 }
             }
             
-            const score = `${this.getCardDisplay(game.playerCard)}-${this.getCardDisplay(game.houseCard)}`;
+            const score = `${getCardDisplay(game.playerCard)}-${getCardDisplay(game.houseCard)}`;
             
-            const textColor = isWin ? '#00FF00' : '#FF4444';
+            // Set color based on game state
+            let textColor;
+            if (isPending || isTie) {
+                textColor = '#FFFFFF'; // White for pending games or ties
+            } else {
+                textColor = isWin ? '#00FF00' : '#FF4444'; // Green for win, red for loss
+            }
             const gameText = this.scene.add.text(0, 0, score, {
                 font: '18px Orbitron',
                 fill: textColor,
@@ -153,12 +170,70 @@ export class GameHistory {
         }
     }
 
-    getCardDisplay(cardValue) {
-        if (cardValue === 14n) return "A";
-        if (cardValue === 11n) return "J";
-        if (cardValue === 12n) return "Q";
-        if (cardValue === 13n) return "K";
-        if (cardValue === 0n) return "?";
-        return cardValue.toString();
+    initializeHistory(recentHistory) {
+        this.recentHistory = recentHistory;
+    }
+
+    addPendingGameToHistory() {
+        // Don't add to history in portrait mode
+        if (!isLandscape()) {
+            return;
+        }
+        
+        // Check if there's already a pending game (most recent game with ?-?)
+        if (this.recentHistory.length > 0) {
+            const mostRecentGame = this.recentHistory[0];
+            if (mostRecentGame && mostRecentGame.playerCard === "?" && mostRecentGame.houseCard === "?") {
+                // Already have a pending game, don't add another one
+                return;
+            }
+        }
+        
+        const newGame = {
+            gameState: 1, // Committed state
+            playerAddress: "0x0", // Will be updated when we have access to wallet
+            playerCommit: "0x0",
+            commitTimestamp: Math.floor(Date.now() / 1000),
+            betAmount: "0", // Will be updated when we have access to bet amount
+            houseRandomness: "0x0",
+            houseRandomnessTimestamp: 0,
+            playerSecret: "0x0",
+            playerCard: "?", // Placeholder
+            houseCard: "?", // Placeholder
+            revealTimestamp: 0
+        };
+        
+        // Add to the beginning of the array (most recent first)
+        this.recentHistory.unshift(newGame);
+        
+        // Keep only the first 10 games
+        if (this.recentHistory.length > 10) {
+            this.recentHistory = this.recentHistory.slice(0, 10);
+        }
+        
+        // Update the display
+        this.updateGameHistory(this.recentHistory);
+    }
+    
+    updateLastGameInHistory(playerCard, houseCard) {
+        // Don't update history in portrait mode
+        if (!isLandscape()) {
+            return;
+        }
+        
+        if (!this.recentHistory || this.recentHistory.length === 0) {
+            return;
+        }
+
+        // Update the first (most recent) game with the actual results
+        const lastGame = this.recentHistory[0];
+        if (lastGame && lastGame.playerCard === "?" && lastGame.houseCard === "?") {
+            lastGame.playerCard = getCardDisplay(playerCard);
+            lastGame.houseCard = getCardDisplay(houseCard);
+            lastGame.revealTimestamp = Math.floor(Date.now() / 1000);
+            
+            // Update the display
+            this.updateGameHistory(this.recentHistory);
+        }
     }
 }

@@ -1,14 +1,20 @@
 import Web3 from 'web3';
-import { printLog } from '../utils/utils.js';
+import { printLog, getCardDisplay } from '../utils/utils.js';
+import { captureBlockchainError } from '../session_tracking.js';
+import { showErrorModal } from '../menus/errorModal.js';
 
 const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS;
+const RPC_URL = import.meta.env.RPC_URL;
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json";
 const GAS_LIMIT = 300000;
+const GAS_FEE_BUFFER_ETH = 0.00001;
 
 let web3;
 let my_contract;
 let globalSelectedBetAmount = null;
 let globalBetAmountsArray = null;
+let globalBetAmountMultipliers = null;
+let globalTieRewardMultiplier = null;
 let globalGasPrice = null;
 let globalNonce = null;
 let globalETHBalance = null;
@@ -26,7 +32,7 @@ export function getLocalWallet() {
 
 export const getWeb3 = async () => {
   return new Promise((resolve, reject) => {
-    const provider = new Web3.providers.HttpProvider("https://carrot.megaeth.com/rpc");
+    const provider = new Web3.providers.HttpProvider(RPC_URL);
     const web3 = new Web3(provider);
     resolve(web3);
   });
@@ -64,6 +70,7 @@ export async function initWeb3() {
         return { web3, my_contract, wallet };
       } catch (error) {
         console.error("Error initializing contract:", error);
+        showErrorModal("Failed to initialize contract: " + error.message + " (code " + (error.code || 'unknown') + ")");
         throw error;
       }
     };
@@ -71,6 +78,83 @@ export async function initWeb3() {
   };
   return awaitWeb3();
   
+}
+
+export async function checkInitialGameState() {
+    const startTime = Date.now();
+    try {
+        const wallet = getLocalWallet();
+        if (!wallet) {
+            return null;
+        }
+        
+        const gameStateTemp = await my_contract.methods.getInitialFrontendGameState(wallet.address).call({}, 'pending');
+        globalETHBalance = gameStateTemp.playerEthBalance;
+        globalGachaTokenBalance = gameStateTemp.playerGachaTokenBalance;
+        
+        // Store bet amounts and multipliers globally
+        globalBetAmountsArray = gameStateTemp.betAmounts;
+        globalBetAmountMultipliers = gameStateTemp.betAmountMultipliersArray;
+        globalTieRewardMultiplier = gameStateTemp.tieRewardMultiplierValue;
+        
+        printLog(['debug'], "Bet amounts array from contract:", gameStateTemp.betAmounts);
+        
+        if (gameStateTemp.betAmounts.length === 0) {
+            throw new Error("No bet amounts configured in contract");
+        }
+        
+        const storedBetAmount = localStorage.getItem('selectedBetAmount');
+        printLog(['debug'], "storedBetAmount", storedBetAmount);
+        
+        if (storedBetAmount) {
+            const storedBetAmountBigInt = BigInt(storedBetAmount);
+            const isValidBetAmount = gameStateTemp.betAmounts.includes(storedBetAmountBigInt);
+            if (isValidBetAmount) {
+                setSelectedBetAmount(storedBetAmountBigInt);
+                printLog(['debug'], "Using stored bet amount:", globalSelectedBetAmount);
+            } else {
+                setSelectedBetAmount(gameStateTemp.betAmounts[0]);
+                printLog(['debug'], "Stored bet amount no longer valid, selected first:", globalSelectedBetAmount);
+            }
+        } else {
+            setSelectedBetAmount(gameStateTemp.betAmounts[0]);
+            printLog(['debug'], "No stored bet amount, selected first:", globalSelectedBetAmount);
+        }
+        
+        const gameState = {
+            playerETHBalance: gameStateTemp.playerEthBalance,
+            playerGachaTokenBalance: gameStateTemp.playerGachaTokenBalance,
+            gameState: gameStateTemp.gameState,
+            playerCommit: gameStateTemp.playerCommit,
+            houseRandomness: gameStateTemp.houseRandomness,
+            gameId: gameStateTemp.gameId,
+            recentHistory: gameStateTemp.recentHistory,
+            tieRewardMultiplier: gameStateTemp.tieRewardMultiplierValue,
+            betAmounts: gameStateTemp.betAmounts,
+            betAmountMultipliers: gameStateTemp.betAmountMultipliersArray
+        };
+        
+        printLog(['profile'], "=== INITIAL GAME STATE LOAD ===");
+        printLog(['profile'], "Game state loaded successfully");
+        printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
+        printLog(['profile'], "=============================");
+        
+        return gameState;
+    } catch (error) {
+        printLog(['profile'], "=== INITIAL GAME STATE LOAD ===");
+        printLog(['profile'], "Game state load failed");
+        printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
+        printLog(['profile'], "=============================");
+        
+        console.error("Error checking initial game state:", error);
+        showErrorModal("Failed to check initial game state: " + error.message + " (code " + (error.code || 'unknown') + ")");
+        captureBlockchainError(error, 'checkInitialGameState', {
+            contract_address: MY_CONTRACT_ADDRESS,
+            error_type: 'blockchain_call_failed'
+        });
+        
+        return null;
+    }
 }
 
 export async function checkGameState() {
@@ -89,12 +173,17 @@ export async function checkGameState() {
             gameState: gameStateTemp.gameState,
             playerCommit: gameStateTemp.playerCommit,
             houseRandomness: gameStateTemp.houseRandomness,
-            gameId: gameStateTemp.gameId,
-            recentHistory: gameStateTemp.recentHistory
+            gameId: gameStateTemp.gameId
         };
         return gameState;
     } catch (error) {
         console.error("Error checking game state:", error);
+        showErrorModal("Failed to check game state: " + error.message + " (code " + (error.code || 'unknown') + ")");
+        captureBlockchainError(error, 'checkGameState', {
+            contract_address: MY_CONTRACT_ADDRESS,
+            error_type: 'blockchain_call_failed'
+        });
+        
         return null;
     }
 }
@@ -102,7 +191,12 @@ export async function checkGameState() {
 export async function commit(commitHash) {
     const wallet = getLocalWallet();
     if (!wallet) {
-        throw new Error("No local wallet found!");
+        const error = new Error("No local wallet found!");
+        showErrorModal(error.message);
+        captureBlockchainError(error, 'commit', {
+            error_type: 'wallet_not_found'
+        });
+        throw error;
     }
 
     if (!globalSelectedBetAmount) {
@@ -112,14 +206,25 @@ export async function commit(commitHash) {
     try {
         data = my_contract.methods.commit(commitHash).encodeABI();
     } catch (error) {
-        console.error("Error encoding commit ABI:", error);
+        showErrorModal("Failed to encode commit ABI: " + error.message + " (code " + (error.code || 'unknown') + ")");
+        captureBlockchainError(error, 'commit', {
+            error_type: 'abi_encoding_failed',
+            commit_hash: commitHash
+        });
         throw error;
     }
     const nonce = getAndIncrementNonce();
     const gasPrice = await getCurrentGasPrice();
     
     if (nonce === null || !gasPrice) {
-        throw new Error("Failed to get nonce or gas price");
+        const error = new Error("Failed to get nonce or gas price");
+        showErrorModal("Failed to get nonce or gas price: " + error.message + " (code " + (error.code || 'unknown') + ")");
+        captureBlockchainError(error, 'commit', {
+            error_type: 'gas_or_nonce_failed',
+            nonce: nonce,
+            gas_price: gasPrice
+        });
+        throw error;
     }
     
     const tx = {
@@ -132,17 +237,31 @@ export async function commit(commitHash) {
         data: data
     };
 
-    const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
-    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-    
-    printLog(['debug'], "Commit Transaction Receipt:", {
-        transactionHash: receipt.transactionHash,
-        blockNumber: receipt.blockNumber,
-        status: receipt.status ? "Confirmed" : "Failed",
-        gasUsed: receipt.gasUsed
-    });
-    
-    return receipt;
+    try {
+        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
+        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        
+        printLog(['debug'], "Commit Transaction Receipt:", {
+            transactionHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber,
+            status: receipt.status ? "Confirmed" : "Failed",
+            gasUsed: receipt.gasUsed
+        });
+        
+        return receipt;
+    } catch (error) {
+        showErrorModal("Failed to commit: " + error.message + " (code " + (error.code || 'unknown') + ")");
+        captureBlockchainError(error, 'commit', {
+            error_type: 'transaction_failed',
+            transaction_data: {
+                to: MY_CONTRACT_ADDRESS,
+                value: globalSelectedBetAmount?.toString(),
+                gas: GAS_LIMIT,
+                nonce: nonce
+            }
+        });
+        throw error;
+    }
 }
 
 export async function forfeit() {
@@ -190,7 +309,14 @@ export async function performReveal(secret) {
         const gasPrice = await getCurrentGasPrice();
         
         if (nonce === null || !gasPrice) {
-            throw new Error("Failed to get nonce or gas price");
+            const error = new Error("Failed to get nonce or gas price");
+            showErrorModal("Failed to get nonce or gas price: " + error.message + " (code " + (error.code || 'unknown') + ")");
+            captureBlockchainError(error, 'performReveal', {
+                error_type: 'gas_or_nonce_failed',
+                nonce: nonce,
+                gas_price: gasPrice
+            });
+            throw error;
         }
         
         const tx = {
@@ -216,6 +342,11 @@ export async function performReveal(secret) {
         return receipt;
     } catch (error) {
         printLog(['error'], "Error in reveal:", error);
+        showErrorModal("Failed to reveal: " + error.message + " (code " + (error.code || 'unknown') + ")");
+        captureBlockchainError(error, 'performReveal', {
+            error_type: 'reveal_transaction_failed',
+            secret_provided: !!secret
+        });
         throw error;
     }
 }
@@ -291,7 +422,7 @@ export async function withdrawFunds(destinationAddress) {
             data: tokenTransferData,
             gas: 100000, // Gas for token transfer
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Transferring Gacha tokens...");
@@ -305,7 +436,7 @@ export async function withdrawFunds(destinationAddress) {
             value: ethAmountToSend.toString(),
             gas: 21000, // Standard gas for ETH transfer
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Transferring ETH...");
@@ -340,7 +471,7 @@ export async function withdrawFunds(destinationAddress) {
             value: amountToSend.toString(),
             gas: gasLimit,
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Withdrawing ETH only:", {
@@ -364,7 +495,8 @@ export async function withdrawFunds(destinationAddress) {
 export async function updateGasPrice() {
     try {
         const startTime = Date.now();
-        globalGasPrice = await web3.eth.getGasPrice();
+        const gasPriceString = await web3.eth.getGasPrice('pending');
+        globalGasPrice = BigInt(gasPriceString);
         lastGasPriceUpdate = startTime;
         printLog(['profile'], "=== GAS PRICE UPDATE ===");
         printLog(['profile'], "New gas price:", globalGasPrice);
@@ -380,7 +512,12 @@ export async function getCurrentGasPrice() {
     if (!globalGasPrice || (now - lastGasPriceUpdate) > GAS_PRICE_UPDATE_INTERVAL) {
         await updateGasPrice();
     }
-    return globalGasPrice*2n;
+    
+    if (!globalGasPrice) {
+        throw new Error("Failed to get gas price");
+    }
+    
+    return globalGasPrice * 2n;
 }
 
 export async function initializeNonce() {
@@ -389,7 +526,7 @@ export async function initializeNonce() {
         if (!wallet) return;
         
         const startTime = Date.now();
-        globalNonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
+        globalNonce = await web3.eth.getTransactionCount(wallet.address, 'pending');
         printLog(['profile'], "=== NONCE INITIALIZATION ===");
         printLog(['profile'], "Initial nonce:", globalNonce);
         printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
@@ -407,47 +544,22 @@ export function getAndIncrementNonce() {
     return globalNonce++;
 }
 
-export async function initializeBetAmount() {
-    try {
-        // Get the bet amounts array in a single call
-        const betAmountsArray = await my_contract.methods.getBetAmountsArray().call();
-        globalBetAmountsArray = betAmountsArray;
-        printLog(['debug'], "Bet amounts array from contract:", betAmountsArray);
-
-        console.log("betAmountsArray", betAmountsArray);
-        
-        if (betAmountsArray.length === 0) {
-            throw new Error("No bet amounts configured in contract");
-        }
-        
-        const storedBetAmount = localStorage.getItem('selectedBetAmount');
-
-        printLog(['debug'], "storedBetAmount", storedBetAmount);
-        printLog(['debug'], "betAmountsArray", betAmountsArray);
-        
-        if (storedBetAmount) {
-            const storedBetAmountBigInt = BigInt(storedBetAmount);
-            const isValidBetAmount = betAmountsArray.includes(storedBetAmountBigInt);
-            if (isValidBetAmount) {
-                setSelectedBetAmount(storedBetAmountBigInt);
-                printLog(['debug'], "Using stored bet amount:", globalSelectedBetAmount);
-            } else {
-                setSelectedBetAmount(betAmountsArray[0]);
-                printLog(['debug'], "Stored bet amount no longer valid, selected first:", globalSelectedBetAmount);
-            }
-        } else {
-            setSelectedBetAmount(betAmountsArray[0]);
-            printLog(['debug'], "No stored bet amount, selected first:", globalSelectedBetAmount);
-        }
-        printLog(['debug'], "Bet amount initialized:", globalSelectedBetAmount);
-    } catch (error) {
-        printLog(['error'], "Error initializing bet amount:", error);
-        throw error;
-    }
-}
 
 export function getBetAmountsArray() {
     return globalBetAmountsArray;
+}
+
+export function getBetAmountMultiplier(betAmount) {
+    if (!globalBetAmountsArray || !globalBetAmountMultipliers) {
+        return 1; // Default to 1x if not available
+    }
+    
+    const index = globalBetAmountsArray.indexOf(betAmount);
+    if (index === -1) {
+        return 1; // Default to 1x if bet amount not found
+    }
+    
+    return globalBetAmountMultipliers[index] || 1;
 }
 
 export function setSelectedBetAmount(betAmount) {
@@ -464,22 +576,12 @@ export function getMinimumPlayableBalance() {
     if (!globalSelectedBetAmount) {
         throw new Error("Bet amount not initialized");
     }
-    return BigInt(globalSelectedBetAmount) + BigInt(globalSelectedBetAmount);
-}
-
-export function getRecommendedPlayableBalance() {
-    if (!globalSelectedBetAmount) {
-        throw new Error("Bet amount not initialized");
-    }
-    return BigInt(globalSelectedBetAmount) * 10n;
+    const gasFeeBufferWei = web3.utils.toWei(GAS_FEE_BUFFER_ETH.toString(), 'ether');
+    return BigInt(globalSelectedBetAmount) + BigInt(gasFeeBufferWei);
 }
 
 export function getPlayerETHBalance() {
     return globalETHBalance;
-}
-
-export function getPlayerGachaTokenBalance() {
-    return globalGachaTokenBalance;
 }
 
 export { web3, my_contract }; 

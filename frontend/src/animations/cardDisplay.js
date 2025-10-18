@@ -1,5 +1,6 @@
-import { isLandscape } from '../utils/utils.js';
+import { isLandscape, getCardDisplay } from '../utils/utils.js';
 import { TieSequence } from './tieSequence.js';
+import { GameHistory } from '../hud/hudTexts/gameHistory.js';
 
 export class CardDisplay {
     constructor(scene) {
@@ -27,7 +28,7 @@ export class CardDisplay {
         const y = this.scene.centerY + 150; // Position below the cards from the start
         
         this.currentGameText = this.scene.add.text(x, y, "", {
-            font: `bold 80px Orbitron`, // Changed to match other UI elements
+            font: `bold 70px Orbitron`, // Changed to match other UI elements
             fill: "#E0F6FF", // Changed to match other text colors
             stroke: "#0066CC", // Changed to match other text strokes
             strokeThickness: 3, // Changed to match other text strokes
@@ -44,6 +45,10 @@ export class CardDisplay {
 
     updateCurrentGameDisplay(playerCard = null, houseCard = null) {
         if (playerCard !== null && houseCard !== null) {
+            // Store the card values for later use
+            this.currentPlayerCard = playerCard;
+            this.currentHouseCard = houseCard;
+            
             // Increment game count
             this.gameCount++;
             
@@ -57,10 +62,10 @@ export class CardDisplay {
             this.createCardSprites(playerCard, houseCard);
             
             if (playerCard === houseCard) {
-                this.currentGameText.setText(`TIE!`);
+                this.currentGameText.setText(`You earned GACHA!`);
                 if (this.scene.tieSequence) {
                     this.scene.time.delayedCall(2000, () => {
-                        this.scene.tieSequence.startTieSequence();
+                        this.scene.tieSequence.startTieSequence(playerCard, houseCard);
                     });
                 } else {
                     console.log("ERROR: TieSequence not found");
@@ -76,6 +81,7 @@ export class CardDisplay {
                 
                 if (this.scene.background && this.scene.background.endBoostAnimation) {
                     this.scene.background.endBoostAnimation();
+                    this.scene.portraitDisplay.endAnimation();
                 }
 
                 if (playerCard > houseCard) {
@@ -114,14 +120,14 @@ export class CardDisplay {
             .setOrigin(0.5)
             .setAlpha(0);
         
-        this.playerCardText = this.scene.add.text(leftCardX, cardY, this.getCardDisplay(playerCard), {
+        this.playerCardText = this.scene.add.text(leftCardX, cardY, getCardDisplay(playerCard), {
             font: `${this.cardFontSize}px Orbitron`, // Changed from Arial to Orbitron
             fill: "#FFFFFF",
             stroke: "#000000",
             strokeThickness: 8 // Increased from 5 to 8 for better visibility
         }).setOrigin(0.5).setAlpha(0);
         
-        this.houseCardText = this.scene.add.text(rightCardX, cardY, this.getCardDisplay(houseCard), {
+        this.houseCardText = this.scene.add.text(rightCardX, cardY, getCardDisplay(houseCard), {
             font: `${this.cardFontSize}px Orbitron`, // Changed from Arial to Orbitron
             fill: "#FFFFFF",
             stroke: "#000000",
@@ -383,6 +389,12 @@ export class CardDisplay {
                 ease: 'Power2'
             });
         }
+        
+        // Update game history after the delay when both card numbers are fully visible
+        this.scene.time.delayedCall(400, () => {
+            this.scene.gameHistory.updateLastGameInHistory(this.currentPlayerCard, this.currentHouseCard);
+            window.dispatchEvent(new CustomEvent('cardsDisplayed'));
+        });
     }
 
     triggerWinParticleAnimation() {
@@ -696,13 +708,5 @@ export class CardDisplay {
         
         this.playerCardData = null;
         this.houseCardData = null;
-    }
-
-    getCardDisplay(cardValue) {
-        if (cardValue === 14) return "A";  // Ace is now 14 (strongest)
-        if (cardValue === 11) return "J";
-        if (cardValue === 12) return "Q";
-        if (cardValue === 13) return "K";
-        return cardValue.toString();
     }
 }

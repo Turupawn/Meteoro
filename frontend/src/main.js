@@ -4,24 +4,25 @@ import {
     initWeb3, 
     getLocalWallet, 
     checkGameState, 
+    checkInitialGameState,
     commit,
     performReveal, 
     updateGasPrice,
     initializeNonce,
-    initializeBetAmount,
     web3,
     getPlayerETHBalance,
     getMinimumPlayableBalance
 } from './web3/blockchain_stuff.js';
 
-import posthog from 'posthog-js'
+import { 
+    captureError, 
+    captureEvent, 
+    captureGameEvent,
+    setWalletAddressGetter,
+} from './session_tracking.js';
 
-posthog.init('phc_3vofleZVJy4GKoykZPb4bOEc7gjl6do5YoFDLB6NVYl',
-    {
-        api_host: 'https://us.i.posthog.com',
-        person_profiles: 'always' // or 'always' to create profiles for anonymous users as well
-    }
-)
+import { showErrorModal } from './menus/errorModal.js';
+import { captureBlockchainError } from './session_tracking.js';
 
 const POLL_INTERVAL = parseInt(import.meta.env.POLL_INTERVAL) || 1000
 
@@ -47,10 +48,14 @@ let loadingScreenReady = false;
 let isTransactionInProgress = false;
 let lastTransactionHash = null;
 
+let initialRecentHistory = [];
 async function loadDapp() {
   try {
+    // Set up wallet address getter for error tracking
+    setWalletAddressGetter(() => getLocalWallet()?.address || 'unknown');
+    
     // Track app initialization
-    posthog.capture('app_initialized', { 
+    captureEvent('app_initialized', { 
       timestamp: Date.now() 
     });
     
@@ -71,6 +76,7 @@ async function loadDapp() {
     posthog.capture('app_initialization_error', { 
       error: error.message 
     });
+    captureError(error, { function: 'loadDapp' });
   }
 }
 
@@ -98,10 +104,9 @@ async function initWeb3WithProgress() {
     console.log("Web3 initialization completed successfully");
     
     // Track successful Web3 initialization
-    posthog.capture('web3_initialized', { 
+    captureEvent('web3_initialized', { 
       timestamp: Date.now() 
     });
-    
   } catch (error) {
     console.error("Error initializing Web3:", error);
     // Mark as complete even if failed to prevent infinite loading
@@ -110,9 +115,10 @@ async function initWeb3WithProgress() {
     updateWeb3Progress(1);
     
     // Track Web3 initialization error
-    posthog.capture('web3_initialization_error', { 
+    captureEvent('web3_initialization_error', { 
       error: error.message 
     });
+    captureError(error, { function: 'initWeb3WithProgress' });
   }
 }
 
@@ -145,13 +151,6 @@ async function loadGameData() {
     while (!isWeb3Ready) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    gameDataLoadingProgress = 0.5;
-    updateGameDataProgress(0.5);
-    console.log("Initializing bet amount...")
-    await initializeBetAmount();
-    console.log("Updating gas price...")
-    await new Promise(resolve => setTimeout(resolve, 150));
-    gameDataLoadingProgress = 0.7;
     updateGameDataProgress(0.7);
     console.log("Updating gas price...")
     await updateGasPrice();
@@ -160,8 +159,43 @@ async function loadGameData() {
     await initializeNonce();
     gameDataLoadingProgress = 0.9;
     updateGameDataProgress(0.9);
-    console.log("Checking game state...")
-    await checkGameState();
+    console.log("Checking initial game state...")
+    gameState = await checkInitialGameState();
+    initialRecentHistory = gameState.recentHistory;
+
+    // Convert BigInt values to strings for readable output (recursive)
+    const convertBigIntToString = (obj) => {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj === 'bigint') return obj.toString();
+        if (Array.isArray(obj)) return obj.map(convertBigIntToString);
+        if (typeof obj === 'object') {
+            const converted = {};
+            for (const [key, value] of Object.entries(obj)) {
+                converted[key] = convertBigIntToString(value);
+            }
+            return converted;
+        }
+        return obj;
+    };
+    
+    const gameStateForLog = convertBigIntToString(gameState);
+    console.log("Initial game state from getInitialFrontendGameState:", JSON.stringify(gameStateForLog, null, 2));
+
+    const pendingReveal = getPendingReveal();
+    if (pendingReveal) {
+        console.log("Pending reveal found:", JSON.stringify(pendingReveal, null, 2));
+        try {
+            console.log("Attempting to reveal pending secret...");
+            await performReveal(pendingReveal.secret);
+            console.log("Reveal completed successfully");
+        } catch (error) {
+            console.log("Reveal failed:", error.message);
+            captureError(error, { function: 'loadGameData attempt to reveal pending secret' });
+        }
+    } else {
+        console.log("No pending reveal found");
+    }
+
     await new Promise(resolve => setTimeout(resolve, 150));    
     gameDataLoadingProgress = 1;
     isGameDataReady = true;
@@ -173,12 +207,14 @@ async function loadGameData() {
     gameDataLoadingProgress = 1;
     isGameDataReady = true;
     updateGameDataProgress(1);
+    captureError(error, { function: 'loadGameData' });
   }
 }
 
 // Function to set the game scene reference
 export function setGameScene(scene) {
     gameScene = scene;
+    gameScene.gameHistory.initializeHistory(initialRecentHistory);
 }
 
 // Function to notify that loading screen is ready
@@ -186,32 +222,12 @@ export function setLoadingScreenReady() {
     loadingScreenReady = true;
 }
 
-// Wait for game to be ready before starting
-window.addEventListener('gameReady', () => {
+// Listen for when cards are displayed to update game state
+window.addEventListener('cardsDisplayed', () => {
   updateGameState();
 });
 
 loadDapp()
-
-const onContractInitCallback = async () => {
-  try {
-    await initializeBetAmount();
-    
-    await updateGasPrice();
-    await initializeNonce();
-    
-    await checkGameState();
-    
-    updateGameState();
-    startGameLoop();
-        
-    window.dispatchEvent(new CustomEvent('gameReady'));
-    
-  } catch (error) {
-    console.error("Error in contract initialization:", error);
-
-  }
-}
 
 function getStoredSecret() {
     const secretData = localStorage.getItem('playerSecret');
@@ -225,14 +241,6 @@ function clearStoredSecret() {
     localStorage.removeItem('playerSecret');
     clearStoredCommit()
     clearPendingReveal()
-}
-
-function getCardDisplay(cardValue) {
-    if (cardValue === 14) return "A";  // Ace is now 14 (strongest)
-    if (cardValue === 11) return "J";
-    if (cardValue === 12) return "Q";
-    if (cardValue === 13) return "K";
-    return cardValue.toString();
 }
 
 async function gameLoop() {
@@ -259,8 +267,7 @@ async function gameLoop() {
         printLog(['debug'], "Pending commit:", pendingCommit);
         printLog(['debug'], "Pending reveal:", pendingReveal);
 
-        // Handle case where game is revealed (state 2n) and there's a pending commit
-        if (gameState && gameState.gameState === 2n && pendingCommit) {
+        if (gameState && gameState.gameState === 2n /* HashPosted */ && pendingCommit) {
             const result = calculateCards(pendingCommit.secret, gameState.houseRandomness);
             
             if (commitStartTime) {
@@ -274,7 +281,7 @@ async function gameLoop() {
                 commitStartTime = null;
                 
                 // Track game completion performance
-                posthog.capture('game_completed', {
+                captureGameEvent('game_completed', {
                     game_id: gameState.gameId?.toString(),
                     player_card: result.playerCard,
                     house_card: result.houseCard,
@@ -289,6 +296,8 @@ async function gameLoop() {
             if (gameScene) {
                 gameScene.updateCardDisplay(result.playerCard, result.houseCard);
             }
+            
+
             printLog(['debug'], "Conditions met for reveal, attempting...");
             
             // Mark transaction as in progress
@@ -298,7 +307,7 @@ async function gameLoop() {
                 printLog(['debug'], "Reveal transaction completed successfully");
                 
                 // Track successful reveal
-                posthog.capture('reveal_transaction_success', {
+                captureGameEvent('reveal_transaction_success', {
                     game_id: gameState.gameId?.toString(),
                     player_card: result.playerCard,
                     house_card: result.houseCard
@@ -308,7 +317,7 @@ async function gameLoop() {
                 printLog(['error'], "Reveal failed:", error);
                 
                 // Track reveal failure
-                posthog.capture('reveal_transaction_failed', {
+                captureGameEvent('reveal_transaction_failed', {
                     game_id: gameState.gameId?.toString(),
                     error: error.message
                 });
@@ -351,23 +360,24 @@ async function gameLoop() {
             const storedCommit = getStoredCommit();
             if (storedCommit) {
                 printLog(['debug'], "Found pending commit from previous game:", storedCommit);
-                alert("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
+                showErrorModal("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
+                captureError(new Error("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete."), { function: 'gameLoop' });
                 shouldProcessCommit = false;
                 
                 // Track attempt to start game with pending commit
-                posthog.capture('game_start_blocked_pending_commit', {
+                captureGameEvent('game_start_blocked_pending_commit', {
                     game_id: gameState.gameId?.toString()
                 });
                 
             } else if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
-                posthog.capture('game_start_failed_uninitialized_state');
+                captureGameEvent('game_start_failed_uninitialized_state');
                 
             } else if (BigInt(getPlayerETHBalance()) < BigInt(getMinimumPlayableBalance())) {
                 printLog(['debug'], "Insufficient balance detected, UI will handle display");
                 shouldProcessCommit = false;
-                posthog.capture('game_start_blocked_insufficient_balance', {
+                captureGameEvent('game_start_blocked_insufficient_balance', {
                     player_balance: getPlayerETHBalance(),
                     minimum_balance: getMinimumPlayableBalance()
                 });
@@ -384,7 +394,7 @@ async function gameLoop() {
                 printLog(['debug'], "Processing commit request...");
                 
                 // Track game start attempt
-                posthog.capture('game_start_attempted', {
+                captureGameEvent('game_start_attempted', {
                     game_id: gameState.gameId?.toString(),
                     player_balance: gameState.playerETHBalance?.toString(),
                     game_state: gameState.gameState?.toString()
@@ -399,7 +409,7 @@ async function gameLoop() {
                     printLog(['debug'], "Commit transaction completed successfully");
                     
                     // Track successful commit
-                    posthog.capture('commit_transaction_success', {
+                    captureGameEvent('commit_transaction_success', {
                         game_id: gameState.gameId?.toString(),
                         player_balance: gameState.playerETHBalance?.toString()
                     });
@@ -409,7 +419,7 @@ async function gameLoop() {
                     shouldProcessCommit = false;
                     
                     // Track commit failure
-                    posthog.capture('commit_transaction_failed', {
+                    captureGameEvent('commit_transaction_failed', {
                         game_id: gameState.gameId?.toString(),
                         error: error.message
                     });
@@ -432,19 +442,20 @@ async function gameLoop() {
         isTransactionInProgress = false;
         
         // Track game loop error
-        posthog.capture('game_loop_error', {
+        captureGameEvent('game_loop_error', {
             error: error.message
         });
+        captureError(error, { function: 'gameLoop' });
     }
 }
 
-async function updateGameState() {
+export async function updateGameState() {
     try {
         if (!gameState) return;
         const wallet = getLocalWallet()
         // Use the game scene reference instead of hardcoded index
         if (gameScene) {
-            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, gameState.recentHistory, wallet.address);
+            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, wallet.address, gameState);
         }
     } catch (error) {
         console.error("Error updating game state:", error);
@@ -454,9 +465,6 @@ async function updateGameState() {
 function startGameLoop() {
     gameLoop();
     setInterval(gameLoop, POLL_INTERVAL);
-}
-
-const onWalletConnectedCallback = async () => {
 }
 
 function storeCommit(secret) {
@@ -512,8 +520,21 @@ export async function commitGame() {
     gameScene.cardDisplay.clearCardSprites();
     shouldProcessCommit = true;
     
+    // Update the previous game's history with actual card values if they exist
+    if (gameScene.cardDisplay.currentPlayerCard !== null && gameScene.cardDisplay.currentHouseCard !== null) {
+        gameScene.gameHistory.updateLastGameInHistory(gameScene.cardDisplay.currentPlayerCard, gameScene.cardDisplay.currentHouseCard);
+    }
+    
+    // Add pending game to history immediately when play button is hit
+    gameScene.gameHistory.addPendingGameToHistory();
+    
+    // Add a small delay to prevent race conditions with the game loop
+    setTimeout(() => {
+        updateGameState(); // Update the display to show the new history entry
+    }, 100);
+    
     // Track manual commit request
-    posthog.capture('commit_game_called', {
+    captureGameEvent('commit_game_called', {
         timestamp: Date.now()
     });
 }
