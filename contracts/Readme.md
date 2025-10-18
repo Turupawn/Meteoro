@@ -27,3 +27,11 @@ forge verify-contract --rpc-url https://carrot.megaeth.com/rpc --verifier blocks
 ```bash
 forge verify-contract --rpc-url https://carrot.megaeth.com/rpc --verifier blockscout --verifier-url https://megaeth-testnet.blockscout.com/api/ 0x1234567890123456789012345678901234567890 src/TwoPartyWarGame.sol:TwoPartyWarGame
 ```
+
+
+## RPCs
+
+```bash
+https://carrot.megaeth.com/rpc
+https://6342.rpc.thirdweb.com
+```
