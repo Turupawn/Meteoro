@@ -26,11 +26,12 @@ export class PlayButton {
         const bottomMargin = isLandscapeMode ? 120 : 500;
         const y = this.scene.screenHeight - bottomMargin;
         
-        const fontSize = isLandscapeMode ? Math.max(48, this.scene.screenWidth / 15) : Math.max(72, this.scene.screenWidth / 10);
-        
         const playButtonText = "PLAY";
         const playButtonWidth = isLandscapeMode ? Math.max(600, playButtonText.length * 40) : Math.max(800, playButtonText.length * 60);
         const playButtonHeight = isLandscapeMode ? 200 : 280;
+        
+        // Font size proportional to button dimensions (bigger text)
+        const fontSize = Math.min(playButtonWidth, playButtonHeight) / 2;
         
         this.buttonBg = this.scene.add.rectangle(
             x,

@@ -10,18 +10,17 @@ export class BetMenuButton {
 
     createButton() {
         const isLandscapeMode = isLandscape();
-        const buttonFontSize = isLandscapeMode
-            ? Math.max(20, this.scene.screenWidth / 50)
-            : Math.max(24, this.scene.screenWidth / 25);
+        // Font size proportional to button dimensions (bigger text)
+        const buttonWidth = 280;
+        const buttonHeight = 80;
+        const buttonFontSize = Math.min(buttonWidth, buttonHeight) / 2.5;
         
-        // Position at the same height as social links but on the right side in landscape
-        // In portrait mode, position below the portrait
+        // Position below portrait in landscape mode, below portrait in portrait mode
         let x, y;
         if (isLandscapeMode) {
-            const bottomMargin = 50;
-            const rightMargin = 50;
-            x = this.scene.screenWidth - rightMargin;
-            y = this.scene.screenHeight - bottomMargin;
+            // In landscape mode, position below the portrait (portrait is at screenWidth - 190, screenHeight - 260 with size 300)
+            x = this.scene.screenWidth - 190; // Same X as portrait
+            y = (this.scene.screenHeight - 260) + 150 + 50; // Portrait Y + half portrait size + margin
         } else {
             // In portrait mode, position below the portrait (portrait is at 170, 270 with size 256)
             x = 170; // Same X as portrait
