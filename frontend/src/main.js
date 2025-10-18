@@ -9,11 +9,9 @@ import {
     performReveal, 
     updateGasPrice,
     initializeNonce,
-    initializeBetAmount,
     web3,
     getPlayerETHBalance,
-    getMinimumPlayableBalance,
-    addPendingGameToHistory
+    getMinimumPlayableBalance
 } from './web3/blockchain_stuff.js';
 
 import { 
@@ -50,6 +48,7 @@ let loadingScreenReady = false;
 let isTransactionInProgress = false;
 let lastTransactionHash = null;
 
+let initialRecentHistory = [];
 async function loadDapp() {
   try {
     // Set up wallet address getter for error tracking
@@ -152,13 +151,6 @@ async function loadGameData() {
     while (!isWeb3Ready) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-    gameDataLoadingProgress = 0.5;
-    updateGameDataProgress(0.5);
-    console.log("Initializing bet amount...")
-    await initializeBetAmount();
-    console.log("Updating gas price...")
-    await new Promise(resolve => setTimeout(resolve, 150));
-    gameDataLoadingProgress = 0.7;
     updateGameDataProgress(0.7);
     console.log("Updating gas price...")
     await updateGasPrice();
@@ -169,6 +161,7 @@ async function loadGameData() {
     updateGameDataProgress(0.9);
     console.log("Checking initial game state...")
     gameState = await checkInitialGameState();
+    initialRecentHistory = gameState.recentHistory;
 
     // Convert BigInt values to strings for readable output (recursive)
     const convertBigIntToString = (obj) => {
@@ -221,6 +214,7 @@ async function loadGameData() {
 // Function to set the game scene reference
 export function setGameScene(scene) {
     gameScene = scene;
+    gameScene.gameHistory.initializeHistory(initialRecentHistory);
 }
 
 // Function to notify that loading screen is ready
@@ -228,37 +222,12 @@ export function setLoadingScreenReady() {
     loadingScreenReady = true;
 }
 
-// Wait for game to be ready before starting
-window.addEventListener('gameReady', () => {
-  updateGameState();
-});
-
 // Listen for when cards are displayed to update game state
 window.addEventListener('cardsDisplayed', () => {
   updateGameState();
 });
 
 loadDapp()
-
-const onContractInitCallback = async () => {
-  try {
-    await initializeBetAmount();
-    
-    await updateGasPrice();
-    await initializeNonce();
-    
-    await checkGameState();
-    
-    updateGameState();
-    startGameLoop();
-        
-    window.dispatchEvent(new CustomEvent('gameReady'));
-    
-  } catch (error) {
-    console.error("Error in contract initialization:", error);
-
-  }
-}
 
 function getStoredSecret() {
     const secretData = localStorage.getItem('playerSecret');
@@ -480,13 +449,13 @@ async function gameLoop() {
     }
 }
 
-async function updateGameState() {
+export async function updateGameState() {
     try {
         if (!gameState) return;
         const wallet = getLocalWallet()
         // Use the game scene reference instead of hardcoded index
         if (gameScene) {
-            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, gameState.recentHistory, wallet.address);
+            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, wallet.address, gameState);
         }
     } catch (error) {
         console.error("Error updating game state:", error);
@@ -496,9 +465,6 @@ async function updateGameState() {
 function startGameLoop() {
     gameLoop();
     setInterval(gameLoop, POLL_INTERVAL);
-}
-
-const onWalletConnectedCallback = async () => {
 }
 
 function storeCommit(secret) {
@@ -554,9 +520,18 @@ export async function commitGame() {
     gameScene.cardDisplay.clearCardSprites();
     shouldProcessCommit = true;
     
+    // Update the previous game's history with actual card values if they exist
+    if (gameScene.cardDisplay.currentPlayerCard !== null && gameScene.cardDisplay.currentHouseCard !== null) {
+        gameScene.gameHistory.updateLastGameInHistory(gameScene.cardDisplay.currentPlayerCard, gameScene.cardDisplay.currentHouseCard);
+    }
+    
     // Add pending game to history immediately when play button is hit
-    addPendingGameToHistory();
-    updateGameState(); // Update the display to show the new history entry
+    gameScene.gameHistory.addPendingGameToHistory();
+    
+    // Add a small delay to prevent race conditions with the game loop
+    setTimeout(() => {
+        updateGameState(); // Update the display to show the new history entry
+    }, 100);
     
     // Track manual commit request
     captureGameEvent('commit_game_called', {

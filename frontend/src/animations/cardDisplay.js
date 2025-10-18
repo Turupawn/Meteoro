@@ -1,6 +1,6 @@
 import { isLandscape, getCardDisplay } from '../utils/utils.js';
 import { TieSequence } from './tieSequence.js';
-import { updateLastGameInHistory } from '../web3/blockchain_stuff.js';
+import { GameHistory } from '../hud/hudTexts/gameHistory.js';
 
 export class CardDisplay {
     constructor(scene) {
@@ -65,7 +65,7 @@ export class CardDisplay {
                 this.currentGameText.setText(`You earned GACHA!`);
                 if (this.scene.tieSequence) {
                     this.scene.time.delayedCall(2000, () => {
-                        this.scene.tieSequence.startTieSequence();
+                        this.scene.tieSequence.startTieSequence(playerCard, houseCard);
                     });
                 } else {
                     console.log("ERROR: TieSequence not found");
@@ -81,6 +81,7 @@ export class CardDisplay {
                 
                 if (this.scene.background && this.scene.background.endBoostAnimation) {
                     this.scene.background.endBoostAnimation();
+                    this.scene.portraitDisplay.endAnimation();
                 }
 
                 if (playerCard > houseCard) {
@@ -391,8 +392,7 @@ export class CardDisplay {
         
         // Update game history after the delay when both card numbers are fully visible
         this.scene.time.delayedCall(400, () => {
-            updateLastGameInHistory(this.currentPlayerCard, this.currentHouseCard);
-            // Dispatch event to trigger UI update
+            this.scene.gameHistory.updateLastGameInHistory(this.currentPlayerCard, this.currentHouseCard);
             window.dispatchEvent(new CustomEvent('cardsDisplayed'));
         });
     }

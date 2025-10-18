@@ -26,11 +26,12 @@ export class PlayButton {
         const bottomMargin = isLandscapeMode ? 120 : 500;
         const y = this.scene.screenHeight - bottomMargin;
         
-        const fontSize = isLandscapeMode ? Math.max(48, this.scene.screenWidth / 15) : Math.max(72, this.scene.screenWidth / 10);
-        
         const playButtonText = "PLAY";
         const playButtonWidth = isLandscapeMode ? Math.max(600, playButtonText.length * 40) : Math.max(800, playButtonText.length * 60);
         const playButtonHeight = isLandscapeMode ? 200 : 280;
+        
+        // Font size proportional to button dimensions (bigger text)
+        const fontSize = Math.min(playButtonWidth, playButtonHeight) / 2;
         
         this.buttonBg = this.scene.add.rectangle(
             x,
@@ -67,9 +68,15 @@ export class PlayButton {
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
         const clickHandler = async () => {
+            // Immediately disable the button to prevent rapid clicking
+            this.disableButton();
+            
             const hasInsufficientBalance = await this.checkInsufficientBalance();
             
             if (hasInsufficientBalance) {
+                // Re-enable button if insufficient balance
+                this.enableButton();
+                
                 if (this.scene.insufficientBalanceMenu) {
                     this.scene.insufficientBalanceMenu.show(true); // Force show when play button is clicked
                     this.scene.insufficientBalanceMenu.triggerShakeAnimation();
@@ -84,6 +91,8 @@ export class PlayButton {
             
             if (this.scene.background && this.scene.background.startBoostAnimation) {
                 this.scene.background.startBoostAnimation();
+                this.scene.portraitDisplay.startAnimation();
+                this.scene.portraitDisplay.startShake();
             }
             
             commitGame();
@@ -106,5 +115,15 @@ export class PlayButton {
             console.error('Error checking balance:', error);
             return false;
         }
+    }
+    
+    enableButton() {
+        this.button.setInteractive(true);
+        this.buttonBg.setInteractive(true);
+    }
+    
+    disableButton() {
+        this.button.setInteractive(false);
+        this.buttonBg.setInteractive(false);
     }
 }

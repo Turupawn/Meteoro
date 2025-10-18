@@ -10,22 +10,29 @@ export class BetMenuButton {
 
     createButton() {
         const isLandscapeMode = isLandscape();
-        const buttonFontSize = isLandscapeMode
-            ? Math.max(20, this.scene.screenWidth / 50)
-            : Math.max(24, this.scene.screenWidth / 25);
+        // Font size proportional to button dimensions (bigger text)
+        const buttonWidth = 280;
+        const buttonHeight = 80;
+        const buttonFontSize = Math.min(buttonWidth, buttonHeight) / 2.5;
         
-        // Position at the same height as social links but on the right side
-        const bottomMargin = isLandscapeMode ? 50 : 300;
-        const rightMargin = isLandscapeMode ? 50 : 45;
-        const x = this.scene.screenWidth - rightMargin;
-        const y = this.scene.screenHeight - bottomMargin;
+        // Position below portrait in landscape mode, below portrait in portrait mode
+        let x, y;
+        if (isLandscapeMode) {
+            // In landscape mode, position below the portrait (portrait is at screenWidth - 190, screenHeight - 260 with size 300)
+            x = this.scene.screenWidth - 190; // Same X as portrait
+            y = (this.scene.screenHeight - 260) + 150 + 50; // Portrait Y + half portrait size + margin
+        } else {
+            // In portrait mode, position below the portrait (portrait is at 170, 270 with size 256)
+            x = 170; // Same X as portrait
+            y = 270 + 128 + 50; // Portrait Y + half portrait size + margin
+        }
         
         const currentBetAmount = getSelectedBetAmount();
         const displayText = this.getDisplayText(currentBetAmount);
         
         this.buttonBg = this.scene.add.rectangle(
-            x - 140,
-            y - 10,
+            x,
+            y,
             280,
             80,
             0x0066CC,
@@ -37,7 +44,7 @@ export class BetMenuButton {
         
         this.buttonBg.setInteractive();
         
-        const betText = this.scene.add.text(x - 140, y - 20, "BET", {
+        const betText = this.scene.add.text(x, y - 20, "BET", {
             font: `bold ${buttonFontSize + 8}px Orbitron`,
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -54,7 +61,7 @@ export class BetMenuButton {
 
         betText.setDepth(51);
 
-        const amountText = this.scene.add.text(x - 140, y + 15, this.getAmountText(currentBetAmount), {
+        const amountText = this.scene.add.text(x, y + 15, this.getAmountText(currentBetAmount), {
             font: `bold ${buttonFontSize - 8}px Orbitron`,
             fill: '#E0F6FF',
             stroke: '#0066CC',

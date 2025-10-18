@@ -99,6 +99,17 @@ async function multiPostRandomnessForGames(randomness, totalBetAmount) {
             console.log('Nonce too low, resetting nonce...');
             currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
         }
+        // If it's a JSON RPC error, reset nonce and let it retry on next tick
+        else if (error.message && (error.message.includes('Invalid JSON RPC response') || error.message.includes('JSON RPC'))) {
+            console.log('JSON RPC error detected, will retry on next tick...');
+            try {
+                // Reset the nonce to get fresh connection state
+                currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
+                console.log('Nonce reset to:', currentNonce);
+            } catch (resetError) {
+                console.error('Failed to reset nonce after JSON RPC error:', resetError);
+            }
+        }
         // If it's a revert error, log more details
         else if (error.message && error.message.includes('reverted')) {
             console.error('Transaction reverted. Error details:', error);
@@ -148,6 +159,18 @@ async function checkForNewGames() {
         await multiPostRandomnessForGames(randomness, totalBetAmount.toString());
     } catch (error) {
         console.error('Error checking for new games:', error);
+        
+        // If it's a JSON RPC error, reset nonce and let it retry on next tick
+        if (error.message && (error.message.includes('Invalid JSON RPC response') || error.message.includes('JSON RPC'))) {
+            console.log('JSON RPC error in checkForNewGames, will retry on next tick...');
+            try {
+                // Reset the nonce to get fresh connection state
+                currentNonce = await web3.eth.getTransactionCount(houseAccount.address, 'latest');
+                console.log('Nonce reset to:', currentNonce);
+            } catch (resetError) {
+                console.error('Failed to reset nonce after JSON RPC error:', resetError);
+            }
+        }
     }
 }
 

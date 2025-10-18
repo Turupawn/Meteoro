@@ -10,15 +10,24 @@ export class SocialLinks {
         const isLandscapeMode = isLandscape();
         const iconSize = isLandscapeMode ? 80 : 70;
         
-        // Position relative to bottom of screen, below the play button, higher up in portrait
-        const bottomMargin = isLandscapeMode ? 50 : 300;
-        const leftMargin = isLandscapeMode ? 50 : 45;
-        const spacing = isLandscapeMode ? 100 : 90;
+        // Position relative to bottom of screen in landscape, top left in portrait
+        let bottomMargin, leftMargin, spacing;
+        if (isLandscapeMode) {
+            bottomMargin = 50;
+            leftMargin = 50;
+            spacing = 100;
+        } else {
+            // In portrait mode, position at top right
+            bottomMargin = this.scene.screenHeight - 50; // Top of screen
+            leftMargin = this.scene.screenWidth - 200; // Right side
+            spacing = 90;
+        }
 
         // GitHub icon (leftmost)
+        const githubY = isLandscapeMode ? this.scene.screenHeight - bottomMargin : 100;
         this.githubIcon = this.scene.add.image(
             leftMargin,
-            this.scene.screenHeight - bottomMargin,
+            githubY,
             'github-icon'
         ).setOrigin(0, 1).setInteractive();
 
@@ -39,9 +48,10 @@ export class SocialLinks {
         });
 
         // Telegram icon (to the right of GitHub)
+        const telegramY = isLandscapeMode ? this.scene.screenHeight - bottomMargin : 100;
         this.telegramIcon = this.scene.add.image(
             leftMargin + spacing,
-            this.scene.screenHeight - bottomMargin,
+            telegramY,
             'telegram-icon'
         ).setOrigin(0, 1).setInteractive();
 

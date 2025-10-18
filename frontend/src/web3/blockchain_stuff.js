@@ -12,11 +12,12 @@ let web3;
 let my_contract;
 let globalSelectedBetAmount = null;
 let globalBetAmountsArray = null;
+let globalBetAmountMultipliers = null;
+let globalTieRewardMultiplier = null;
 let globalGasPrice = null;
 let globalNonce = null;
 let globalETHBalance = null;
 let globalGachaTokenBalance = null;
-let globalRecentHistory = null;
 let lastGasPriceUpdate = 0;
 const GAS_PRICE_UPDATE_INTERVAL = 60000;
 
@@ -79,6 +80,7 @@ export async function initWeb3() {
 }
 
 export async function checkInitialGameState() {
+    const startTime = Date.now();
     try {
         const wallet = getLocalWallet();
         if (!wallet) {
@@ -88,7 +90,36 @@ export async function checkInitialGameState() {
         const gameStateTemp = await my_contract.methods.getInitialFrontendGameState(wallet.address).call({}, 'pending');
         globalETHBalance = gameStateTemp.playerEthBalance;
         globalGachaTokenBalance = gameStateTemp.playerGachaTokenBalance;
-        globalRecentHistory = gameStateTemp.recentHistory;
+        
+        // Store bet amounts and multipliers globally
+        globalBetAmountsArray = gameStateTemp.betAmounts;
+        globalBetAmountMultipliers = gameStateTemp.betAmountMultipliersArray;
+        globalTieRewardMultiplier = gameStateTemp.tieRewardMultiplierValue;
+        
+        printLog(['debug'], "Bet amounts array from contract:", gameStateTemp.betAmounts);
+        
+        if (gameStateTemp.betAmounts.length === 0) {
+            throw new Error("No bet amounts configured in contract");
+        }
+        
+        const storedBetAmount = localStorage.getItem('selectedBetAmount');
+        printLog(['debug'], "storedBetAmount", storedBetAmount);
+        
+        if (storedBetAmount) {
+            const storedBetAmountBigInt = BigInt(storedBetAmount);
+            const isValidBetAmount = gameStateTemp.betAmounts.includes(storedBetAmountBigInt);
+            if (isValidBetAmount) {
+                setSelectedBetAmount(storedBetAmountBigInt);
+                printLog(['debug'], "Using stored bet amount:", globalSelectedBetAmount);
+            } else {
+                setSelectedBetAmount(gameStateTemp.betAmounts[0]);
+                printLog(['debug'], "Stored bet amount no longer valid, selected first:", globalSelectedBetAmount);
+            }
+        } else {
+            setSelectedBetAmount(gameStateTemp.betAmounts[0]);
+            printLog(['debug'], "No stored bet amount, selected first:", globalSelectedBetAmount);
+        }
+        
         const gameState = {
             playerETHBalance: gameStateTemp.playerEthBalance,
             playerGachaTokenBalance: gameStateTemp.playerGachaTokenBalance,
@@ -96,10 +127,24 @@ export async function checkInitialGameState() {
             playerCommit: gameStateTemp.playerCommit,
             houseRandomness: gameStateTemp.houseRandomness,
             gameId: gameStateTemp.gameId,
-            recentHistory: gameStateTemp.recentHistory
+            recentHistory: gameStateTemp.recentHistory,
+            tieRewardMultiplier: gameStateTemp.tieRewardMultiplierValue,
+            betAmounts: gameStateTemp.betAmounts,
+            betAmountMultipliers: gameStateTemp.betAmountMultipliersArray
         };
+        
+        printLog(['profile'], "=== INITIAL GAME STATE LOAD ===");
+        printLog(['profile'], "Game state loaded successfully");
+        printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
+        printLog(['profile'], "=============================");
+        
         return gameState;
     } catch (error) {
+        printLog(['profile'], "=== INITIAL GAME STATE LOAD ===");
+        printLog(['profile'], "Game state load failed");
+        printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
+        printLog(['profile'], "=============================");
+        
         console.error("Error checking initial game state:", error);
         showErrorModal("Failed to check initial game state: " + error.message + " (code " + (error.code || 'unknown') + ")");
         captureBlockchainError(error, 'checkInitialGameState', {
@@ -127,8 +172,7 @@ export async function checkGameState() {
             gameState: gameStateTemp.gameState,
             playerCommit: gameStateTemp.playerCommit,
             houseRandomness: gameStateTemp.houseRandomness,
-            gameId: gameStateTemp.gameId,
-            recentHistory: globalRecentHistory
+            gameId: gameStateTemp.gameId
         };
         return gameState;
     } catch (error) {
@@ -377,7 +421,7 @@ export async function withdrawFunds(destinationAddress) {
             data: tokenTransferData,
             gas: 100000, // Gas for token transfer
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Transferring Gacha tokens...");
@@ -391,7 +435,7 @@ export async function withdrawFunds(destinationAddress) {
             value: ethAmountToSend.toString(),
             gas: 21000, // Standard gas for ETH transfer
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Transferring ETH...");
@@ -426,7 +470,7 @@ export async function withdrawFunds(destinationAddress) {
             value: amountToSend.toString(),
             gas: gasLimit,
             gasPrice: gasPrice,
-            nonce: await web3.eth.getTransactionCount(wallet.address, 'latest')
+            nonce: await web3.eth.getTransactionCount(wallet.address, 'pending')
         };
         
         console.log("Withdrawing ETH only:", {
@@ -450,7 +494,8 @@ export async function withdrawFunds(destinationAddress) {
 export async function updateGasPrice() {
     try {
         const startTime = Date.now();
-        globalGasPrice = await web3.eth.getGasPrice();
+        const gasPriceString = await web3.eth.getGasPrice('pending');
+        globalGasPrice = BigInt(gasPriceString);
         lastGasPriceUpdate = startTime;
         printLog(['profile'], "=== GAS PRICE UPDATE ===");
         printLog(['profile'], "New gas price:", globalGasPrice);
@@ -466,7 +511,12 @@ export async function getCurrentGasPrice() {
     if (!globalGasPrice || (now - lastGasPriceUpdate) > GAS_PRICE_UPDATE_INTERVAL) {
         await updateGasPrice();
     }
-    return globalGasPrice*2n;
+    
+    if (!globalGasPrice) {
+        throw new Error("Failed to get gas price");
+    }
+    
+    return globalGasPrice * 2n;
 }
 
 export async function initializeNonce() {
@@ -475,7 +525,7 @@ export async function initializeNonce() {
         if (!wallet) return;
         
         const startTime = Date.now();
-        globalNonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
+        globalNonce = await web3.eth.getTransactionCount(wallet.address, 'pending');
         printLog(['profile'], "=== NONCE INITIALIZATION ===");
         printLog(['profile'], "Initial nonce:", globalNonce);
         printLog(['profile'], "Time taken:", Date.now() - startTime, "ms");
@@ -493,47 +543,22 @@ export function getAndIncrementNonce() {
     return globalNonce++;
 }
 
-export async function initializeBetAmount() {
-    try {
-        // Get the bet amounts array in a single call
-        const betAmountsArray = await my_contract.methods.getBetAmountsArray().call();
-        globalBetAmountsArray = betAmountsArray;
-        printLog(['debug'], "Bet amounts array from contract:", betAmountsArray);
-
-        console.log("betAmountsArray", betAmountsArray);
-        
-        if (betAmountsArray.length === 0) {
-            throw new Error("No bet amounts configured in contract");
-        }
-        
-        const storedBetAmount = localStorage.getItem('selectedBetAmount');
-
-        printLog(['debug'], "storedBetAmount", storedBetAmount);
-        printLog(['debug'], "betAmountsArray", betAmountsArray);
-        
-        if (storedBetAmount) {
-            const storedBetAmountBigInt = BigInt(storedBetAmount);
-            const isValidBetAmount = betAmountsArray.includes(storedBetAmountBigInt);
-            if (isValidBetAmount) {
-                setSelectedBetAmount(storedBetAmountBigInt);
-                printLog(['debug'], "Using stored bet amount:", globalSelectedBetAmount);
-            } else {
-                setSelectedBetAmount(betAmountsArray[0]);
-                printLog(['debug'], "Stored bet amount no longer valid, selected first:", globalSelectedBetAmount);
-            }
-        } else {
-            setSelectedBetAmount(betAmountsArray[0]);
-            printLog(['debug'], "No stored bet amount, selected first:", globalSelectedBetAmount);
-        }
-        printLog(['debug'], "Bet amount initialized:", globalSelectedBetAmount);
-    } catch (error) {
-        printLog(['error'], "Error initializing bet amount:", error);
-        throw error;
-    }
-}
 
 export function getBetAmountsArray() {
     return globalBetAmountsArray;
+}
+
+export function getBetAmountMultiplier(betAmount) {
+    if (!globalBetAmountsArray || !globalBetAmountMultipliers) {
+        return 1; // Default to 1x if not available
+    }
+    
+    const index = globalBetAmountsArray.indexOf(betAmount);
+    if (index === -1) {
+        return 1; // Default to 1x if bet amount not found
+    }
+    
+    return globalBetAmountMultipliers[index] || 1;
 }
 
 export function setSelectedBetAmount(betAmount) {
@@ -554,61 +579,8 @@ export function getMinimumPlayableBalance() {
     return BigInt(globalSelectedBetAmount) + BigInt(gasFeeBufferWei);
 }
 
-export function getRecommendedPlayableBalance() {
-    if (!globalSelectedBetAmount) {
-        throw new Error("Bet amount not initialized");
-    }
-    return BigInt(globalSelectedBetAmount) * 10n;
-}
-
 export function getPlayerETHBalance() {
     return globalETHBalance;
-}
-
-export function getPlayerGachaTokenBalance() {
-    return globalGachaTokenBalance;
-}
-
-export function addPendingGameToHistory() {
-    if (!globalRecentHistory) {
-        globalRecentHistory = [];
-    }
-    
-    const newGame = {
-        gameState: 1, // Committed state
-        playerAddress: getLocalWallet()?.address || "0x0",
-        playerCommit: "0x0",
-        commitTimestamp: Math.floor(Date.now() / 1000),
-        betAmount: globalSelectedBetAmount || "0",
-        houseRandomness: "0x0",
-        houseRandomnessTimestamp: 0,
-        playerSecret: "0x0",
-        playerCard: "?", // Placeholder
-        houseCard: "?", // Placeholder
-        revealTimestamp: 0
-    };
-    
-    // Add to the beginning of the array (most recent first)
-    globalRecentHistory.unshift(newGame);
-    
-    // Keep only the last 10 games (MAX_RETURN_HISTORY)
-    if (globalRecentHistory.length > 10) {
-        globalRecentHistory = globalRecentHistory.slice(0, 10);
-    }
-}
-
-export function updateLastGameInHistory(playerCard, houseCard) {
-    if (!globalRecentHistory || globalRecentHistory.length === 0) {
-        return;
-    }
-    
-    // Update the first (most recent) game with the actual results
-    const lastGame = globalRecentHistory[0];
-    if (lastGame && lastGame.playerCard === "?" && lastGame.houseCard === "?") {
-        lastGame.playerCard = getCardDisplay(playerCard);
-        lastGame.houseCard = getCardDisplay(houseCard);
-        lastGame.revealTimestamp = Math.floor(Date.now() / 1000);
-    }
 }
 
 export { web3, my_contract }; 

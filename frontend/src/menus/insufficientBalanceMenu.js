@@ -1,4 +1,4 @@
-import { web3, getLocalWallet, getPlayerETHBalance, getRecommendedPlayableBalance, getMinimumPlayableBalance } from '../web3/blockchain_stuff.js';
+import { web3, getLocalWallet, getPlayerETHBalance, getMinimumPlayableBalance } from '../web3/blockchain_stuff.js';
 import { isLandscape } from '../utils/utils.js';
 import { MenuText } from './menuElements/menuText.js';
 import { MenuInput } from './menuElements/menuInput.js';
@@ -29,8 +29,6 @@ export class InsufficientBalanceMenu {
 
     createScreenElements() {
         const isLandscapeMode = isLandscape();
-        
-        const recommendedAmountEth = web3.utils.fromWei(getRecommendedPlayableBalance().toString(), 'ether');
         
         this.screenWidth = isLandscapeMode
             ? Math.min(1000, this.scene.screenWidth * 0.95)

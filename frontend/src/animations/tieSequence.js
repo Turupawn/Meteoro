@@ -1,20 +1,27 @@
 import { isLandscape } from '../utils/utils.js';
-import { getSelectedBetAmount, getBetAmountsArray } from '../web3/blockchain_stuff.js';
+import { getSelectedBetAmount, getBetAmountsArray, getBetAmountMultiplier } from '../web3/blockchain_stuff.js';
+import { BigWinAnimation } from './bigWinAnimation.js';
 
 export class TieSequence {
-    constructor(scene) {
+    constructor(scene, gameState = null) {
         this.scene = scene;
+        this.gameState = gameState;
         this.currentImageIndex = 0;
         this.storyImages = [];
         this.nextButton = null;
         this.background = null;
         this.isActive = false;
         this.betLevel = null;
+        this.bigWinAnimation = new BigWinAnimation(scene);
+        this.playerCard = null;
+        this.houseCard = null;
     }
 
-    startTieSequence() {
+    startTieSequence(playerCard = null, houseCard = null) {
         this.isActive = true;
         this.currentImageIndex = 0;
+        this.playerCard = playerCard;
+        this.houseCard = houseCard;
         
         // Determine bet level based on selected bet amount
         this.betLevel = this.getBetLevel();
@@ -43,6 +50,46 @@ export class TieSequence {
             return '03'; // Highest bet
         } else {
             return '02'; // Middle bet
+        }
+    }
+
+    isJKQAPair() {
+        if (!this.playerCard || !this.houseCard) {
+            return false;
+        }
+        
+        // Check if both cards are J (11), K (13), Q (12), or A (14)
+        const jkqaValues = [11, 12, 13, 14];
+        return jkqaValues.includes(this.playerCard) && jkqaValues.includes(this.houseCard) && this.playerCard === this.houseCard;
+    }
+
+    getWinAmount() {
+        // Calculate win amount using the contract formula: playerCard * tieRewardMultiplier * betMultiplier
+        const selectedBetAmount = getSelectedBetAmount();
+        
+        if (!selectedBetAmount || !this.playerCard) {
+            return 100; // Default amount
+        }
+        
+        try {
+            // Get the tie reward multiplier from the game state
+            const tieRewardMultiplier = this.gameState?.tieRewardMultiplier || 10;
+            
+            // Get the bet amount multiplier from the stored values (no RPC call needed)
+            const betMultiplier = getBetAmountMultiplier(selectedBetAmount);
+            
+            // Convert BigInt values to numbers
+            const cardValue = typeof this.playerCard === 'bigint' ? Number(this.playerCard) : this.playerCard;
+            const tieMultiplier = typeof tieRewardMultiplier === 'bigint' ? Number(tieRewardMultiplier) : tieRewardMultiplier;
+            const betMult = typeof betMultiplier === 'bigint' ? Number(betMultiplier) : betMultiplier;
+            
+            // Calculate the win amount: playerCard * tieRewardMultiplier * betMultiplier
+            const winAmount = cardValue * tieMultiplier * betMult;
+            
+            return winAmount;
+        } catch (error) {
+            console.error("Error calculating win amount:", error);
+            return 100; // Default amount on error
         }
     }
 
@@ -195,8 +242,10 @@ export class TieSequence {
             this.displayCurrentImage();
             this.updateNextButton();
         } else {
-            // Close the sequence
             this.closeTieSequence();
+            const winAmount = this.getWinAmount();
+            const isJKQAPair = this.isJKQAPair();
+            this.bigWinAnimation.startBigWinAnimation(winAmount, isJKQAPair);
         }
     }
 
@@ -236,5 +285,8 @@ export class TieSequence {
 
     destroy() {
         this.closeTieSequence();
+        if (this.bigWinAnimation) {
+            this.bigWinAnimation.destroy();
+        }
     }
 }
