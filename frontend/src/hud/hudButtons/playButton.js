@@ -91,6 +91,7 @@ export class PlayButton {
             if (this.scene.background && this.scene.background.startBoostAnimation) {
                 this.scene.background.startBoostAnimation();
                 this.scene.portraitDisplay.startAnimation();
+                this.scene.portraitDisplay.startShake();
             }
             
             commitGame();

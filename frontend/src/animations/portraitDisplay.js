@@ -7,6 +7,9 @@ export class PortraitDisplay {
         this.portraitSprite = null;
         this.currentBetAmount = null;
         this.isAnimationActive = false;
+        this.isShaking = false;
+        this.originalX = 0;
+        this.originalY = 0;
         this.landscapeModeSize = 300;
         this.portraitModeSize = 256; // 512x512 scaled down to 128x128
         this.create();
@@ -136,7 +139,46 @@ export class PortraitDisplay {
 
     endAnimation() {
         this.isAnimationActive = false;
+        this.stopShake();
         this.updatePortrait();
+    }
+
+    startShake() {
+        if (!this.portraitSprite) return;
+        
+        this.isShaking = true;
+        this.originalX = this.portraitSprite.x;
+        this.originalY = this.portraitSprite.y;
+        
+        // Start the shake animation loop
+        this.shakeLoop();
+    }
+
+    shakeLoop() {
+        if (!this.isShaking || !this.portraitSprite) return;
+        
+        // Random shake in different directions
+        const shakeX = (Math.random() - 0.5) * 15; // Random X shake
+        const shakeY = (Math.random() - 0.5) * 15; // Random Y shake
+        
+        this.portraitSprite.setPosition(
+            this.originalX + shakeX,
+            this.originalY + shakeY
+        );
+        
+        // Continue shaking for a short duration
+        this.scene.time.delayedCall(50, () => {
+            this.shakeLoop();
+        });
+    }
+
+    stopShake() {
+        this.isShaking = false;
+        
+        if (this.portraitSprite) {
+            // Return to original position
+            this.portraitSprite.setPosition(this.originalX, this.originalY);
+        }
     }
 
     destroy() {
