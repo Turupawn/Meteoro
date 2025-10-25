@@ -1,4 +1,4 @@
-A fast-paced war game built 100% on-chain and deployed on MegaETH Testnet. By using MegaETH’s fast block times and mini blocks API, we aim to deliver a sub 500ms experience. Each round, you and the house draw a card, the higher card wins. You can play the game now at [realtimeplay.xyz](https://realtimeplay.xyz/).
+A fast-paced war game built 100% on-chain and deployed on Rise Testnet. By using Rise fast block times and mini blocks API, we aim to deliver a sub 500ms experience. Each round, you and the house draw a card, the higher card wins. You can play the game now at [realtimeplay.xyz](https://realtimeplay.xyz/).
 
 ![FastWeb3Casino](img/readme/gameplay.png)
 _Play the demo now at [realtimeplay.xyz](https://realtimeplay.xyz/)_

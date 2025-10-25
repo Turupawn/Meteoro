@@ -253,12 +253,12 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             faucetLinkY, 
-            "https://testnet.megaeth.com/", 
+            "https://faucet.testnet.riselabs.xyz/",
             titleFontSize - 4,
             {
                 interactive: true,
                 isLink: true, // Add link styling
-                onClick: () => window.open('https://testnet.megaeth.com/', '_blank'),
+                onClick: () => window.open('https://faucet.testnet.riselabs.xyz/', '_blank'),
                 depth: 254
             }
         );
