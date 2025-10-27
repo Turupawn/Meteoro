@@ -27,3 +27,9 @@ forge verify-contract --rpc-url https://testnet.riselabs.xyz --verifier blocksco
 ```bash
 forge verify-contract --rpc-url https://testnet.riselabs.xyz --verifier blockscout --verifier-url https://explorer.testnet.riselabs.xyz/api/ 0x1234567890123456789012345678901234567890 src/TwoPartyWarGame.sol:TwoPartyWarGame
 ```
+
+## Update Bet Amounts and Multipliers
+
+```bash
+source .env && forge script UpdateBetAmountsScript --sig "run(address)" 0x1234567890123456789012345678901234567890 --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
+```
