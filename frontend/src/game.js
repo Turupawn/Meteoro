@@ -15,9 +15,9 @@ import { MainMenu } from './menus/mainMenu.js';
 import { BetMenu } from './menus/betMenu.js';
 import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
 import { setErrorModal, ErrorModal } from './menus/errorModal.js';
-import { setGameScene, updateGameState } from './main.js';
+import { setGameScene, updateGameDisplay } from './main.js';
 import { printLog, isLandscape } from './utils/utils.js';
-import { getMinimumPlayableBalance } from './web3/blockchain_stuff.js';
+import { getMinimumPlayableBalance, getPlayerETHBalance, getPlayerGachaTokenBalanceFormatted } from './web3/blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -69,7 +69,7 @@ class GameScene extends Phaser.Scene {
         setGameScene(this);
 
         this.time.delayedCall(100, () => {
-            updateGameState();
+            updateGameDisplay();
         });
 
         this.time.delayedCall(1000, () => {
@@ -80,9 +80,13 @@ class GameScene extends Phaser.Scene {
     }
 
     updateDisplay(balance = null, gachaTokenBalance = null, gameState = null) {
-        this.currentBalance = balance;
-        this.ethBalanceText.updateBalance(balance);
-        this.gachaTokenBalanceText.updateBalance(gachaTokenBalance);
+        // Get balance directly from blockchain functions instead of parameters
+        const currentBalance = balance || getPlayerETHBalance();
+        const currentGachaBalance = gachaTokenBalance || getPlayerGachaTokenBalanceFormatted();
+        
+        this.currentBalance = currentBalance;
+        this.ethBalanceText.updateBalance(currentBalance);
+        this.gachaTokenBalanceText.updateBalance(currentGachaBalance);
         this.cardDisplay.updateCurrentGameDisplay();
         
         this.portraitDisplay.updatePortrait();
@@ -105,7 +109,7 @@ class GameScene extends Phaser.Scene {
             this.betMenuButton.updateDisplay();
         }
         
-        this.checkInsufficientBalance(balance);
+        this.checkInsufficientBalance(getPlayerETHBalance());
         
         // Re-enable play button when game state is ready for new input
         if (this.playButton && gameState) {
@@ -123,7 +127,7 @@ class GameScene extends Phaser.Scene {
     onBetAmountChanged(newBetAmount) {
         console.log('Bet amount changed to:', newBetAmount);
         this.portraitDisplay.updatePortrait();
-        updateGameState();
+        updateGameDisplay();
     }
 
     checkInsufficientBalance(balance) {

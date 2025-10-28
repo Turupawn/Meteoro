@@ -7,11 +7,8 @@ import {
     checkInitialGameState,
     commit,
     performReveal, 
-    updateGasPrice,
-    initializeNonce,
-    web3,
-    getPlayerETHBalance,
-    getMinimumPlayableBalance
+    startEventMonitoring,
+    stopEventMonitoring
 } from './web3/blockchain_stuff.js';
 
 import { 
@@ -21,15 +18,19 @@ import {
     setWalletAddressGetter,
 } from './session_tracking.js';
 
-import { showErrorModal } from './menus/errorModal.js';
-import { captureBlockchainError } from './session_tracking.js';
-
-const POLL_INTERVAL = parseInt(import.meta.env.POLL_INTERVAL) || 1000
+import { 
+    getMinimumPlayableBalance,
+    getPlayerETHBalance,
+    getGameState,
+    updateGameState,
+    updateBalances
+} from './gameState.js';
 
 var game
 var gameScene = null; // Reference to the main game scene
 
 const MIN_BALANCE = "0.00001";
+const GAME_LOOP_INTERVAL = 50;
 let commitStartTime = null;
 
 let gameState = null;
@@ -152,16 +153,19 @@ async function loadGameData() {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     updateGameDataProgress(0.7);
-    console.log("Updating gas price...")
-    await updateGasPrice();
-    console.log("Initializing nonce...")
-    await new Promise(resolve => setTimeout(resolve, 150));
-    await initializeNonce();
-    gameDataLoadingProgress = 0.9;
-    updateGameDataProgress(0.9);
     console.log("Checking initial game state...")
     gameState = await checkInitialGameState();
-    initialRecentHistory = gameState.recentHistory;
+    
+    gameDataLoadingProgress = 0.9;
+    updateGameDataProgress(0.9);
+    console.log("Starting real-time event monitoring...")
+    startEventMonitoring()
+    
+    if (!gameState) {
+      throw new Error("Failed to load initial game state - contract may not be deployed or accessible")
+    }
+    
+    initialRecentHistory = gameState.recentHistory || [];
 
     // Convert BigInt values to strings for readable output (recursive)
     const convertBigIntToString = (obj) => {
@@ -224,10 +228,15 @@ export function setLoadingScreenReady() {
 
 // Listen for when cards are displayed to update game state
 window.addEventListener('cardsDisplayed', () => {
-  updateGameState();
+  updateGameDisplay();
 });
 
 loadDapp()
+
+// Cleanup event monitoring when page is unloaded
+window.addEventListener('beforeunload', () => {
+    stopEventMonitoring()
+})
 
 function getStoredSecret() {
     const secretData = localStorage.getItem('playerSecret');
@@ -259,16 +268,15 @@ async function gameLoop() {
     try {
         printLog(['debug'], "=== GAME LOOP START ===");
 
-        gameState = await checkGameState();
-        printLog(['debug'], "Current game state:", gameState);
+        const centralizedGameState = getGameState()
         
         const pendingCommit = getStoredCommit();
         const pendingReveal = getPendingReveal();
         printLog(['debug'], "Pending commit:", pendingCommit);
         printLog(['debug'], "Pending reveal:", pendingReveal);
 
-        if (gameState && gameState.gameState === 2n /* HashPosted */ && pendingCommit) {
-            const result = calculateCards(pendingCommit.secret, gameState.houseRandomness);
+        if (centralizedGameState && centralizedGameState.gameState === 2n /* HashPosted */ && pendingCommit) {
+            const result = calculateCards(pendingCommit.secret, centralizedGameState.houseRandomness);
             
             if (commitStartTime) {
                 const endTime = Date.now();
@@ -282,11 +290,11 @@ async function gameLoop() {
                 
                 // Track game completion performance
                 captureGameEvent('game_completed', {
-                    game_id: gameState.gameId?.toString(),
+                    game_id: centralizedGameState.gameId?.toString(),
                     player_card: result.playerCard,
                     house_card: result.houseCard,
                     total_time_ms: totalTime,
-                    player_balance: gameState.playerETHBalance?.toString()
+                    player_balance: centralizedGameState.playerETHBalance?.toString()
                 });
             }
 
@@ -306,9 +314,8 @@ async function gameLoop() {
                 await performReveal(pendingCommit.secret);
                 printLog(['debug'], "Reveal transaction completed successfully");
                 
-                // Track successful reveal
                 captureGameEvent('reveal_transaction_success', {
-                    game_id: gameState.gameId?.toString(),
+                    game_id: centralizedGameState.gameId?.toString(),
                     player_card: result.playerCard,
                     house_card: result.houseCard
                 });
@@ -318,7 +325,7 @@ async function gameLoop() {
                 
                 // Track reveal failure
                 captureGameEvent('reveal_transaction_failed', {
-                    game_id: gameState.gameId?.toString(),
+                    game_id: centralizedGameState.gameId?.toString(),
                     error: error.message
                 });
                 
@@ -333,14 +340,14 @@ async function gameLoop() {
         }
         
         // Handle case where game is already revealed (state 3n) and there's a pending reveal
-        if (gameState && gameState.gameState === 3n && pendingReveal) {
+        if (centralizedGameState && centralizedGameState.gameState === 3n && pendingReveal) {
             printLog(['debug'], "Game already revealed, clearing pending reveal");
             clearPendingReveal();
             
             // Calculate and display the result
-            if (gameState.playerCard && gameState.houseCard) {
-                const playerCard = parseInt(gameState.playerCard);
-                const houseCard = parseInt(gameState.houseCard);
+            if (centralizedGameState.playerCard && centralizedGameState.houseCard) {
+                const playerCard = parseInt(centralizedGameState.playerCard);
+                const houseCard = parseInt(centralizedGameState.houseCard);
                 if (!isNaN(playerCard) && !isNaN(houseCard)) {
                     if (gameScene) {
                         gameScene.updateCardDisplay(playerCard, houseCard);
@@ -351,25 +358,25 @@ async function gameLoop() {
         
         // Handle new game requests
         if (
-            gameState && (
-                gameState.gameState === 0n /* NotStarted */ ||
-                gameState.gameState === 3n /* Revealed */   ||
-                gameState.gameState === 4n /* Forfeited */)
+            centralizedGameState && (
+                centralizedGameState.gameState === 0n /* NotStarted */ ||
+                centralizedGameState.gameState === 3n /* Revealed */   ||
+                centralizedGameState.gameState === 4n /* Forfeited */)
             && shouldProcessCommit) {
+            
             shouldProcessCommit = false;
             const storedCommit = getStoredCommit();
+            
             if (storedCommit) {
                 printLog(['debug'], "Found pending commit from previous game:", storedCommit);
-                showErrorModal("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete.");
-                captureError(new Error("Cannot start new game while previous game's commit is still pending. Please wait for the current game to complete."), { function: 'gameLoop' });
-                shouldProcessCommit = false;
-                
-                // Track attempt to start game with pending commit
+                printLog(['debug'], "Clearing stale commit and proceeding...");
+                clearStoredCommit();
                 captureGameEvent('game_start_blocked_pending_commit', {
-                    game_id: gameState.gameId?.toString()
-                });
-                
-            } else if (!gameState) {
+                    game_id: centralizedGameState.gameId?.toString()
+                });                
+            }
+            
+            if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
                 shouldProcessCommit = false;
                 captureGameEvent('game_start_failed_uninitialized_state');
@@ -382,9 +389,10 @@ async function gameLoop() {
                     minimum_balance: getMinimumPlayableBalance()
                 });
                 
-            } else if ( gameState.gameState === 0n /* NotStarted */ ||
-                        gameState.gameState === 3n /* Revealed */   ||
-                        gameState.gameState === 4n /* Forfeited */) {
+            } else if ( centralizedGameState.gameState === 0n /* NotStarted */ ||
+                        centralizedGameState.gameState === 3n /* Revealed */   ||
+                        centralizedGameState.gameState === 4n /* Forfeited */) {
+                printLog(['debug'], "=== STARTING COMMIT PROCESS ===");
                 const secret = generateRandomBytes32();
                 storeCommit(secret);
                 commitStartTime = Date.now();
@@ -395,23 +403,26 @@ async function gameLoop() {
                 
                 // Track game start attempt
                 captureGameEvent('game_start_attempted', {
-                    game_id: gameState.gameId?.toString(),
-                    player_balance: gameState.playerETHBalance?.toString(),
-                    game_state: gameState.gameState?.toString()
+                    game_id: centralizedGameState.gameId?.toString(),
+                    player_balance: centralizedGameState.playerETHBalance?.toString(),
+                    game_state: centralizedGameState.gameState?.toString()
                 });
                 
                 // Mark transaction as in progress
                 isTransactionInProgress = true;
                 try {
-                    await commit(web3.utils.soliditySha3(secret));
+                    // Use keccak256 hash instead of web3.utils.soliditySha3
+                    const { keccak256 } = await import('viem')
+                    const commitHash = keccak256(secret);
+                    await commit(commitHash);
                     shouldProcessCommit = false;
-                    updateGameState();
+                    updateGameDisplay();
                     printLog(['debug'], "Commit transaction completed successfully");
                     
                     // Track successful commit
                     captureGameEvent('commit_transaction_success', {
-                        game_id: gameState.gameId?.toString(),
-                        player_balance: gameState.playerETHBalance?.toString()
+                        game_id: centralizedGameState.gameId?.toString(),
+                        player_balance: centralizedGameState.playerETHBalance?.toString()
                     });
                     
                 } catch (error) {
@@ -420,7 +431,7 @@ async function gameLoop() {
                     
                     // Track commit failure
                     captureGameEvent('commit_transaction_failed', {
-                        game_id: gameState.gameId?.toString(),
+                        game_id: centralizedGameState.gameId?.toString(),
                         error: error.message
                     });
                     
@@ -434,7 +445,7 @@ async function gameLoop() {
                 }
             }
         }
-        updateGameState();
+        updateGameDisplay();
         printLog(['debug'], "=== GAME LOOP END ===");
     } catch (error) {
         printLog(['error'], "Error in game loop:", error);
@@ -449,13 +460,14 @@ async function gameLoop() {
     }
 }
 
-export async function updateGameState() {
+export async function updateGameDisplay() {
     try {
-        if (!gameState) return;
+        const centralizedGameState = getGameState()
+        if (!centralizedGameState) return;
         const wallet = getLocalWallet()
         // Use the game scene reference instead of hardcoded index
         if (gameScene) {
-            gameScene.updateDisplay(gameState.playerETHBalance, gameState.playerGachaTokenBalance, wallet.address, gameState);
+            gameScene.updateDisplay(centralizedGameState.playerETHBalance, centralizedGameState.playerGachaTokenBalance, wallet.address, centralizedGameState);
         }
     } catch (error) {
         console.error("Error updating game state:", error);
@@ -464,14 +476,14 @@ export async function updateGameState() {
 
 function startGameLoop() {
     gameLoop();
-    setInterval(gameLoop, POLL_INTERVAL);
+    setInterval(gameLoop, GAME_LOOP_INTERVAL);
 }
 
 function storeCommit(secret) {
     printLog(['debug'], "=== STORE COMMIT ===");
     printLog(['debug'], "Previous commit:", getStoredCommit());
     printLog(['debug'], "New commit:", secret);
-    printLog(['debug'], "Commitment:", web3.utils.soliditySha3(secret));
+    // Note: commitment hash will be calculated in the commit function
     localStorage.setItem('pendingCommit', JSON.stringify({
         secret: secret,
         timestamp: Date.now()
@@ -520,20 +532,16 @@ export async function commitGame() {
     gameScene.cardDisplay.clearCardSprites();
     shouldProcessCommit = true;
     
-    // Update the previous game's history with actual card values if they exist
     if (gameScene.cardDisplay.currentPlayerCard !== null && gameScene.cardDisplay.currentHouseCard !== null) {
         gameScene.gameHistory.updateLastGameInHistory(gameScene.cardDisplay.currentPlayerCard, gameScene.cardDisplay.currentHouseCard);
     }
     
-    // Add pending game to history immediately when play button is hit
     gameScene.gameHistory.addPendingGameToHistory();
     
-    // Add a small delay to prevent race conditions with the game loop
     setTimeout(() => {
-        updateGameState(); // Update the display to show the new history entry
+        updateGameDisplay();
     }, 100);
     
-    // Track manual commit request
     captureGameEvent('commit_game_called', {
         timestamp: Date.now()
     });

@@ -50,6 +50,12 @@ contract TwoPartyWarGame is Ownable, Pausable {
     event BetAmountsUpdated(uint[] newBetAmounts);
     event TieRewardMultiplierUpdated(uint newMultiplier);
     event BetAmountMultiplierUpdated(uint betAmount, uint multiplier);
+    event GameStateChanged(uint indexed gameId, State newState, address indexed player);
+    event HouseRandomnessPosted(uint indexed gameId, bytes32 randomness, uint timestamp);
+    event GameRevealed(uint indexed gameId, address indexed player, uint playerCard, uint houseCard, address winner);
+    event GameWon(address indexed winner, uint indexed gameId, uint amount);
+    event GameTied(uint indexed gameId, address indexed player, uint playerCard, uint houseCard, uint tieReward);
+    event BalanceUpdated(address indexed player, uint ethBalance, uint gachaTokenBalance);
 
     constructor(address _house, address _gachaToken) Ownable(msg.sender) {
         HOUSE = _house;
@@ -85,6 +91,7 @@ contract TwoPartyWarGame is Ownable, Pausable {
         games[nextGameId] = newGame;
         playerGames[msg.sender].push(nextGameId);
         emit GameCreated(msg.sender, _commitHash, nextGameId, msg.value);
+        emit GameStateChanged(nextGameId, State.Committed, msg.sender);
         nextGameId++;
     }
 
@@ -103,6 +110,8 @@ contract TwoPartyWarGame is Ownable, Pausable {
                 playerGame.gameState = State.HashPosted;
                 playerGame.houseRandomness = randomness[i];
                 playerGame.houseRandomnessTimestamp = block.timestamp;
+                emit HouseRandomnessPosted(gameId, randomness[i], block.timestamp);
+                emit GameStateChanged(gameId, State.HashPosted, playerGame.playerAddress);
             }
         }
         require(msg.value == totalExpectedValue, "Incorrect total bet amount");
@@ -137,6 +146,11 @@ contract TwoPartyWarGame is Ownable, Pausable {
         playerGame.revealTimestamp = block.timestamp;
 
         uint totalStake = playerGame.betAmount * 2;
+        uint currentGameId = getCurrentGameId(msg.sender);
+        
+        emit GameRevealed(currentGameId, msg.sender, playerCard, houseCard, winner);
+        emit GameStateChanged(currentGameId, State.Revealed, msg.sender);
+        
         if (isTie) {
             uint betMultiplier = betAmountMultipliers[playerGame.betAmount];
             if (betMultiplier == 0) {
@@ -144,9 +158,11 @@ contract TwoPartyWarGame is Ownable, Pausable {
             }
             uint tieReward = playerCard * tieRewardMultiplier * betMultiplier;
             gachaToken.mint(msg.sender, tieReward);
-            emit TieRewardMinted(msg.sender, tieReward, getCurrentGameId(msg.sender));
+            emit TieRewardMinted(msg.sender, tieReward, currentGameId);
+            emit GameTied(currentGameId, msg.sender, playerCard, houseCard, tieReward);
             transferEth(payable(HOUSE), totalStake);
         } else {
+            emit GameWon(winner, currentGameId, totalStake);
             transferEth(payable(winner), totalStake);
         }
     }
@@ -160,6 +176,7 @@ contract TwoPartyWarGame is Ownable, Pausable {
         playerGame.gameState = State.Forfeited;
         transferEth(payable(HOUSE), playerGame.betAmount);
         emit GameForfeited(msg.sender, HOUSE);
+        emit GameStateChanged(getCurrentGameId(msg.sender), State.Forfeited, msg.sender);
     }
 
     // Helpers

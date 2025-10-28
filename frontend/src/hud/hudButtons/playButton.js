@@ -68,13 +68,11 @@ export class PlayButton {
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
         const clickHandler = async () => {
-            // Immediately disable the button to prevent rapid clicking
             this.disableButton();
             
             const hasInsufficientBalance = await this.checkInsufficientBalance();
             
             if (hasInsufficientBalance) {
-                // Re-enable button if insufficient balance
                 this.enableButton();
                 
                 if (this.scene.insufficientBalanceMenu) {
@@ -84,7 +82,6 @@ export class PlayButton {
                 return;
             }
 
-            // Proceed with normal game flow
             if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {
                 this.scene.cardDisplay.currentGameText.setText(`Please wait...`);
             }

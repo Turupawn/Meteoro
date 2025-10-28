@@ -1,5 +1,5 @@
 import { isLandscape } from '../utils/utils.js';
-import { getSelectedBetAmount, getBetAmountsArray, getBetAmountMultiplier } from '../web3/blockchain_stuff.js';
+import { getSelectedBetAmount, getBetAmountsArray, getBetAmountMultiplier } from '../gameState.js';
 import { BigWinAnimation } from './bigWinAnimation.js';
 
 export class TieSequence {

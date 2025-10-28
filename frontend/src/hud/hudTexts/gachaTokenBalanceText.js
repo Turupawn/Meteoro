@@ -1,6 +1,6 @@
 
 import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../../utils/utils.js';
-import { web3 } from '../../web3/blockchain_stuff.js';
+import { formatBalance } from '../../web3/blockchain_stuff.js';
 
 export class GachaTokenBalanceText {
     constructor(scene) {
@@ -82,16 +82,7 @@ export class GachaTokenBalanceText {
 
         let gachaTokenBalanceString = "     0 GACHA";
         if (balance !== null) {
-            try {
-                if (web3 && web3.utils) {
-                    const balanceInEth = web3.utils.fromWei(balance, 'ether');
-                    gachaTokenBalanceString = `${parseFloat(balanceInEth).toFixed(0)} GACHA`;
-                } else {
-                    gachaTokenBalanceString = `${balance} WEI`;
-                }
-            } catch (error) {
-                gachaTokenBalanceString = `${balance} WEI`;
-            }
+            gachaTokenBalanceString = `${formatBalance(balance, 0)} GACHA`;
         }
 
         const gachaTokenBalanceText = this.scene.add.text(0, 0, gachaTokenBalanceString, {
