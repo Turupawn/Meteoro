@@ -1,4 +1,5 @@
-import { getSelectedBetAmount, web3 } from '../../web3/blockchain_stuff.js';
+import { getSelectedBetAmount } from '../../gameState.js';
+import { formatBalance } from '../../web3/blockchain_stuff.js';
 import { isLandscape } from '../../utils/utils.js';
 
 export class BetMenuButton {
@@ -92,28 +93,14 @@ export class BetMenuButton {
         if (!betAmount) {
             return "Loading...";
         }
-
-        try {
-            const ethAmount = web3.utils.fromWei(betAmount, 'ether');
-            return `BET\n${parseFloat(ethAmount).toFixed(6)} ETH`;
-        } catch (error) {
-            console.error('Error converting bet amount:', error);
-            return "BET\nError";
-        }
+        return `BET\n${formatBalance(betAmount, 6)} ETH`;
     }
 
     getAmountText(betAmount) {
         if (!betAmount) {
             return "Loading...";
         }
-        
-        try {
-            const ethAmount = web3.utils.fromWei(betAmount, 'ether');
-            return `${parseFloat(ethAmount).toFixed(6)} ETH`;
-        } catch (error) {
-            console.error('Error converting bet amount:', error);
-            return "Error";
-        }
+        return `${formatBalance(betAmount, 6)} ETH`;
     }
 
     updateDisplay() {

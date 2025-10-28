@@ -1,5 +1,5 @@
 import { isLandscape } from '../utils/utils.js';
-import { getSelectedBetAmount, getBetAmountsArray } from '../web3/blockchain_stuff.js';
+import { getSelectedBetAmount, getBetAmountsArray } from '../gameState.js';
 
 export class PortraitDisplay {
     constructor(scene) {

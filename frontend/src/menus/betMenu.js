@@ -1,4 +1,5 @@
-import { getBetAmountsArray, setSelectedBetAmount, getSelectedBetAmount, web3 } from '../web3/blockchain_stuff.js';
+import { getBetAmountsArray, setSelectedBetAmount, getSelectedBetAmount } from '../gameState.js';
+import { formatBalance } from '../web3/blockchain_stuff.js';
 import { isLandscape } from '../utils/utils.js';
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuText } from './menuElements/menuText.js';
@@ -130,8 +131,7 @@ export class BetMenu {
 
         betAmountsArray.forEach((betAmount, index) => {
             const y = startY + (index * buttonSpacing);
-            const ethAmount = web3.utils.fromWei(betAmount, 'ether');
-            const displayText = `${parseFloat(ethAmount).toFixed(6)} ETH`;
+            const displayText = `${formatBalance(betAmount, 6)} ETH`;
             const isSelected = betAmount === currentBetAmount;
             
             const button = new MenuButton(

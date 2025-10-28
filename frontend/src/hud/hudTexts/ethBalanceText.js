@@ -1,6 +1,6 @@
 
 import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../../utils/utils.js';
-import { web3 } from '../../web3/blockchain_stuff.js';
+import { formatBalance } from '../../web3/blockchain_stuff.js';
 
 export class ETHBalanceText {
     constructor(scene) {
@@ -74,18 +74,9 @@ export class ETHBalanceText {
 
         this.renderTexture.clear();
 
-        let ethBalanceString = "0.00000 ETH";
+        let ethBalanceString = "0.000000 ETH";
         if (balance !== null) {
-            try {
-                if (web3 && web3.utils) {
-                    const balanceInEth = web3.utils.fromWei(balance, 'ether');
-                    ethBalanceString = `${parseFloat(balanceInEth).toFixed(5)} ETH`;
-                } else {
-                    ethBalanceString = `${balance} WEI`;
-                }
-            } catch (error) {
-                ethBalanceString = `${balance} WEI`;
-            }
+            ethBalanceString = `${formatBalance(balance, 6)} ETH`;
         }
 
         const ethBalanceText = this.scene.add.text(0, 0, ethBalanceString, {
