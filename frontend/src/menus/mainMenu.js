@@ -1,4 +1,4 @@
-import { forfeit, withdrawFunds, getLocalWallet, web3 } from '../web3/blockchain_stuff.js';
+import { forfeit, withdrawFunds, getLocalWallet, formatBalance } from '../web3/blockchain_stuff.js';
 import { isLandscape } from '../utils/utils.js';
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuInput } from './menuElements/menuInput.js';
@@ -253,12 +253,12 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             faucetLinkY, 
-            "https://testnet.megaeth.com/", 
+            "https://faucet.testnet.riselabs.xyz/",
             titleFontSize - 4,
             {
                 interactive: true,
                 isLink: true, // Add link styling
-                onClick: () => window.open('https://testnet.megaeth.com/', '_blank'),
+                onClick: () => window.open('https://faucet.testnet.riselabs.xyz/', '_blank'),
                 depth: 254
             }
         );
@@ -343,8 +343,7 @@ export class MainMenu {
         let ethBalanceString = "0.00000 ETH";
         if (this.scene.currentBalance) {
             try {
-                const balanceInEth = web3.utils.fromWei(this.scene.currentBalance.toString(), 'ether');
-                ethBalanceString = `${parseFloat(balanceInEth).toFixed(5)} ETH`;
+                ethBalanceString = `${formatBalance(this.scene.currentBalance, 6)} ETH`;
             } catch (error) {
                 console.error('Error converting balance:', error);
                 ethBalanceString = `${this.scene.currentBalance} WEI`;

@@ -19,19 +19,17 @@ forge inspect src/TwoPartyWarGame.sol abi --json --via-ir | tee ../frontend/publ
 ## Verify Token
 
 ```bash
-forge verify-contract --rpc-url https://carrot.megaeth.com/rpc --verifier blockscout --verifier-url https://megaeth-testnet.blockscout.com/api/ 0x7dfDdF0aa8084dF7eD63f1ddBC0C1dce436a5e8c src/GachaToken.sol:GachaToken
+forge verify-contract --rpc-url https://testnet.riselabs.xyz --verifier blockscout --verifier-url https://explorer.testnet.riselabs.xyz/api/ 0x1234567890123456789012345678901234567890 src/GachaToken.sol:GachaToken
 ```
 
 ## Verify Game
 
 ```bash
-forge verify-contract --rpc-url https://carrot.megaeth.com/rpc --verifier blockscout --verifier-url https://megaeth-testnet.blockscout.com/api/ 0x1234567890123456789012345678901234567890 src/TwoPartyWarGame.sol:TwoPartyWarGame
+forge verify-contract --rpc-url https://testnet.riselabs.xyz --verifier blockscout --verifier-url https://explorer.testnet.riselabs.xyz/api/ 0x1234567890123456789012345678901234567890 src/TwoPartyWarGame.sol:TwoPartyWarGame
 ```
 
-
-## RPCs
+## Update Bet Amounts and Multipliers
 
 ```bash
-https://carrot.megaeth.com/rpc
-https://6342.rpc.thirdweb.com
+source .env && forge script UpdateBetAmountsScript --sig "run(address)" 0x1234567890123456789012345678901234567890 --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
 ```

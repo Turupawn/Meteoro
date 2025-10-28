@@ -6,7 +6,7 @@ const port = process.env.PORT || 3000;
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL) || 1500;
 const MAX_CONSECUTIVE_FAILURES = parseInt(process.env.MAX_CONSECUTIVE_FAILURES) || 5;
 
-const web3 = new Web3(process.env.RPC_URL);
+const web3 = new Web3(process.env.INDEXER_RPC_URL);
 const contractAddress = process.env.CONTRACT_ADDRESS;
 const contractABI = require('./json_abi/MyContract.json');
 
