@@ -2,6 +2,8 @@ import Web3 from 'web3';
 
 const PRINT_LEVELS = ['profile', 'error']; //['debug', 'profile', 'error'];
 
+export const BET_AMOUNT_DECIMALS = 4;
+
 export function generateRandomBytes32() {
     return Web3.utils.randomHex(32);
 }

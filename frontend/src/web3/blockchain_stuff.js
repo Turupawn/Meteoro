@@ -12,12 +12,14 @@ const WSS_URL = import.meta.env.WSS_URL || 'wss://testnet.riselabs.xyz'
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json"
 const GAS_LIMIT = 300000
 const GAS_FEE_BUFFER_ETH = 0.00001
+const BALANCE_POLL_INTERVAL = 1000
 
 let CONTRACT_ABI = null
 
 let wsClient
 let walletClient
 let eventUnwatch = null
+let balancePoll = null
 
 export function formatBalance(weiBalance, shownDecimals = 6) {
   const balanceInEth = formatEther(weiBalance)
@@ -492,6 +494,12 @@ export async function startEventMonitoring() {
     
     printLog(['debug'], "Event monitoring started successfully")
     
+    balancePoll = setInterval(async () => {
+      const ethBalance = await wsClient.getBalance({ address: wallet.address })
+      const currentGacha = gameState.getGachaTokenBalance()
+      updateBalances(ethBalance, currentGacha)
+    }, BALANCE_POLL_INTERVAL)
+    
     return eventUnwatch
   } catch (error) {
     console.error("Error starting event monitoring:", error)
@@ -505,6 +513,10 @@ export function stopEventMonitoring() {
     eventUnwatch()
     eventUnwatch = null
     printLog(['debug'], "Event monitoring stopped")
+  }
+  if (balancePoll) {
+    clearInterval(balancePoll)
+    balancePoll = null
   }
 }
 

@@ -1,6 +1,6 @@
 import { getBetAmountsArray, setSelectedBetAmount, getSelectedBetAmount } from '../gameState.js';
 import { formatBalance } from '../web3/blockchain_stuff.js';
-import { isLandscape } from '../utils/utils.js';
+import { isLandscape, BET_AMOUNT_DECIMALS } from '../utils/utils.js';
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuText } from './menuElements/menuText.js';
 
@@ -131,7 +131,7 @@ export class BetMenu {
 
         betAmountsArray.forEach((betAmount, index) => {
             const y = startY + (index * buttonSpacing);
-            const displayText = `${formatBalance(betAmount, 6)} ETH`;
+            const displayText = `${formatBalance(betAmount, BET_AMOUNT_DECIMALS)} ETH`;
             const isSelected = betAmount === currentBetAmount;
             
             const button = new MenuButton(
