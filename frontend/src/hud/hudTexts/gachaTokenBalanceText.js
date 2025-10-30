@@ -3,6 +3,9 @@ import { applyPerspectiveToQuadImageToLeft, isLandscape, GACHA_BALANCE_DECIMALS 
 import { formatBalance } from '../../web3/blockchain_stuff.js';
 
 export class GachaTokenBalanceText {
+
+    gachaTokenBalanceText = '';
+
     constructor(scene) {
         this.scene = scene;
         this.createGachaTokenBalanceText();
@@ -72,45 +75,45 @@ export class GachaTokenBalanceText {
     }
 
     updateBalance(balance = null) {
-        if (!this.renderTexture) {
-            return;
-        }
+        this.scene.time.delayedCall(250, () => {
+            if (!this.renderTexture) {
+                return;
+            }
 
-        // Clear the render texture
-        this.renderTexture.clear();
+            // Clear the render texture
+            this.renderTexture.clear();
 
+            if (balance !== null) {
+                this.gachaTokenBalanceText = `${formatBalance(balance, GACHA_BALANCE_DECIMALS)} GACHA`;
+            }
 
-        let gachaTokenBalanceString = "     0 GACHA";
-        if (balance !== null) {
-            gachaTokenBalanceString = `${formatBalance(balance, GACHA_BALANCE_DECIMALS)} GACHA`;
-        }
+            const gachaTokenBalanceText = this.scene.add.text(0, 0, this.gachaTokenBalanceText, {
+                font: 'bold 32px Orbitron',
+                fill: '#E0F6FF',
+                stroke: '#0066CC',
+                strokeThickness: 2,
+                alpha: 0.9,
+                shadow: {
+                    offsetX: 2,
+                    offsetY: 2,
+                    color: '#003366',
+                    blur: 4,
+                    fill: true
+                }
+            });
+            gachaTokenBalanceText.setVisible(false);
+            if(isLandscape()) {
+                this.renderTexture.draw(gachaTokenBalanceText, 320, 100);
+            } else {
+                this.renderTexture.draw(gachaTokenBalanceText, 20, 30);
+            }
+            gachaTokenBalanceText.destroy();
 
-        const gachaTokenBalanceText = this.scene.add.text(0, 0, gachaTokenBalanceString, {
-            font: 'bold 32px Orbitron',
-            fill: '#E0F6FF',
-            stroke: '#0066CC',
-            strokeThickness: 2,
-            alpha: 0.9,
-            shadow: {
-                offsetX: 2,
-                offsetY: 2,
-                color: '#003366',
-                blur: 4,
-                fill: true
+            // Update the quad image texture
+            if (this.quadImage) {
+                this.quadImage.setTexture('gachaTokenBalanceTexture');
+                this.quadImage.setVisible(true);
             }
         });
-        gachaTokenBalanceText.setVisible(false);
-        if(isLandscape()) {
-            this.renderTexture.draw(gachaTokenBalanceText, 320, 100);
-        } else {
-            this.renderTexture.draw(gachaTokenBalanceText, 20, 30);
-        }
-        gachaTokenBalanceText.destroy();
-
-        // Update the quad image texture
-        if (this.quadImage) {
-            this.quadImage.setTexture('gachaTokenBalanceTexture');
-            this.quadImage.setVisible(true);
-        }
     }
 }

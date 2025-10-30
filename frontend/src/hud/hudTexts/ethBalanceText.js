@@ -2,19 +2,22 @@ import { applyPerspectiveToQuadImageToLeft, isLandscape, ETH_BALANCE_DECIMALS } 
 import { formatBalance } from '../../web3/blockchain_stuff.js';
 
 export class ETHBalanceText {
+
+    balanceText = '';
+
     constructor(scene) {
         this.scene = scene;
         this.createETHBalanceText();
     }
 
-    createETHBalanceText() {
+    async createETHBalanceText() {
         if(isLandscape()) {
             this.renderTexture = this.scene.add.renderTexture(0, 0, 1200, 1200);
         } else {
             this.renderTexture = this.scene.add.renderTexture(0, 0, 600, 220);
         }
         
-        const ethBalanceText = this.scene.add.text(0, 0, '0.000000 ETH', {
+        const ethBalanceText = this.scene.add.text(0, 0, '', {
             font: 'bold 48px Orbitron',
             fill: '#E0F6FF',
             stroke: '#0066CC',
@@ -64,45 +67,51 @@ export class ETHBalanceText {
             this.quadImage.bottomRight.y -= 100;
         }
         this.quadImage.setVisible(false);
+
+        // add a blocking delay here
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        this.updateBalance();
     }
 
     updateBalance(balance = null) {
-        if (!this.renderTexture) {
-            return;
-        }
+        this.scene.time.delayedCall(250, () => {
+            if (!this.renderTexture) {
+                return;
+            }
 
-        this.renderTexture.clear();
+            this.renderTexture.clear();
 
-        let ethBalanceString = "0.000000 ETH";
-        if (balance !== null) {
-            ethBalanceString = `${formatBalance(balance, ETH_BALANCE_DECIMALS)} ETH`;
-        }
+            if (balance !== null) {
+                this.balanceText = `${formatBalance(balance, ETH_BALANCE_DECIMALS)} ETH`;
+            }
 
-        const ethBalanceText = this.scene.add.text(0, 0, ethBalanceString, {
-            font: 'bold 32px Orbitron',
-            fill: '#E0F6FF',
-            stroke: '#0066CC',
-            strokeThickness: 2,
-            alpha: 0.9,
-            shadow: {
-                offsetX: 2,
-                offsetY: 2,
-                color: '#003366',
-                blur: 4,
-                fill: true
+            const ethBalanceText = this.scene.add.text(0, 0, this.balanceText, {
+                font: 'bold 32px Orbitron',
+                fill: '#E0F6FF',
+                stroke: '#0066CC',
+                strokeThickness: 2,
+                alpha: 0.9,
+                shadow: {
+                    offsetX: 2,
+                    offsetY: 2,
+                    color: '#003366',
+                    blur: 4,
+                    fill: true
+                }
+            });
+            ethBalanceText.setVisible(false);
+            if(isLandscape()) {
+                this.renderTexture.draw(ethBalanceText, 320, 100);
+            } else {
+                this.renderTexture.draw(ethBalanceText, 20, 30);
+            }
+            ethBalanceText.destroy();
+
+            if (this.quadImage) {
+                this.quadImage.setTexture('ethBalanceTexture');
+                this.quadImage.setVisible(true);
             }
         });
-        ethBalanceText.setVisible(false);
-        if(isLandscape()) {
-            this.renderTexture.draw(ethBalanceText, 320, 100);
-        } else {
-            this.renderTexture.draw(ethBalanceText, 20, 30);
-        }
-        ethBalanceText.destroy();
-
-        if (this.quadImage) {
-            this.quadImage.setTexture('ethBalanceTexture');
-            this.quadImage.setVisible(true);
-        }
     }
 }

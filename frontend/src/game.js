@@ -53,7 +53,7 @@ class GameScene extends Phaser.Scene {
         this.portraitDisplay = new PortraitDisplay(this);
         this.ethBalanceText = new ETHBalanceText(this);
         this.gachaTokenBalanceText = new GachaTokenBalanceText(this);
-        this.gameHistory = new GameHistory(this, );
+        this.gameHistory = new GameHistory(this);
         this.playButton = new PlayButton(this);
         this.mainMenu = new MainMenu(this);
         this.betMenu = new BetMenu(this);
