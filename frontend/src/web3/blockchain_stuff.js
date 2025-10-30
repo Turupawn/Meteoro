@@ -1,7 +1,7 @@
 import { createPublicClient, createWalletClient, webSocket, formatEther, encodeFunctionData } from 'viem'
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { riseTestnet } from 'viem/chains'
-import { shredActions, sendRawTransactionSync } from 'shreds/viem'
+import { shredActions, sendRawTransactionSync, watchShreds } from 'shreds/viem'
 import { printLog, getCardDisplay } from '../utils/utils.js'
 import { captureBlockchainError } from '../session_tracking.js'
 import { showErrorModal } from '../menus/errorModal.js'
@@ -16,10 +16,42 @@ const BALANCE_POLL_INTERVAL = 1000
 
 let CONTRACT_ABI = null
 
+// ERC20 ABI for token transfers
+const ERC20_ABI = [
+  {
+    type: 'function',
+    name: 'transfer',
+    inputs: [
+      { name: 'to', type: 'address', internalType: 'address' },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'balanceOf',
+    inputs: [{ name: 'account', type: 'address', internalType: 'address' }],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'event',
+    name: 'Transfer',
+    inputs: [
+      { name: 'from', type: 'address', indexed: true, internalType: 'address' },
+      { name: 'to', type: 'address', indexed: true, internalType: 'address' },
+      { name: 'value', type: 'uint256', indexed: false, internalType: 'uint256' }
+    ],
+    anonymous: false
+  }
+]
+
 let wsClient
 let walletClient
 let eventUnwatch = null
 let balancePoll = null
+let gachaTokenBalanceUnwatch = null
 
 export function formatBalance(weiBalance, shownDecimals = 6) {
   const balanceInEth = formatEther(weiBalance)
@@ -321,35 +353,107 @@ export async function commit(commitHash) {
   }
 }
 
-export async function withdrawFunds() {
+export async function withdrawFunds(destinationAddress) {
   try {
     const wallet = getLocalWallet()
     if (!wallet) {
       throw new Error("No wallet connected")
     }
 
-    printLog(['debug'], "Withdrawing funds via WebSocket...")
+    if (!destinationAddress || typeof destinationAddress !== 'string' || !destinationAddress.startsWith('0x') || destinationAddress.length !== 42) {
+      throw new Error("Invalid destination address")
+    }
+
+    printLog(['debug'], "Withdrawing funds via WebSocket to:", destinationAddress)
+
+    // Fetch current balance, gas price, and GachaToken address
+    const [currentBalance, gasPrice, gachaTokenAddress] = await Promise.all([
+      wsClient.getBalance({ address: wallet.address }),
+      wsClient.getGasPrice(),
+      wsClient.readContract({
+        address: MY_CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'gachaToken',
+        args: []
+      })
+    ])
+
+    // Get Gacha token balance
+    const gachaTokenBalance = gameState.getGachaTokenBalance()
+
+    // Compute gas cost and a small safety buffer
+    // We need enough ETH for both token transfer (if needed) and ETH transfer
+    const gasLimit = BigInt(GAS_LIMIT)
+    const gasCost = gasPrice * gasLimit
+    const safetyBufferWei = BigInt(Math.floor(GAS_FEE_BUFFER_ETH * 1e18))
+    // Reserve gas for token transfer (if tokens exist) + ETH transfer
+    const totalGasReserve = gachaTokenBalance > 0n 
+      ? (gasCost * 2n) + safetyBufferWei 
+      : gasCost + safetyBufferWei
+
+    if (currentBalance <= totalGasReserve) {
+      throw new Error("Insufficient balance to cover gas for withdrawal")
+    }
+
+    const receipts = []
+
+    // First, transfer Gacha tokens if user has any
+    if (gachaTokenBalance > 0n) {
+      printLog(['debug'], "Transferring Gacha tokens:", gachaTokenBalance.toString(), "to", destinationAddress)
+      
+      const tokenTransferRequest = await walletClient.prepareTransactionRequest({
+        to: gachaTokenAddress,
+        value: 0n,
+        data: encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: 'transfer',
+          args: [destinationAddress, gachaTokenBalance]
+        }),
+        gas: gasLimit
+      })
+
+      const tokenSerializedTransaction = await walletClient.signTransaction(tokenTransferRequest)
+      const tokenReceipt = await wsClient.sendRawTransactionSync({
+        serializedTransaction: tokenSerializedTransaction
+      })
+
+      printLog(['debug'], "Gacha token transfer transaction sent:", tokenReceipt.transactionHash)
+      receipts.push(tokenReceipt.transactionHash)
+    }
+
+    // Then transfer ETH (after reserving gas for token transfer if it happened)
+    const ethGasReserve = gachaTokenBalance > 0n 
+      ? (gasCost * 2n) + safetyBufferWei 
+      : gasCost + safetyBufferWei
     
-    // Prepare transaction request
-    const request = await walletClient.prepareTransactionRequest({
-      to: wallet.address,
-      value: 0n,
-      data: '0x',
-      gas: BigInt(GAS_LIMIT)
-    })
-    
-    // Sign the transaction
-    const serializedTransaction = await walletClient.signTransaction(request)
-    
-    // Use sendRawTransactionSync with signed transaction
-    const receipt = await wsClient.sendRawTransactionSync({
-      serializedTransaction
-    })
-    
-    printLog(['debug'], "Withdraw transaction sent:", receipt.transactionHash)
-    return receipt.transactionHash
+    const valueToSend = currentBalance > ethGasReserve 
+      ? currentBalance - ethGasReserve 
+      : 0n
+
+    if (valueToSend > 0n) {
+      printLog(['debug'], "Transferring ETH:", valueToSend.toString(), "to", destinationAddress)
+      
+      const ethTransferRequest = await walletClient.prepareTransactionRequest({
+        to: destinationAddress,
+        value: valueToSend,
+        data: '0x',
+        gas: gasLimit
+      })
+
+      const ethSerializedTransaction = await walletClient.signTransaction(ethTransferRequest)
+      const ethReceipt = await wsClient.sendRawTransactionSync({
+        serializedTransaction: ethSerializedTransaction
+      })
+
+      printLog(['debug'], "ETH transfer transaction sent:", ethReceipt.transactionHash)
+      receipts.push(ethReceipt.transactionHash)
+    }
+
+    printLog(['debug'], "Withdraw transactions completed:", receipts)
+    return receipts.length === 1 ? receipts[0] : receipts
   } catch (error) {
     printLog(['error'], "Error withdrawing funds:", error)
+    showErrorModal("Failed to withdraw: " + (error?.message || String(error)))
     throw error
   }
 }
@@ -493,6 +597,8 @@ export async function startEventMonitoring() {
       },
     });
     
+    eventUnwatch = unwatch
+    
     printLog(['debug'], "Event monitoring started successfully")
     
     balancePoll = setInterval(async () => {
@@ -501,11 +607,145 @@ export async function startEventMonitoring() {
       updateBalances(ethBalance, currentGacha)
     }, BALANCE_POLL_INTERVAL)
     
+    await startGachaTokenBalanceMonitoring()
+    
     return eventUnwatch
   } catch (error) {
     console.error("Error starting event monitoring:", error)
     showErrorModal("Failed to start event monitoring: " + error.message)
     throw error
+  }
+}
+
+// Separate monitoring for Gacha token balance using shreds
+async function startGachaTokenBalanceMonitoring() {
+  try {
+    const wallet = getLocalWallet()
+    if (!wallet) {
+      throw new Error("No local wallet found!")
+    }
+
+    // Get GachaToken contract address
+    const gachaTokenAddress = await wsClient.readContract({
+      address: MY_CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'gachaToken',
+      args: []
+    })
+
+    printLog(['debug'], "Starting Gacha token balance monitoring via shreds for:", gachaTokenAddress)
+
+    // Get initial token balance
+    const initialBalance = await wsClient.readContract({
+      address: gachaTokenAddress,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [wallet.address]
+    })
+
+    // Update initial balance in game state
+    const currentEthBalance = gameState.getETHBalance()
+    updateBalances(currentEthBalance, initialBalance)
+    printLog(['debug'], "Initial Gacha token balance:", initialBalance.toString())
+
+    // Watch for Transfer events on the Gacha token contract
+    const transferUnwatch = wsClient.watchContractEvent({
+      address: gachaTokenAddress,
+      abi: ERC20_ABI,
+      eventName: 'Transfer',
+      args: {
+        from: wallet.address
+      },
+      onLogs: async (logs) => {
+        // When tokens are sent from wallet, update balance
+        printLog(['debug'], "Gacha token Transfer event detected, updating balance...")
+        await updateGachaTokenBalance(gachaTokenAddress, wallet.address)
+      },
+    })
+
+    // Also watch for transfers TO the wallet
+    const receiveUnwatch = wsClient.watchContractEvent({
+      address: gachaTokenAddress,
+      abi: ERC20_ABI,
+      eventName: 'Transfer',
+      args: {
+        to: wallet.address
+      },
+      onLogs: async (logs) => {
+        // When tokens are received by wallet, update balance
+        printLog(['debug'], "Gacha token Transfer event detected (receipt), updating balance...")
+        await updateGachaTokenBalance(gachaTokenAddress, wallet.address)
+      },
+    })
+
+    // Store both unwatch functions
+    gachaTokenBalanceUnwatch = () => {
+      transferUnwatch()
+      receiveUnwatch()
+    }
+
+    // Additionally, use watchShreds for real-time updates via state changes
+    const shredsUnwatch = watchShreds(wsClient, {
+      onShred: async (shred) => {
+        // Check if this shred affects our wallet address or the token contract
+        const walletLower = wallet.address.toLowerCase()
+        let shouldUpdate = false
+
+        // Check state changes for address balance updates
+        if (shred.stateChanges) {
+          for (const stateChange of shred.stateChanges) {
+            const address = stateChange.address?.toLowerCase()
+            // If the shred affects our wallet or the token contract, update balance
+            if (address === walletLower || address === gachaTokenAddress.toLowerCase()) {
+              shouldUpdate = true
+              break
+            }
+          }
+        }
+
+        if (shouldUpdate) {
+          printLog(['debug'], "Shred detected affecting wallet or token contract, updating Gacha balance...")
+          await updateGachaTokenBalance(gachaTokenAddress, wallet.address)
+        }
+      },
+      onError: (error) => {
+        printLog(['error'], "Shred watching error for Gacha token:", error)
+      }
+    })
+
+    // Combine both unwatch functions
+    const originalUnwatch = gachaTokenBalanceUnwatch
+    gachaTokenBalanceUnwatch = () => {
+      originalUnwatch()
+      shredsUnwatch()
+    }
+
+    printLog(['debug'], "Gacha token balance monitoring started successfully")
+  } catch (error) {
+    printLog(['error'], "Error starting Gacha token balance monitoring:", error)
+    // Non-fatal error - continue without token monitoring
+  }
+}
+
+// Helper function to update Gacha token balance
+async function updateGachaTokenBalance(gachaTokenAddress, walletAddress) {
+  try {
+    const newBalance = await wsClient.readContract({
+      address: gachaTokenAddress,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [walletAddress]
+    })
+
+    const currentEthBalance = gameState.getETHBalance()
+    const oldGachaBalance = gameState.getGachaTokenBalance()
+
+    if (newBalance !== oldGachaBalance) {
+      printLog(['debug'], `Gacha token balance updated: ${oldGachaBalance.toString()} -> ${newBalance.toString()}`)
+      updateBalances(currentEthBalance, newBalance)
+    }
+  } catch (error) {
+    printLog(['error'], "Error updating Gacha token balance:", error)
   }
 }
 
@@ -518,6 +758,11 @@ export function stopEventMonitoring() {
   if (balancePoll) {
     clearInterval(balancePoll)
     balancePoll = null
+  }
+  if (gachaTokenBalanceUnwatch) {
+    gachaTokenBalanceUnwatch()
+    gachaTokenBalanceUnwatch = null
+    printLog(['debug'], "Gacha token balance monitoring stopped")
   }
 }
 
