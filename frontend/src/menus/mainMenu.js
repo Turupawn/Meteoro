@@ -1,5 +1,5 @@
 import { forfeit, withdrawFunds, getLocalWallet, formatBalance } from '../web3/blockchain_stuff.js';
-import { isLandscape } from '../utils/utils.js';
+import { isLandscape, ETH_BALANCE_DECIMALS } from '../utils/utils.js';
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuInput } from './menuElements/menuInput.js';
 import { MenuText } from './menuElements/menuText.js';
@@ -343,7 +343,7 @@ export class MainMenu {
         let ethBalanceString = "0.00000 ETH";
         if (this.scene.currentBalance) {
             try {
-                ethBalanceString = `${formatBalance(this.scene.currentBalance, 6)} ETH`;
+                ethBalanceString = `${formatBalance(this.scene.currentBalance, ETH_BALANCE_DECIMALS)} ETH`;
             } catch (error) {
                 console.error('Error converting balance:', error);
                 ethBalanceString = `${this.scene.currentBalance} WEI`;
