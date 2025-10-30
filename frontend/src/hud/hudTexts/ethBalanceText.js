@@ -1,5 +1,4 @@
-
-import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../../utils/utils.js';
+import { applyPerspectiveToQuadImageToLeft, isLandscape, ETH_BALANCE_DECIMALS } from '../../utils/utils.js';
 import { formatBalance } from '../../web3/blockchain_stuff.js';
 
 export class ETHBalanceText {
@@ -76,7 +75,7 @@ export class ETHBalanceText {
 
         let ethBalanceString = "0.000000 ETH";
         if (balance !== null) {
-            ethBalanceString = `${formatBalance(balance, 6)} ETH`;
+            ethBalanceString = `${formatBalance(balance, ETH_BALANCE_DECIMALS)} ETH`;
         }
 
         const ethBalanceText = this.scene.add.text(0, 0, ethBalanceString, {

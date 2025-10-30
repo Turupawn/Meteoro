@@ -1,5 +1,5 @@
 
-import { applyPerspectiveToQuadImageToLeft, isLandscape } from '../../utils/utils.js';
+import { applyPerspectiveToQuadImageToLeft, isLandscape, GACHA_BALANCE_DECIMALS } from '../../utils/utils.js';
 import { formatBalance } from '../../web3/blockchain_stuff.js';
 
 export class GachaTokenBalanceText {
@@ -82,7 +82,7 @@ export class GachaTokenBalanceText {
 
         let gachaTokenBalanceString = "     0 GACHA";
         if (balance !== null) {
-            gachaTokenBalanceString = `${formatBalance(balance, 0)} GACHA`;
+            gachaTokenBalanceString = `${formatBalance(balance, GACHA_BALANCE_DECIMALS)} GACHA`;
         }
 
         const gachaTokenBalanceText = this.scene.add.text(0, 0, gachaTokenBalanceString, {
