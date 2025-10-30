@@ -74,7 +74,6 @@ class GameScene extends Phaser.Scene {
 
         this.time.delayedCall(1000, () => {
             printLog(['profile'], "Started lazy loading at:" + new Date().toISOString());
-            this.lazyLoadCosmicScene();
             this.lazyLoadStoryImages();
         });
     }
@@ -145,34 +144,12 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    lazyLoadCosmicScene() {
-        if (!this.scene.get('CosmicScene')) {
-            import('./animations/cosmicScene.js').then(({ CosmicScene }) => {
-                this.scene.add('CosmicScene', CosmicScene, false);
-                printLog(['profile'], "CosmicScene loaded lazily at:" + new Date().toISOString());
-            }).catch(error => {
-                console.error('Failed to lazy load CosmicScene:', error);
-            });
-        }
-    }
-
     async lazyLoadStoryImages() {
         try {
             await TieSequence.preloadStoryImages(this);
             printLog(['profile'], "Story images loaded lazily at:" + new Date().toISOString());
         } catch (error) {
             console.error('Failed to lazy load story images:', error);
-        }
-    }
-
-    startCosmicScene() {
-        if (!this.scene.get('CosmicScene')) {
-            this.lazyLoadCosmicScene();
-            this.time.delayedCall(100, () => {
-                this.scene.launch('CosmicScene');
-            });
-        } else {
-            this.scene.launch('CosmicScene');
         }
     }
 }
