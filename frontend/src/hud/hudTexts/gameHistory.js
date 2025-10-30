@@ -80,94 +80,96 @@ export class GameHistory {
     }
 
     updateGameHistory(playerAddress = null) {
-        if (!this.renderTexture) {
-            return;
-        }
-        
-        // Don't update game history in portrait mode
-        if (!isLandscape()) {
-            return;
-        }
+        this.scene.time.delayedCall(250, () => {
+            if (!this.renderTexture) {
+                return;
+            }
+            
+            // Don't update game history in portrait mode
+            if (!isLandscape()) {
+                return;
+            }
 
-        this.renderTexture.clear();
+            this.renderTexture.clear();
 
-        if(isLandscape()) {
-            const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
-                font: 'bold 24px Orbitron',
-                fill: '#E0F6FF',
-                stroke: '#0066CC',
-                strokeThickness: 2,
-                alpha: 0.9,
-                shadow: {
-                    offsetX: 2,
-                    offsetY: 2,
-                    color: '#003366',
-                    blur: 4,
-                    fill: true
+            if(isLandscape()) {
+                const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
+                    font: 'bold 24px Orbitron',
+                    fill: '#E0F6FF',
+                    stroke: '#0066CC',
+                    strokeThickness: 2,
+                    alpha: 0.9,
+                    shadow: {
+                        offsetX: 2,
+                        offsetY: 2,
+                        color: '#003366',
+                        blur: 4,
+                        fill: true
+                    }
+                });
+                titleText.setVisible(false);
+                this.renderTexture.draw(titleText, 10, 10);
+                titleText.destroy();
+            }
+            
+            let yOffset = 40;
+            this.recentHistory.forEach((game, index) => {
+                let isWin = false;
+                let isTie = false;
+                let isPending = false;
+
+                if (game.playerCard === "?" && game.houseCard === "?") {
+                    isPending = true;
+                } else if (game.playerCard && game.houseCard) {
+                    let playerCard = game.playerCard;
+                    let houseCard = game.houseCard;
+                    if (playerCard === houseCard) {
+                        isTie = true;
+                    } else {
+                        if (playerCard == "J") playerCard = 11;
+                        else if (playerCard == "Q") playerCard = 12;
+                        else if (playerCard == "K") playerCard = 13;
+                        else if (playerCard == "A") playerCard = 14;
+                        else playerCard = parseInt(playerCard);
+
+                        if (houseCard == "J") houseCard = 11;
+                        else if (houseCard == "Q") houseCard = 12;
+                        else if (houseCard == "K") houseCard = 13;
+                        else if (houseCard == "A") houseCard = 14;
+                        else houseCard = parseInt(houseCard);
+
+                        isWin = playerCard > houseCard;
+                    }
                 }
-            });
-            titleText.setVisible(false);
-            this.renderTexture.draw(titleText, 10, 10);
-            titleText.destroy();
-        }
-        
-        let yOffset = 40;
-        this.recentHistory.forEach((game, index) => {
-            let isWin = false;
-            let isTie = false;
-            let isPending = false;
-
-            if (game.playerCard === "?" && game.houseCard === "?") {
-                isPending = true;
-            } else if (game.playerCard && game.houseCard) {
-                let playerCard = game.playerCard;
-                let houseCard = game.houseCard;
-                if (playerCard === houseCard) {
-                    isTie = true;
+                
+                const score = `${getCardDisplay(game.playerCard)}-${getCardDisplay(game.houseCard)}`;
+                
+                // Set color based on game state
+                let textColor;
+                if (isPending || isTie) {
+                    textColor = '#FFFFFF'; // White for pending games or ties
                 } else {
-                    if (playerCard == "J") playerCard = 11;
-                    else if (playerCard == "Q") playerCard = 12;
-                    else if (playerCard == "K") playerCard = 13;
-                    else if (playerCard == "A") playerCard = 14;
-                    else playerCard = parseInt(playerCard);
-
-                    if (houseCard == "J") houseCard = 11;
-                    else if (houseCard == "Q") houseCard = 12;
-                    else if (houseCard == "K") houseCard = 13;
-                    else if (houseCard == "A") houseCard = 14;
-                    else houseCard = parseInt(houseCard);
-
-                    isWin = playerCard > houseCard;
+                    textColor = isWin ? '#00FF00' : '#FF4444'; // Green for win, red for loss
                 }
-            }
-            
-            const score = `${getCardDisplay(game.playerCard)}-${getCardDisplay(game.houseCard)}`;
-            
-            // Set color based on game state
-            let textColor;
-            if (isPending || isTie) {
-                textColor = '#FFFFFF'; // White for pending games or ties
-            } else {
-                textColor = isWin ? '#00FF00' : '#FF4444'; // Green for win, red for loss
-            }
-            const gameText = this.scene.add.text(0, 0, score, {
-                font: '18px Orbitron',
-                fill: textColor,
-                stroke: '#0066CC',
-                strokeThickness: 1,
-                alpha: 0.9
+                const gameText = this.scene.add.text(0, 0, score, {
+                    font: '18px Orbitron',
+                    fill: textColor,
+                    stroke: '#0066CC',
+                    strokeThickness: 1,
+                    alpha: 0.9
+                });
+                gameText.setVisible(false);
+                this.renderTexture.draw(gameText, 10, yOffset);
+                gameText.destroy();
+                
+                yOffset += 25;
             });
-            gameText.setVisible(false);
-            this.renderTexture.draw(gameText, 10, yOffset);
-            gameText.destroy();
-            
-            yOffset += 25;
-        });
 
-        if (this.quadImage) {
-            this.quadImage.setTexture('gameHistoryTexture');
-            this.quadImage.setVisible(true);
-        }
+            if (this.quadImage) {
+                this.quadImage.setTexture('gameHistoryTexture');
+                this.quadImage.setVisible(true);
+            }
+        });
     }
 
     initializeHistory(recentHistory) {

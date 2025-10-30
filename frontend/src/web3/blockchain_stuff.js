@@ -1,5 +1,5 @@
 import { createPublicClient, createWalletClient, webSocket, formatEther, encodeFunctionData } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
+import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { riseTestnet } from 'viem/chains'
 import { shredActions, sendRawTransactionSync } from 'shreds/viem'
 import { printLog, getCardDisplay } from '../utils/utils.js'
@@ -63,15 +63,16 @@ export async function initWeb3() {
     // Get or create wallet
     let wallet = getLocalWallet()
     if (!wallet) {
-      const account = privateKeyToAccount('0x' + Math.random().toString(16).substr(2, 64))
+      console.log("Generating new wallet...")
+      const pk = generatePrivateKey()
+      const account = privateKeyToAccount(pk)
       wallet = {
         address: account.address,
-        privateKey: account.privateKey
+        privateKey: pk
       }
       localStorage.setItem('localWallet', JSON.stringify(wallet))
     }
-    
-    // Create wallet client for signing transactions
+
     walletClient = createWalletClient({
       account: privateKeyToAccount(wallet.privateKey),
       chain: riseTestnet,
