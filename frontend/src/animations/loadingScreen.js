@@ -27,6 +27,13 @@ export class LoadingScreen extends Phaser.Scene {
         this.load.image("github-icon", "/social_links/github.svg");
         this.load.image("telegram-icon", "/social_links/telegram.svg");
         this.load.plugin('rexquadimageplugin', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexquadimageplugin.min.js', true);
+
+        // Preload portrait textures early so the portrait shows immediately
+        for (let i = 1; i <= 4; i++) {
+            const folder = String(i).padStart(2, '0');
+            this.load.image(`portrait_${folder}_01`, `/portraits/${folder}/01.png`);
+            this.load.image(`portrait_${folder}_02`, `/portraits/${folder}/02.png`);
+        }
     }
 
     create() {
