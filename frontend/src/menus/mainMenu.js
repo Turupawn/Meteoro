@@ -523,6 +523,11 @@ export class MainMenu {
     }
 
     async executeForfeit() {
+        // Show please wait screen before forfeiting
+        if (this.scene.pleaseWaitScreen) {
+            this.scene.pleaseWaitScreen.show();
+        }
+        
         try {
             this.clearAllCache();
             await forfeit();
@@ -530,6 +535,7 @@ export class MainMenu {
         } catch (error) {
             console.error("Error executing forfeit:", error);
         } finally {
+            // Screen will persist until reload
             window.location.reload();
         }
     }

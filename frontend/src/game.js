@@ -15,6 +15,7 @@ import { MainMenu } from './menus/mainMenu.js';
 import { BetMenu } from './menus/betMenu.js';
 import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
 import { setErrorModal, ErrorModal } from './menus/errorModal.js';
+import { PleaseWaitScreen } from './menus/pleaseWaitScreen.js';
 import { setGameScene, updateGameDisplay } from './main.js';
 import { printLog, isLandscape } from './utils/utils.js';
 import { getMinimumPlayableBalance, getPlayerETHBalance, getPlayerGachaTokenBalanceFormatted } from './web3/blockchain_stuff.js';
@@ -64,6 +65,7 @@ class GameScene extends Phaser.Scene {
         this.socialLinks = new SocialLinks(this);
         this.insufficientBalanceMenu = new InsufficientBalanceMenu(this);
         this.errorModal = new ErrorModal(this);
+        this.pleaseWaitScreen = new PleaseWaitScreen(this);
 
         setErrorModal(this.errorModal);
         setGameScene(this);
