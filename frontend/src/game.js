@@ -111,14 +111,6 @@ class GameScene extends Phaser.Scene {
         }
         
         this.checkInsufficientBalance(getPlayerETHBalance());
-        
-        // Re-enable play button when game state is ready for new input
-        if (this.playButton && gameState) {
-            // Re-enable button when not in a transaction state
-            if (gameState.gameState === 0n || gameState.gameState === 3n) {
-                this.playButton.enableButton();
-            }
-        }
     }
 
     updateCardDisplay(playerCard, houseCard) {
