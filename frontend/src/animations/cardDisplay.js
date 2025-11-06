@@ -391,7 +391,7 @@ export class CardDisplay {
         }
         
         // Update game history after the delay when both card numbers are fully visible
-        this.scene.time.delayedCall(400, () => {
+        this.scene.time.delayedCall(100, () => {
             this.scene.gameHistory.updateLastGameInHistory(this.currentPlayerCard, this.currentHouseCard);
             window.dispatchEvent(new CustomEvent('cardsDisplayed'));
         });
