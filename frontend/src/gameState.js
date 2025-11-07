@@ -109,8 +109,7 @@ class GameState {
     if (!selectedBetAmount || selectedBetAmount === 0n) {
       return 0n
     }
-    // Add gas fee buffer (0.001 ETH)
-    const gasFeeBufferWei = BigInt(1e15) // 0.001 ETH in wei
+    const gasFeeBufferWei = BigInt(5*1e12) // 0.000005 ETH in wei
     return selectedBetAmount + gasFeeBufferWei
   }
 

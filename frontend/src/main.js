@@ -319,6 +319,8 @@ async function gameLoop() {
                     player_card: result.playerCard,
                     house_card: result.houseCard
                 });
+
+                gameScene.playButton.unlockButton()
                 
             } catch (error) {
                 printLog(['error'], "Reveal failed:", error);

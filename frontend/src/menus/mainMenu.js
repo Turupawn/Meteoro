@@ -523,6 +523,10 @@ export class MainMenu {
     }
 
     async executeForfeit() {
+        if (this.scene.pleaseWaitScreen) {
+            this.scene.pleaseWaitScreen.show();
+        }
+        
         try {
             this.clearAllCache();
             await forfeit();

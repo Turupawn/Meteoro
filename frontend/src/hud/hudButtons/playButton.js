@@ -5,6 +5,7 @@ import { getPlayerETHBalance, getLocalWallet, getMinimumPlayableBalance } from '
 export class PlayButton {
     constructor(scene) {
         this.scene = scene;
+        this.unlockButton();
         this.createButton();
     }
 
@@ -68,13 +69,13 @@ export class PlayButton {
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
         const clickHandler = async () => {
-            this.disableButton();
-            
+            if (this.isLocked()) {
+                return;
+            }
+            this.lockButton();
             const hasInsufficientBalance = await this.checkInsufficientBalance();
             
-            if (hasInsufficientBalance) {
-                this.enableButton();
-                
+            if (hasInsufficientBalance) {                
                 if (this.scene.insufficientBalanceMenu) {
                     this.scene.insufficientBalanceMenu.show(true); // Force show when play button is clicked
                     this.scene.insufficientBalanceMenu.triggerShakeAnimation();
@@ -113,14 +114,16 @@ export class PlayButton {
             return false;
         }
     }
-    
-    enableButton() {
-        this.button.setInteractive(true);
-        this.buttonBg.setInteractive(true);
+
+    lockButton() {
+        this.lock = true;
     }
-    
-    disableButton() {
-        this.button.setInteractive(false);
-        this.buttonBg.setInteractive(false);
+
+    unlockButton() {
+        this.lock = false;
+    }
+
+    isLocked() {
+        return this.lock;
     }
 }
