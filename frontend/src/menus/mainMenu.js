@@ -512,11 +512,13 @@ export class MainMenu {
         this.openMenu();
     }
 
-    executeWithdraw() {
+    async executeWithdraw() {
         const address = this.addressInput.getValue().trim();
         if (address && address.startsWith('0x') && address.length === 42) {
-            withdrawFunds(address);
+            this.scene.pleaseWaitScreen.show(address);
             this.closeMenu();
+            await withdrawFunds(address);
+            this.scene.pleaseWaitScreen.hide();
         } else {
             console.log('Invalid address format');
         }
