@@ -143,7 +143,7 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             forfeitY, 
-            "FORFEIT", 
+            "CLEANUP", 
             buttonFontSize,
             () => this.showForfeitSubmenu()
         );
@@ -399,7 +399,7 @@ export class MainMenu {
     }
 
     showForfeitSubmenu() {
-        this.currentSubmenu = 'forfeit';
+        this.currentSubmenu = 'cleanup';
         
         this.clearMainMenu();
         
@@ -436,7 +436,7 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             titleY, 
-            "FORFEIT GAME", 
+            "CLEANUP", 
             titleFontSize,
             { depth: 254 }
         );
@@ -445,7 +445,7 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             warningY,
-            "This will forfeit your current game\nand clear all cached data.", 
+            "This will forfeit your current game\nand clear cache. This will not\naffect your balance.", 
             titleFontSize - 4,
             {
                 depth: 254,
@@ -458,7 +458,7 @@ export class MainMenu {
             this.scene,
             this.scene.centerX,
             confirmButtonY,
-            "CONFIRM FORFEIT", 
+            "CONFIRM CLEANUP", 
             titleFontSize,
             () => this.executeForfeit()
         );
