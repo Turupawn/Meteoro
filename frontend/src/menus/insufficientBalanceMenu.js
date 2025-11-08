@@ -43,8 +43,7 @@ export class InsufficientBalanceMenu {
         
         // Closer Y positioning - reduced spacing between elements
         const titleY = this.scene.centerY - (isLandscapeMode ? 130 : 250);
-        const addressY = this.scene.centerY - (isLandscapeMode ? 60 : 180);
-        const warningY = this.scene.centerY + (isLandscapeMode ? 40 : -60);
+        const addressY = this.scene.centerY - (isLandscapeMode ? 20 : 120);
         const faucetTextY = this.scene.centerY + (isLandscapeMode ? 120 : 60);
         const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 160 : 100);
         
@@ -53,7 +52,7 @@ export class InsufficientBalanceMenu {
             this.scene,
             this.scene.centerX, 
             titleY, 
-            "Deposit ETH to start playing. (Gas fees applies)",
+            "Deposit ETH on Rise Testnet to start playing.\nGas fees applies.",
             titleFontSize,
             { depth: 302 }
         );
@@ -63,37 +62,23 @@ export class InsufficientBalanceMenu {
         const wallet = getLocalWallet();
         const address = wallet ? wallet.address : 'No wallet';
 
-        // Address input (read-only)
+        const addressInputWidth = isLandscapeMode
+            ? Math.min(800, this.scene.screenWidth * 0.85)
+            : Math.min(700, this.scene.screenWidth * 0.95);
+
         this.addressInput = new MenuInput(
             this.scene,
             this.scene.centerX,
             addressY,
             '',
-            titleFontSize - 2,
+            isLandscapeMode ? titleFontSize - 10 : titleFontSize - 6,
             {
                 readOnly: true,
-                value: address
+                value: address,
+                width: addressInputWidth
             }
         );
         this.addressInput.inputElement.style.display = 'none';
-
-        // Warning text
-        this.warningText = new MenuText(
-            this.scene,
-            this.scene.centerX,
-            warningY, 
-            "This is your local storage wallet, do not clear browser data nor deposit large amounts.\nClick to learn more.", 
-            isLandscapeMode ? titleFontSize - 20 : titleFontSize - 4,
-            { 
-                depth: 302,
-                wordWrap: { width: this.screenWidth - 100 },
-                align: 'center',
-                interactive: true,
-                color: '#00ff00',
-                onClick: () => window.open('https://dev.to/filosofiacodigoen/how-local-storage-wallets-on-ethereum-work-4c0p', '_blank')
-            }
-        );
-        this.warningText.textElement.setVisible(false);
 
         // Faucet text
         this.faucetText = new MenuText(
@@ -125,7 +110,6 @@ export class InsufficientBalanceMenu {
         this.elements = [
             this.title,
             this.addressInput,
-            this.warningText,
             this.faucetText,
             this.faucetLink
         ];

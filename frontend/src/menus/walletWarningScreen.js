@@ -70,13 +70,12 @@ export class WalletWarningScreen {
         const privateKeyY = this.scene.centerY - (isLandscapeMode ? 40 : 60);
         const acceptButtonY = this.scene.centerY + (isLandscapeMode ? 120 : 100);
 
-        // Warning text with green color (#00ff00) - same as deposit menu
         this.warningText = new MenuText(
             this.scene,
             this.scene.centerX,
             warningY, 
             "Back up your local storage wallet private key, you can also view it anytime on the menu. Don't use it for large amounts. Click to learn more", 
-            isLandscapeMode ? titleFontSize - 6 : titleFontSize - 4,
+            isLandscapeMode ? titleFontSize - 12 : titleFontSize - 10,
             { 
                 depth: 352,
                 wordWrap: { width: this.screenWidth - 100 },
@@ -92,7 +91,6 @@ export class WalletWarningScreen {
         const wallet = getLocalWallet();
         const privateKey = wallet ? wallet.privateKey : 'No wallet';
 
-        // Private key input (read-only) - longer than address input
         const privateKeyInputWidth = isLandscapeMode 
             ? Math.min(800, this.scene.screenWidth * 0.85)
             : Math.min(700, this.scene.screenWidth * 0.95);
@@ -102,13 +100,14 @@ export class WalletWarningScreen {
             this.scene.centerX,
             privateKeyY,
             '',
-            titleFontSize - 2,
+            isLandscapeMode ? titleFontSize - 14 : titleFontSize - 8,
             {
                 readOnly: true,
                 value: privateKey,
                 width: privateKeyInputWidth
             }
         );
+        this.privateKeyInput.inputElement.style.color = '#FFFFFF';
         this.privateKeyInput.inputElement.style.display = 'none';
 
         // Accept button
