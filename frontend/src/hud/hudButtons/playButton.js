@@ -1,5 +1,5 @@
 import { commitGame } from '../../main.js';
-import { isLandscape } from '../../utils/utils.js';
+import { isLandscape, shouldShowWalletWarning } from '../../utils/utils.js';
 import { getPlayerETHBalance, getLocalWallet, getMinimumPlayableBalance } from '../../web3/blockchain_stuff.js';
 
 export class PlayButton {
@@ -69,19 +69,20 @@ export class PlayButton {
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
         const clickHandler = async () => {
-            if (this.isLocked()) {
-                return;
-            }
-            this.lockButton();
             const hasInsufficientBalance = await this.checkInsufficientBalance();
-            
             if (hasInsufficientBalance) {                
                 if (this.scene.insufficientBalanceMenu) {
-                    this.scene.insufficientBalanceMenu.show(true); // Force show when play button is clicked
+                    this.scene.insufficientBalanceMenu.show(true);
                     this.scene.insufficientBalanceMenu.triggerShakeAnimation();
                 }
                 return;
             }
+
+            if (this.isLocked()) {
+                return;
+            }
+
+            this.lockButton();
 
             if (this.scene.cardDisplay && this.scene.cardDisplay.currentGameText) {
                 this.scene.cardDisplay.currentGameText.setText(`Please wait...`);

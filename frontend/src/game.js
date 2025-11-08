@@ -130,6 +130,10 @@ class GameScene extends Phaser.Scene {
 
     checkInsufficientBalance(balance) {
         try {
+            if (shouldShowWalletWarning()) {
+                return;
+            }
+
             const hasInsufficientBalance = BigInt(balance) < BigInt(getMinimumPlayableBalance());
             
             if (hasInsufficientBalance && this.cardDisplay && 
