@@ -16,8 +16,9 @@ import { BetMenu } from './menus/betMenu.js';
 import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
 import { setErrorModal, ErrorModal } from './menus/errorModal.js';
 import { PleaseWaitScreen } from './menus/pleaseWaitScreen.js';
+import { WalletWarningScreen } from './menus/walletWarningScreen.js';
 import { setGameScene, updateGameDisplay } from './main.js';
-import { printLog, isLandscape } from './utils/utils.js';
+import { printLog, isLandscape, shouldShowWalletWarning } from './utils/utils.js';
 import { getMinimumPlayableBalance, getPlayerETHBalance, getPlayerGachaTokenBalanceFormatted } from './web3/blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
@@ -66,10 +67,14 @@ class GameScene extends Phaser.Scene {
         this.insufficientBalanceMenu = new InsufficientBalanceMenu(this);
         this.errorModal = new ErrorModal(this);
         this.pleaseWaitScreen = new PleaseWaitScreen(this);
+        this.walletWarningScreen = new WalletWarningScreen(this);
 
         setErrorModal(this.errorModal);
         setGameScene(this);
 
+        if (shouldShowWalletWarning()) {
+            this.walletWarningScreen.show();
+        }
         this.time.delayedCall(100, () => {
             updateGameDisplay();
         });
