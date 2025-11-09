@@ -26,6 +26,7 @@ export class MenuText {
             stroke: '#0066CC',
             strokeThickness: 2,
             alpha: 0.9,
+            align: this.options.align || 'center',
             shadow: {
                 offsetX: 2,
                 offsetY: 2,

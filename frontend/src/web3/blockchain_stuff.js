@@ -11,7 +11,7 @@ const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS
 const WSS_URL = import.meta.env.WSS_URL || 'wss://testnet.riselabs.xyz'
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json"
 const GAS_LIMIT = 300000
-const GAS_FEE_BUFFER_ETH = 0.00001
+const GAS_FEE_BUFFER_ETH = 0.0000001
 const BALANCE_POLL_INTERVAL = 1000
 
 let CONTRACT_ABI = null

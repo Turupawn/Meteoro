@@ -15,8 +15,8 @@ export class MenuButton {
     createButton() {
         const isLandscapeMode = isLandscape();
         const buttonWidth = isLandscapeMode
-            ? Math.max(500, this.text.length * 30)
-            : Math.max(600, this.text.length * 35);
+            ? Math.max(700, this.text.length * 40)
+            : Math.max(800, this.text.length * 50);
         const buttonHeight = isLandscapeMode ? 80 : 100;
         
         this.buttonBg = this.scene.add.rectangle(

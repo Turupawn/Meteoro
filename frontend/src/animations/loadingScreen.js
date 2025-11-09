@@ -26,6 +26,7 @@ export class LoadingScreen extends Phaser.Scene {
         this.load.image("spade", "/cards/spade.png");
         this.load.image("github-icon", "/social_links/github.svg");
         this.load.image("telegram-icon", "/social_links/telegram.svg");
+        this.load.image("x-icon", "/social_links/x.svg");
         this.load.plugin('rexquadimageplugin', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexquadimageplugin.min.js', true);
 
         for (let i = 1; i <= 3; i++) {

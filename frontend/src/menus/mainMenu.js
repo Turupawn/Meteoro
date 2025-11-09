@@ -1,8 +1,10 @@
-import { forfeit, withdrawFunds, getLocalWallet, formatBalance } from '../web3/blockchain_stuff.js';
-import { isLandscape, ETH_BALANCE_DECIMALS } from '../utils/utils.js';
+import { forfeit, withdrawFunds, getLocalWallet, formatBalance, getPlayerGachaTokenBalance } from '../web3/blockchain_stuff.js';
+import { isLandscape, ETH_BALANCE_DECIMALS, GACHA_BALANCE_DECIMALS } from '../utils/utils.js';
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuInput } from './menuElements/menuInput.js';
 import { MenuText } from './menuElements/menuText.js';
+
+const NETWORK = import.meta.env.NETWORK || 'rise testnet';
 
 export class MainMenu {
     constructor(scene) {
@@ -116,7 +118,7 @@ export class MainMenu {
             ? Math.max(32, this.scene.screenWidth / 30)
             : Math.max(48, this.scene.screenWidth / 15);
         const buttonSpacing = isLandscapeMode ? 150 : 160;
-        const startY = this.scene.centerY - (isLandscapeMode ? 120 : 120);
+        const startY = this.scene.centerY - (isLandscapeMode ? 180 : 180);
         
         this.menuButtons = [];
 
@@ -138,12 +140,22 @@ export class MainMenu {
             () => this.showWithdrawSubmenu()
         );
 
-        const forfeitY = startY + buttonSpacing * 2;
+        const privateKeyY = startY + buttonSpacing * 2;
+        this.privateKeyButton = new MenuButton(
+            this.scene,
+            this.scene.centerX, 
+            privateKeyY, 
+            "PRIVATE KEY", 
+            buttonFontSize,
+            () => this.showPrivateKeySubmenu()
+        );
+
+        const forfeitY = startY + buttonSpacing * 3;
         this.forfeitButton = new MenuButton(
             this.scene,
             this.scene.centerX, 
             forfeitY, 
-            "FORFEIT", 
+            "CLEANUP", 
             buttonFontSize,
             () => this.showForfeitSubmenu()
         );
@@ -151,6 +163,7 @@ export class MainMenu {
         this.menuButtons = [
             this.depositButton, 
             this.withdrawButton, 
+            this.privateKeyButton,
             this.forfeitButton
         ];
     }
@@ -186,23 +199,32 @@ export class MainMenu {
             : Math.max(32, this.scene.screenWidth / 25);
         
         const titleY = this.scene.centerY - this.submenuHeight/2 + 40;
-        const addressY = this.scene.centerY - (isLandscapeMode ? this.submenuHeight/4 : this.submenuHeight/3);
-        const instructionY = this.scene.centerY;
-        const warningY = this.scene.centerY + (isLandscapeMode ? 90 : 80);
-        const faucetTextY = this.scene.centerY + (isLandscapeMode ? 220 : 160);
-        const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 260 : 200);
+        const instructionY = this.scene.centerY - (isLandscapeMode ? 120 : 140);
+        const addressY = this.scene.centerY - (isLandscapeMode ? 40 : 60);
+        const warningY = this.scene.centerY + (isLandscapeMode ? 60 : 40);
+        const faucetTextY = this.scene.centerY + (isLandscapeMode ? 180 : 160);
+        const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 220 : 200);
         
         this.submenuTitle = new MenuText(
             this.scene,
             this.scene.centerX, 
             titleY, 
-            "DEPOSIT ADDRESS", 
+            "DEPOSIT", 
             titleFontSize,
             { depth: 254 }
         );
         
         const wallet = getLocalWallet();
         const address = wallet ? wallet.address : 'No wallet';
+
+        this.instructionText = new MenuText(
+            this.scene,
+            this.scene.centerX, 
+            instructionY, 
+            "Deposit to this address to play.", 
+            titleFontSize - 4,
+            { depth: 254 }
+        );
 
         this.addressInput = new MenuInput(
             this.scene,
@@ -214,15 +236,6 @@ export class MainMenu {
                 readOnly: true,
                 value: address
             }
-        );
-
-        this.instructionText = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            instructionY, 
-            "Deposit to this address to play.", 
-            titleFontSize - 4,
-            { depth: 254 }
         );
 
         this.warningText = new MenuText(
@@ -240,39 +253,41 @@ export class MainMenu {
             }
         );
 
-        this.faucetText = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            faucetTextY, 
-            "Get test tokens from faucet:", 
-            titleFontSize - 4,
-            { depth: 254 }
-        );
-
-        this.faucetLink = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            faucetLinkY, 
-            "https://faucet.testnet.riselabs.xyz/",
-            titleFontSize - 4,
-            {
-                interactive: true,
-                isLink: true, // Add link styling
-                onClick: () => window.open('https://faucet.testnet.riselabs.xyz/', '_blank'),
-                depth: 254
-            }
-        );
-
         this.submenuElements = [
             this.submenuContainer,
             this.submenuTitle,
-            this.addressInput,
             this.instructionText,
+            this.addressInput,
             this.warningText,
-            this.faucetText,
-            this.faucetLink,
             this.submenuXButton
         ];
+        
+        if (NETWORK === 'rise testnet') {
+            this.faucetText = new MenuText(
+                this.scene,
+                this.scene.centerX, 
+                faucetTextY, 
+                "Get test token", 
+                titleFontSize - 4,
+                { depth: 254 }
+            );
+
+            this.faucetLink = new MenuText(
+                this.scene,
+                this.scene.centerX, 
+                faucetLinkY, 
+                "https://faucet.testnet.riselabs.xyz/",
+                titleFontSize - 4,
+                {
+                    interactive: true,
+                    isLink: true, // Add link styling
+                    onClick: () => window.open('https://faucet.testnet.riselabs.xyz/', '_blank'),
+                    depth: 254
+                }
+            );
+            
+            this.submenuElements.push(this.faucetText, this.faucetLink);
+        }
     }
 
     createSubmenuXButton(submenuWidth, submenuHeight) {
@@ -326,9 +341,10 @@ export class MainMenu {
             : Math.max(32, this.scene.screenWidth / 25);
         
         const titleY = this.scene.centerY - this.submenuHeight/2 + 30;
-        const balanceY = this.scene.centerY - (isLandscapeMode ? 120 : 120);
-        const addressLabelY = this.scene.centerY - (isLandscapeMode ? 50 : 60);
-        const addressInputY = this.scene.centerY + (isLandscapeMode ? 30 : 20);
+        const balanceY = this.scene.centerY - (isLandscapeMode ? 180 : 180);
+        const gachaBalanceY = this.scene.centerY - (isLandscapeMode ? 140 : 140);
+        const addressLabelY = this.scene.centerY - (isLandscapeMode ? 50 : 50);
+        const addressInputY = this.scene.centerY + (isLandscapeMode ? 20 : 10);
         const withdrawButtonY = this.scene.centerY + (isLandscapeMode ? 180 : 160);
         
         this.submenuTitle = new MenuText(
@@ -356,7 +372,25 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             balanceY, 
-            `Balance: ${ethBalanceString}`, 
+            `Your ETH Balance: ${ethBalanceString}`, 
+            titleFontSize - 2,
+            { depth: 254 }
+        );
+
+        let gachaBalanceString = "0 GACHA";
+        try {
+            const gachaBalance = getPlayerGachaTokenBalance();
+            gachaBalanceString = `${formatBalance(gachaBalance, GACHA_BALANCE_DECIMALS)} GACHA`;
+        } catch (error) {
+            console.error('Error converting gacha balance:', error);
+            gachaBalanceString = "0 GACHA";
+        }
+
+        this.gachaBalanceText = new MenuText(
+            this.scene,
+            this.scene.centerX, 
+            gachaBalanceY, 
+            `Your GACHA Balance: ${gachaBalanceString}`, 
             titleFontSize - 2,
             { depth: 254 }
         );
@@ -391,6 +425,7 @@ export class MainMenu {
             this.submenuContainer,
             this.submenuTitle,
             this.ethBalanceText,
+            this.gachaBalanceText,
             this.addressLabel,
             this.addressInput,
             this.withdrawButton,
@@ -398,8 +433,96 @@ export class MainMenu {
         ];
     }
 
+    showPrivateKeySubmenu() {
+        this.currentSubmenu = 'privateKey';
+        
+        this.clearMainMenu();
+        
+        const isLandscapeMode = isLandscape();
+        this.submenuWidth = isLandscapeMode
+            ? Math.min(1000, this.scene.screenWidth * 0.95)
+            : Math.min(850, this.scene.screenWidth * 0.97);
+        this.submenuHeight = isLandscapeMode
+            ? Math.min(700, this.scene.screenHeight * 0.85)
+            : Math.min(600, this.scene.screenHeight * 0.8);
+        
+        this.submenuContainer = this.scene.add.rectangle(
+            this.scene.centerX, 
+            this.scene.centerY, 
+            this.submenuWidth, 
+            this.submenuHeight, 
+            0x000000, 
+            0.95
+        );
+        this.submenuContainer.setStrokeStyle(2, 0x00FFFF);
+        this.submenuContainer.setDepth(253);
+
+        this.createSubmenuXButton(this.submenuWidth, this.submenuHeight);
+
+        const titleFontSize = isLandscapeMode
+            ? Math.max(22, this.scene.screenWidth / 50)
+            : Math.max(32, this.scene.screenWidth / 25);
+        
+        const titleY = this.scene.centerY - this.submenuHeight/2 + 40;
+        const privateKeyY = this.scene.centerY - (isLandscapeMode ? 80 : 100);
+        const instructionY = this.scene.centerY + (isLandscapeMode ? 100 : 80);
+        
+        this.submenuTitle = new MenuText(
+            this.scene,
+            this.scene.centerX, 
+            titleY, 
+            "YOUR PRIVATE KEY", 
+            titleFontSize,
+            { depth: 254 }
+        );
+        
+        const wallet = getLocalWallet();
+        const privateKey = wallet ? wallet.privateKey : 'No wallet';
+
+        // Private key input (read-only) - wider input, smaller font, white color
+        const privateKeyInputWidth = isLandscapeMode 
+            ? Math.min(800, this.scene.screenWidth * 0.85)
+            : Math.min(700, this.scene.screenWidth * 0.95);
+        
+        this.privateKeyInput = new MenuInput(
+            this.scene,
+            this.scene.centerX,
+            privateKeyY,
+            '',
+            isLandscapeMode ? titleFontSize - 14 : titleFontSize - 8,
+            {
+                readOnly: true,
+                value: privateKey,
+                width: privateKeyInputWidth
+            }
+        );
+        // Override color to white
+        this.privateKeyInput.inputElement.style.color = '#FFFFFF';
+
+        this.instructionText = new MenuText(
+            this.scene,
+            this.scene.centerX, 
+            instructionY, 
+            "Back up your private key. This is a local storage wallet, don't use it for large amounts.", 
+            titleFontSize - 4,
+            { 
+                depth: 254,
+                wordWrap: { width: this.submenuWidth - 100 },
+                align: 'center'
+            }
+        );
+
+        this.submenuElements = [
+            this.submenuContainer,
+            this.submenuTitle,
+            this.privateKeyInput,
+            this.instructionText,
+            this.submenuXButton
+        ];
+    }
+
     showForfeitSubmenu() {
-        this.currentSubmenu = 'forfeit';
+        this.currentSubmenu = 'cleanup';
         
         this.clearMainMenu();
         
@@ -436,7 +559,7 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             titleY, 
-            "FORFEIT GAME", 
+            "CLEANUP", 
             titleFontSize,
             { depth: 254 }
         );
@@ -445,7 +568,7 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             warningY,
-            "This will forfeit your current game\nand clear all cached data.", 
+            "This will forfeit your current game\nand clear cache. This will not\naffect your balance.", 
             titleFontSize - 4,
             {
                 depth: 254,
@@ -458,7 +581,7 @@ export class MainMenu {
             this.scene,
             this.scene.centerX,
             confirmButtonY,
-            "CONFIRM FORFEIT", 
+            "CONFIRM CLEANUP", 
             titleFontSize,
             () => this.executeForfeit()
         );
@@ -512,11 +635,13 @@ export class MainMenu {
         this.openMenu();
     }
 
-    executeWithdraw() {
+    async executeWithdraw() {
         const address = this.addressInput.getValue().trim();
         if (address && address.startsWith('0x') && address.length === 42) {
-            withdrawFunds(address);
+            this.scene.pleaseWaitScreen.show(address);
             this.closeMenu();
+            await withdrawFunds(address);
+            this.scene.pleaseWaitScreen.hide();
         } else {
             console.log('Invalid address format');
         }

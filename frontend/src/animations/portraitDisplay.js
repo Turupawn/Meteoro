@@ -12,7 +12,6 @@ export class PortraitDisplay {
         this.originalY = 0;
         this.landscapeModeSize = 300;
         this.portraitModeSize = 256; // 512x512 scaled down to 128x128
-        this.clickAnimationTimer = null;
         this.create();
     }
 
@@ -189,30 +188,12 @@ export class PortraitDisplay {
     }
 
     onPortraitClick() {
-        // Don't trigger click animation if already in an animation state
-        if (this.isAnimationActive || this.clickAnimationTimer) {
-            return;
+        if (this.scene.betMenu && !this.scene.betMenu.isOpen) {
+            this.scene.betMenu.openMenu();
         }
-
-        // Switch to frame 2 (animation frame)
-        this.isAnimationActive = true;
-        this.updatePortrait();
-
-        // After 500ms, return to frame 1 (default frame)
-        this.clickAnimationTimer = this.scene.time.delayedCall(500, () => {
-            this.isAnimationActive = false;
-            this.updatePortrait();
-            this.clickAnimationTimer = null;
-        });
     }
 
     destroy() {
-        // Clean up any pending timers
-        if (this.clickAnimationTimer) {
-            this.scene.time.removeEvent(this.clickAnimationTimer);
-            this.clickAnimationTimer = null;
-        }
-
         if (this.portraitSprite) {
             this.portraitSprite.destroy();
         }
