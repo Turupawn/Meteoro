@@ -4,6 +4,8 @@ import { MenuButton } from './menuElements/menuButton.js';
 import { MenuInput } from './menuElements/menuInput.js';
 import { MenuText } from './menuElements/menuText.js';
 
+const NETWORK = import.meta.env.NETWORK || 'rise testnet';
+
 export class MainMenu {
     constructor(scene) {
         this.scene = scene;
@@ -251,39 +253,41 @@ export class MainMenu {
             }
         );
 
-        this.faucetText = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            faucetTextY, 
-            "Get test token", 
-            titleFontSize - 4,
-            { depth: 254 }
-        );
-
-        this.faucetLink = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            faucetLinkY, 
-            "https://faucet.testnet.riselabs.xyz/",
-            titleFontSize - 4,
-            {
-                interactive: true,
-                isLink: true, // Add link styling
-                onClick: () => window.open('https://faucet.testnet.riselabs.xyz/', '_blank'),
-                depth: 254
-            }
-        );
-
         this.submenuElements = [
             this.submenuContainer,
             this.submenuTitle,
             this.instructionText,
             this.addressInput,
             this.warningText,
-            this.faucetText,
-            this.faucetLink,
             this.submenuXButton
         ];
+        
+        if (NETWORK === 'rise testnet') {
+            this.faucetText = new MenuText(
+                this.scene,
+                this.scene.centerX, 
+                faucetTextY, 
+                "Get test token", 
+                titleFontSize - 4,
+                { depth: 254 }
+            );
+
+            this.faucetLink = new MenuText(
+                this.scene,
+                this.scene.centerX, 
+                faucetLinkY, 
+                "https://faucet.testnet.riselabs.xyz/",
+                titleFontSize - 4,
+                {
+                    interactive: true,
+                    isLink: true, // Add link styling
+                    onClick: () => window.open('https://faucet.testnet.riselabs.xyz/', '_blank'),
+                    depth: 254
+                }
+            );
+            
+            this.submenuElements.push(this.faucetText, this.faucetLink);
+        }
     }
 
     createSubmenuXButton(submenuWidth, submenuHeight) {

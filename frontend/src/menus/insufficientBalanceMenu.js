@@ -3,6 +3,8 @@ import { isLandscape } from '../utils/utils.js';
 import { MenuText } from './menuElements/menuText.js';
 import { MenuInput } from './menuElements/menuInput.js';
 
+const NETWORK = import.meta.env.NETWORK || 'rise testnet';
+
 export class InsufficientBalanceMenu {
     constructor(scene) {
         this.scene = scene;
@@ -48,11 +50,12 @@ export class InsufficientBalanceMenu {
         const faucetLinkY = this.scene.centerY + (isLandscapeMode ? 160 : 100);
         
         // Title - now shows the instruction text instead of "INSUFFICIENT BALANCE"
+        const networkName = NETWORK === 'rise testnet' ? 'Rise Testnet' : 'Rise Mainnet';
         this.title = new MenuText(
             this.scene,
             this.scene.centerX, 
             titleY, 
-            "Deposit ETH on Rise Testnet to start playing.\nGas fees applies.",
+            `Deposit ETH on ${networkName} to start playing.\nGas fees applies.`,
             titleFontSize,
             { depth: 302 }
         );
@@ -80,7 +83,6 @@ export class InsufficientBalanceMenu {
         );
         this.addressInput.inputElement.style.display = 'none';
 
-        // Faucet text
         this.faucetText = new MenuText(
             this.scene,
             this.scene.centerX, 
@@ -91,7 +93,6 @@ export class InsufficientBalanceMenu {
         );
         this.faucetText.textElement.setVisible(false);
 
-        // Faucet link
         this.faucetLink = new MenuText(
             this.scene,
             this.scene.centerX, 
@@ -109,10 +110,12 @@ export class InsufficientBalanceMenu {
 
         this.elements = [
             this.title,
-            this.addressInput,
-            this.faucetText,
-            this.faucetLink
+            this.addressInput
         ];
+        
+        if (NETWORK === 'rise testnet') {
+            this.elements.push(this.faucetText, this.faucetLink);
+        }
     }
 
     show(force = false) {
