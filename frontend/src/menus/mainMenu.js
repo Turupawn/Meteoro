@@ -1,5 +1,5 @@
-import { forfeit, withdrawFunds, getLocalWallet, formatBalance } from '../web3/blockchain_stuff.js';
-import { isLandscape, ETH_BALANCE_DECIMALS } from '../utils/utils.js';
+import { forfeit, withdrawFunds, getLocalWallet, formatBalance, getPlayerGachaTokenBalance } from '../web3/blockchain_stuff.js';
+import { isLandscape, ETH_BALANCE_DECIMALS, GACHA_BALANCE_DECIMALS } from '../utils/utils.js';
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuInput } from './menuElements/menuInput.js';
 import { MenuText } from './menuElements/menuText.js';
@@ -341,9 +341,10 @@ export class MainMenu {
             : Math.max(32, this.scene.screenWidth / 25);
         
         const titleY = this.scene.centerY - this.submenuHeight/2 + 30;
-        const balanceY = this.scene.centerY - (isLandscapeMode ? 120 : 120);
-        const addressLabelY = this.scene.centerY - (isLandscapeMode ? 50 : 60);
-        const addressInputY = this.scene.centerY + (isLandscapeMode ? 30 : 20);
+        const balanceY = this.scene.centerY - (isLandscapeMode ? 180 : 180);
+        const gachaBalanceY = this.scene.centerY - (isLandscapeMode ? 140 : 140);
+        const addressLabelY = this.scene.centerY - (isLandscapeMode ? 50 : 50);
+        const addressInputY = this.scene.centerY + (isLandscapeMode ? 20 : 10);
         const withdrawButtonY = this.scene.centerY + (isLandscapeMode ? 180 : 160);
         
         this.submenuTitle = new MenuText(
@@ -371,7 +372,25 @@ export class MainMenu {
             this.scene,
             this.scene.centerX, 
             balanceY, 
-            `Balance: ${ethBalanceString}`, 
+            `Your ETH Balance: ${ethBalanceString}`, 
+            titleFontSize - 2,
+            { depth: 254 }
+        );
+
+        let gachaBalanceString = "0 GACHA";
+        try {
+            const gachaBalance = getPlayerGachaTokenBalance();
+            gachaBalanceString = `${formatBalance(gachaBalance, GACHA_BALANCE_DECIMALS)} GACHA`;
+        } catch (error) {
+            console.error('Error converting gacha balance:', error);
+            gachaBalanceString = "0 GACHA";
+        }
+
+        this.gachaBalanceText = new MenuText(
+            this.scene,
+            this.scene.centerX, 
+            gachaBalanceY, 
+            `Your GACHA Balance: ${gachaBalanceString}`, 
             titleFontSize - 2,
             { depth: 254 }
         );
@@ -406,6 +425,7 @@ export class MainMenu {
             this.submenuContainer,
             this.submenuTitle,
             this.ethBalanceText,
+            this.gachaBalanceText,
             this.addressLabel,
             this.addressInput,
             this.withdrawButton,
