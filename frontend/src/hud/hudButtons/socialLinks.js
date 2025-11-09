@@ -68,6 +68,28 @@ export class SocialLinks {
         this.telegramIcon.on('pointerdown', () => {
             window.open('https://t.me/+ZYZ49Pt_EaczZTUx', '_blank');
         });
+
+        // X (Twitter) icon (to the right of Telegram)
+        const xY = isLandscapeMode ? this.scene.screenHeight - bottomMargin : 100;
+        this.xIcon = this.scene.add.image(
+            leftMargin + spacing * 2,
+            xY,
+            'x-icon'
+        ).setOrigin(0, 1).setInteractive();
+
+        this.xIcon.setDepth(50);
+        this.xIcon.setScale(iconSize / 250); // Original SVG size is 250px
+        this.xIcon.setAlpha(0.8);
+        
+        // Bigger hit area on portrait (mobile)
+        this.xIcon.setSize(
+            this.xIcon.width + hitAreaWidth,
+            this.xIcon.height + hitAreaHeight
+        );
+        
+        this.xIcon.on('pointerdown', () => {
+            window.open('https://x.com/meteoroxyz', '_blank');
+        });
     }
 
     destroy() {
@@ -76,6 +98,9 @@ export class SocialLinks {
         }
         if (this.telegramIcon) {
             this.telegramIcon.destroy();
+        }
+        if (this.xIcon) {
+            this.xIcon.destroy();
         }
     }
 }
