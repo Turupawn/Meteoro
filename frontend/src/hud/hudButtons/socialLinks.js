@@ -17,9 +17,8 @@ export class SocialLinks {
             leftMargin = 50;
             spacing = 100;
         } else {
-            // In portrait mode, position at top right
             bottomMargin = this.scene.screenHeight - 50; // Top of screen
-            leftMargin = this.scene.screenWidth - 200; // Right side
+            leftMargin = this.scene.screenWidth - 280;
             spacing = 90;
         }
 
