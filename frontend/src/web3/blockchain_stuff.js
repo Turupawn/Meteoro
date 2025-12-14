@@ -60,7 +60,7 @@ export function formatBalance(weiBalance, shownDecimals = 6) {
 
 async function loadContractABI() {
   if (CONTRACT_ABI) return CONTRACT_ABI
-  
+
   try {
     const response = await fetch(MY_CONTRACT_ABI_PATH)
     CONTRACT_ABI = await response.json()
@@ -85,13 +85,13 @@ export async function initWeb3() {
     printLog(['debug'], "Initializing WebSocket-based blockchain connection...")
     printLog(['debug'], "WSS_URL:", WSS_URL)
     printLog(['debug'], "CONTRACT_ADDRESS:", MY_CONTRACT_ADDRESS)
-    
+
     await loadContractABI()
     wsClient = createPublicClient({
       chain: riseTestnet,
       transport: webSocket(WSS_URL)
     }).extend(shredActions)
-    
+
     // Get or create wallet
     let wallet = getLocalWallet()
     if (!wallet) {
@@ -110,10 +110,10 @@ export async function initWeb3() {
       chain: riseTestnet,
       transport: webSocket(WSS_URL)
     })
-    
+
     printLog(['debug'], "WebSocket client initialized successfully")
     printLog(['debug'], "Wallet address:", wallet.address)
-    
+
     return { web3: wsClient, my_contract: null, wallet }
   } catch (error) {
     console.error("Error initializing WebSocket client:", error)
@@ -129,13 +129,13 @@ export async function checkInitialGameState() {
     if (!wallet) {
       return null
     }
-    
+
     console.log("=== INITIAL STATE CHECK (WebSocket) ===")
     console.log("Contract address:", MY_CONTRACT_ADDRESS)
     console.log("Wallet address:", wallet.address)
     console.log("Contract ABI loaded:", !!CONTRACT_ABI)
     printLog(['debug'], "Using WebSocket for initial state check")
-    
+
     let gameStateTemp
     try {
       printLog(['debug'], "Using WebSocket client for initial state check...")
@@ -151,13 +151,13 @@ export async function checkInitialGameState() {
       printLog(['error'], "WebSocket initial state check failed:", wsError.message)
       throw wsError
     }
-    
+
     console.log("=== CONTRACT CALL SUCCESSFUL ===")
     console.log("Received data:", gameStateTemp)
     console.log("Data length:", gameStateTemp.length)
     console.log("Element 8 (betAmounts):", gameStateTemp[8])
     console.log("Element 9 (betAmountMultipliers):", gameStateTemp[9])
-    
+
     // Access the array elements by index according to the ABI
     const playerEthBalance = gameStateTemp[0]
     const playerGachaTokenBalance = gameStateTemp[1]
@@ -169,13 +169,13 @@ export async function checkInitialGameState() {
     const tieRewardMultiplierValue = gameStateTemp[7]
     const betAmounts = gameStateTemp[8]
     const betAmountMultipliersArray = gameStateTemp[9]
-    
+
     console.log("Bet amounts:", betAmounts)
     console.log("Bet amounts type:", typeof betAmounts)
     console.log("Bet amounts length:", betAmounts?.length)
-    
+
     printLog(['debug'], "Contract call successful, received:", gameStateTemp)
-    
+
     // Debug the bet amounts BEFORE any processing
     printLog(['debug'], "=== BET AMOUNTS DEBUG ===")
     printLog(['debug'], "Bet amounts array from contract:", betAmounts)
@@ -185,19 +185,19 @@ export async function checkInitialGameState() {
     printLog(['debug'], "Bet amount multipliers:", betAmountMultipliersArray)
     printLog(['debug'], "Tie reward multiplier:", tieRewardMultiplierValue)
     printLog(['debug'], "=========================")
-    
+
     // Update centralized game state
     updateBalances(playerEthBalance, playerGachaTokenBalance)
     updateBetConfiguration(betAmounts, betAmountMultipliersArray, tieRewardMultiplierValue)
-    
+
     if (!betAmounts || betAmounts.length === 0) {
       printLog(['error'], "Contract is accessible but has no bet amounts configured")
       printLog(['error'], "This means the contract owner needs to call setBetAmounts()")
       throw new Error("No bet amounts configured in contract - owner needs to set bet amounts")
     }
-    
+
     // Selected bet amount is now handled in gameState.updateBetConfiguration()
-    
+
     const gameState = {
       playerETHBalance: playerEthBalance,
       playerGachaTokenBalance: playerGachaTokenBalance,
@@ -210,26 +210,26 @@ export async function checkInitialGameState() {
       betAmounts: betAmounts,
       betAmountMultipliers: betAmountMultipliersArray
     }
-    
+
     printLog(['profile'], "=== INITIAL GAME STATE LOAD ===")
     printLog(['profile'], "Game state loaded successfully")
     printLog(['profile'], "Time taken:", Date.now() - startTime, "ms")
     printLog(['profile'], "=============================")
-    
+
     return gameState
   } catch (error) {
     printLog(['profile'], "=== INITIAL GAME STATE LOAD ===")
     printLog(['profile'], "Game state load failed")
     printLog(['profile'], "Time taken:", Date.now() - startTime, "ms")
     printLog(['profile'], "=============================")
-    
+
     console.error("Error checking initial game state:", error)
     showErrorModal("Failed to check initial game state: " + error.message)
     captureBlockchainError(error, 'checkInitialGameState', {
       contract_address: MY_CONTRACT_ADDRESS,
       error_type: 'blockchain_call_failed'
     })
-    
+
     return null
   }
 }
@@ -240,7 +240,7 @@ export async function checkGameState() {
     if (!wallet) {
       return null
     }
-    
+
     let gameStateTemp = await wsClient.readContract({
       address: MY_CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
@@ -254,10 +254,10 @@ export async function checkGameState() {
     const playerCommit = gameStateTemp[3]
     const houseRandomness = gameStateTemp[4]
     const gameId = gameStateTemp[5]
-    
+
     // Update centralized game state
     updateBalances(playerEthBalance, playerGachaTokenBalance)
-    
+
     const gameStateData = {
       playerETHBalance: playerEthBalance,
       playerGachaTokenBalance: playerGachaTokenBalance,
@@ -266,7 +266,7 @@ export async function checkGameState() {
       houseRandomness: houseRandomness,
       gameId: gameId
     }
-    
+
     return gameStateData
   } catch (error) {
     console.error("Error checking game state:", error)
@@ -275,7 +275,7 @@ export async function checkGameState() {
       contract_address: MY_CONTRACT_ADDRESS,
       error_type: 'blockchain_call_failed'
     })
-    
+
     return null
   }
 }
@@ -290,15 +290,15 @@ export async function commit(commitHash) {
     })
     throw error
   }
-  
+
   if (!gameState.getSelectedBetAmount()) {
     await initializeBetAmount()
   }
-  
+
   try {
     printLog(['debug'], "Sending commit transaction via WebSocket...")
     const startTime = Date.now()
-    
+
     const request = await walletClient.prepareTransactionRequest({
       to: MY_CONTRACT_ADDRESS,
       value: gameState.getSelectedBetAmount(),
@@ -309,15 +309,15 @@ export async function commit(commitHash) {
       }),
       gas: BigInt(GAS_LIMIT)
     })
-    
+
     // Sign the transaction
     const serializedTransaction = await walletClient.signTransaction(request)
-    
+
     // Use sendRawTransactionSync with signed transaction
     const receipt = await wsClient.sendRawTransactionSync({
       serializedTransaction
     })
-    
+
     if (receipt.status === '0x0' || receipt.status === 0) {
       const error = new Error("Transaction failed: Game state may not allow this action. Please check if you need to reveal a previous game first.");
       showErrorModal(error.message);
@@ -328,7 +328,7 @@ export async function commit(commitHash) {
       });
       throw error;
     }
-    
+
     const confirmTime = Date.now() - startTime
     printLog(['debug'], "Commit Transaction Receipt:", {
       transactionHash: receipt.transactionHash,
@@ -337,7 +337,7 @@ export async function commit(commitHash) {
       gasUsed: receipt.gasUsed,
       confirmationTime: confirmTime + "ms"
     })
-    
+
     return receipt
   } catch (error) {
     showErrorModal("Failed to commit: " + error.message)
@@ -387,8 +387,8 @@ export async function withdrawFunds(destinationAddress) {
     const gasCost = gasPrice * gasLimit
     const safetyBufferWei = BigInt(Math.floor(GAS_FEE_BUFFER_ETH * 1e18))
     // Reserve gas for token transfer (if tokens exist) + ETH transfer
-    const totalGasReserve = gachaTokenBalance > 0n 
-      ? (gasCost * 2n) + safetyBufferWei 
+    const totalGasReserve = gachaTokenBalance > 0n
+      ? (gasCost * 2n) + safetyBufferWei
       : gasCost + safetyBufferWei
 
     if (currentBalance <= totalGasReserve) {
@@ -400,7 +400,7 @@ export async function withdrawFunds(destinationAddress) {
     // First, transfer Gacha tokens if user has any
     if (gachaTokenBalance > 0n) {
       printLog(['debug'], "Transferring Gacha tokens:", gachaTokenBalance.toString(), "to", destinationAddress)
-      
+
       const tokenTransferRequest = await walletClient.prepareTransactionRequest({
         to: gachaTokenAddress,
         value: 0n,
@@ -422,17 +422,17 @@ export async function withdrawFunds(destinationAddress) {
     }
 
     // Then transfer ETH (after reserving gas for token transfer if it happened)
-    const ethGasReserve = gachaTokenBalance > 0n 
-      ? (gasCost * 2n) + safetyBufferWei 
+    const ethGasReserve = gachaTokenBalance > 0n
+      ? (gasCost * 2n) + safetyBufferWei
       : gasCost + safetyBufferWei
-    
-    const valueToSend = currentBalance > ethGasReserve 
-      ? currentBalance - ethGasReserve 
+
+    const valueToSend = currentBalance > ethGasReserve
+      ? currentBalance - ethGasReserve
       : 0n
 
     if (valueToSend > 0n) {
       printLog(['debug'], "Transferring ETH:", valueToSend.toString(), "to", destinationAddress)
-      
+
       const ethTransferRequest = await walletClient.prepareTransactionRequest({
         to: destinationAddress,
         value: valueToSend,
@@ -463,11 +463,11 @@ export async function forfeit() {
   if (!wallet) {
     throw new Error("No local wallet found!")
   }
-  
+
   try {
     printLog(['debug'], "Sending forfeit transaction via WebSocket...")
     const startTime = Date.now()
-    
+
     // Prepare transaction request
     const request = await walletClient.prepareTransactionRequest({
       to: MY_CONTRACT_ADDRESS,
@@ -479,15 +479,15 @@ export async function forfeit() {
       }),
       gas: BigInt(GAS_LIMIT)
     })
-    
+
     // Sign the transaction
     const serializedTransaction = await walletClient.signTransaction(request)
-    
+
     // Use sendRawTransactionSync with signed transaction
     const receipt = await wsClient.sendRawTransactionSync({
       serializedTransaction
     })
-    
+
     const confirmTime = Date.now() - startTime
     printLog(['debug'], "Forfeit Transaction Receipt:", {
       transactionHash: receipt.transactionHash,
@@ -510,15 +510,15 @@ export async function forfeit() {
 export async function performReveal(secret) {
   try {
     printLog(['debug'], "=== PERFORM REVEAL START ===")
-    
+
     const wallet = getLocalWallet()
     if (!wallet) {
       throw new Error("No local wallet found!")
     }
-    
+
     printLog(['debug'], "Sending reveal transaction via WebSocket...")
     const startTime = Date.now()
-    
+
     // Prepare transaction request
     const request = await walletClient.prepareTransactionRequest({
       to: MY_CONTRACT_ADDRESS,
@@ -530,15 +530,15 @@ export async function performReveal(secret) {
       }),
       gas: BigInt(GAS_LIMIT)
     })
-    
+
     // Sign the transaction
     const serializedTransaction = await walletClient.signTransaction(request)
-    
+
     // Use sendRawTransactionSync with signed transaction
     const receipt = await wsClient.sendRawTransactionSync({
       serializedTransaction
     })
-    
+
     // Check if transaction actually succeeded
     if (receipt.status === '0x0' || receipt.status === 0) {
       console.log("❌ Reveal transaction failed - status indicates failure");
@@ -551,7 +551,7 @@ export async function performReveal(secret) {
       });
       throw error;
     }
-    
+
     const confirmTime = Date.now() - startTime
     printLog(['debug'], "Reveal Transaction Receipt:", {
       transactionHash: receipt.transactionHash,
@@ -560,7 +560,7 @@ export async function performReveal(secret) {
       gasUsed: receipt.gasUsed,
       confirmationTime: confirmTime + "ms"
     })
-    
+
     printLog(['debug'], "=== PERFORM REVEAL END ===")
     return receipt
   } catch (error) {
@@ -578,7 +578,7 @@ export async function performReveal(secret) {
 export async function startEventMonitoring() {
   try {
     printLog(['debug'], "Starting real-time event monitoring...")
-    
+
     const wallet = getLocalWallet()
     if (!wallet) {
       throw new Error("No local wallet found!")
@@ -596,19 +596,19 @@ export async function startEventMonitoring() {
         updateGameState(await checkGameState())
       },
     });
-    
+
     eventUnwatch = unwatch
-    
+
     printLog(['debug'], "Event monitoring started successfully")
-    
+
     balancePoll = setInterval(async () => {
       const ethBalance = await wsClient.getBalance({ address: wallet.address })
       const currentGacha = gameState.getGachaTokenBalance()
       updateBalances(ethBalance, currentGacha)
     }, BALANCE_POLL_INTERVAL)
-    
+
     await startGachaTokenBalanceMonitoring()
-    
+
     return eventUnwatch
   } catch (error) {
     console.error("Error starting event monitoring:", error)
@@ -684,40 +684,10 @@ async function startGachaTokenBalanceMonitoring() {
       receiveUnwatch()
     }
 
-    // Additionally, use watchShreds for real-time updates via state changes
-    const shredsUnwatch = watchShreds(wsClient, {
-      onShred: async (shred) => {
-        // Check if this shred affects our wallet address or the token contract
-        const walletLower = wallet.address.toLowerCase()
-        let shouldUpdate = false
-
-        // Check state changes for address balance updates
-        if (shred.stateChanges) {
-          for (const stateChange of shred.stateChanges) {
-            const address = stateChange.address?.toLowerCase()
-            // If the shred affects our wallet or the token contract, update balance
-            if (address === walletLower || address === gachaTokenAddress.toLowerCase()) {
-              shouldUpdate = true
-              break
-            }
-          }
-        }
-
-        if (shouldUpdate) {
-          printLog(['debug'], "Shred detected affecting wallet or token contract, updating Gacha balance...")
-          await updateGachaTokenBalance(gachaTokenAddress, wallet.address)
-        }
-      },
-      onError: (error) => {
-        printLog(['error'], "Shred watching error for Gacha token:", error)
-      }
-    })
-
     // Combine both unwatch functions
     const originalUnwatch = gachaTokenBalanceUnwatch
     gachaTokenBalanceUnwatch = () => {
       originalUnwatch()
-      shredsUnwatch()
     }
 
     printLog(['debug'], "Gacha token balance monitoring started successfully")
@@ -771,12 +741,12 @@ async function initializeBetAmount() {
   if (!betAmounts || betAmounts.length === 0) {
     throw new Error("Bet amounts not initialized")
   }
-  
+
   gameState.setSelectedBetAmount(betAmounts[0])
 }
 
-export { 
-  setSelectedBetAmount, 
+export {
+  setSelectedBetAmount,
   getMinimumPlayableBalance,
   getPlayerETHBalance,
   getPlayerGachaTokenBalance,
