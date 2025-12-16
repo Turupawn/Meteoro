@@ -10,13 +10,16 @@
     "start": "npx http-server ./dist"
   },
   "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.1.0",
     "typescript": "^5.9.3",
     "vite": "^4.5.0"
   },
   "dependencies": {
     "dotenv": "^17.2.1",
+    "ox": "^0.10.2",
     "phaser": "^3.90.0",
     "posthog-js": "^1.258.6",
+    "rise-wallet": "^0.3.0",
     "shreds": "^0.2.3",
     "viem": "^2.38.4",
     "web3": "^4.16.0"

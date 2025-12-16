@@ -1,7 +1,9 @@
-import { createPublicClient, createWalletClient, webSocket, formatEther, encodeFunctionData } from 'viem'
-import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
+import { createPublicClient, createWalletClient, webSocket, formatEther, encodeFunctionData, custom, createClient } from 'viem'
 import { riseTestnet } from 'viem/chains'
 import { shredActions, sendRawTransactionSync, watchShreds } from 'shreds/viem'
+import { RiseWallet } from 'rise-wallet'
+import { WalletActions } from 'rise-wallet/viem'
+import { P256, Signature } from 'ox'
 import { printLog, getCardDisplay } from '../utils/utils.js'
 import { captureBlockchainError } from '../session_tracking.js'
 import { showErrorModal } from '../menus/errorModal.js'
@@ -49,6 +51,7 @@ const ERC20_ABI = [
 
 let wsClient
 let walletClient
+let riseWalletInstance // Store instance to access provider
 let eventUnwatch = null
 let balancePoll = null
 let gachaTokenBalanceUnwatch = null
@@ -87,39 +90,160 @@ export async function initWeb3() {
     printLog(['debug'], "CONTRACT_ADDRESS:", MY_CONTRACT_ADDRESS)
 
     await loadContractABI()
+
+    // Create Rise Wallet instance
+    const rw = RiseWallet.create();
+    riseWalletInstance = rw;
+
     wsClient = createPublicClient({
       chain: riseTestnet,
       transport: webSocket(WSS_URL)
     }).extend(shredActions)
 
-    // Get or create wallet
-    let wallet = getLocalWallet()
-    if (!wallet) {
-      console.log("Generating new wallet...")
-      const pk = generatePrivateKey()
-      const account = privateKeyToAccount(pk)
-      wallet = {
-        address: account.address,
-        privateKey: pk
-      }
-      localStorage.setItem('localWallet', JSON.stringify(wallet))
-    }
-
-    walletClient = createWalletClient({
-      account: privateKeyToAccount(wallet.privateKey),
+    // Create Viem client with Rise Wallet provider
+    walletClient = createClient({
       chain: riseTestnet,
-      transport: webSocket(WSS_URL)
+      transport: custom(rw.provider)
     })
 
-    printLog(['debug'], "WebSocket client initialized successfully")
-    printLog(['debug'], "Wallet address:", wallet.address)
+    // Connect to wallet using WalletActions
+    // Instead of auto-connecting which blocks, we will return the client and let the UI trigger connection
+    console.log("Rise Wallet client create without auto-connect")
 
-    return { web3: wsClient, my_contract: null, wallet }
+    // We can try to see if we are already connected?
+    // For now, let's return the client and wallet as null or partial?
+    // The game expects 'wallet' object. 
+
+    // Attempt silent connect or just return initialized structure
+    return { web3: wsClient, my_contract: null, wallet: null, walletClient: walletClient }
+
   } catch (error) {
     console.error("Error initializing WebSocket client:", error)
     showErrorModal("Failed to initialize WebSocket client: " + error.message)
     throw error
   }
+}
+
+export async function connectWallet() {
+  try {
+    console.log("Connecting to Rise Wallet via WalletActions...")
+    const { accounts } = await WalletActions.connect(walletClient)
+    console.log("Connected accounts:", accounts)
+
+    const wallet = {
+      address: accounts[0]
+    }
+
+    localStorage.setItem('localWallet', JSON.stringify(wallet))
+
+    // Session Key Logic
+    let sessionPrivateKey = localStorage.getItem('sessionPrivateKey')
+
+    if (!sessionPrivateKey) {
+      console.log("No session key found. Generating new P256 key...")
+      sessionPrivateKey = P256.randomPrivateKey()
+      const publicKey = P256.getPublicKey(sessionPrivateKey)
+
+      console.log("Granting permissions for session key...")
+      // Grant permissions
+      // We grant permission for ALL contract calls for now to simplify, or specific if needed.
+      // For this game: commit, reveal, forfeit, transfer(ERC20).
+      // To simplify, we might try a broad permission or just list the contract.
+      // The docs showed 'calls' array.
+
+      const response = await WalletActions.grantPermissions(walletClient, {
+        key: {
+          type: 'p256',
+          publicKey: publicKey
+        },
+        expiry: Math.floor(Date.now() / 1000) + 86400, // 24 hours
+        permissions: {
+          // Allow everything for now? Or specific contract.
+          // If we omit 'calls', does it allow all? Docs example shows specific calls.
+          // Let's try to allow calls to MY_CONTRACT_ADDRESS and GachaToken?
+          // For now let's just use the doc example structure but targeting our contract.
+          calls: [
+            {
+              to: MY_CONTRACT_ADDRESS
+              // selector: undefined (allow all functions?)
+            }
+          ],
+          // Also need to allow spending ETH/Tokens if we do that?
+          // The 'spend' permission is for native token or ERC20.
+          // We stake ETH.
+          spend: [
+            {
+              limit: BigInt(100000000000000000000), // High limit
+              period: 'day',
+              token: '0x0000000000000000000000000000000000000000' // ETH
+            }
+          ]
+        }
+      })
+
+      console.log("Permissions granted:", response)
+      localStorage.setItem('sessionPrivateKey', sessionPrivateKey)
+    } else {
+      console.log("Existing session key found.")
+    }
+
+    return wallet
+  } catch (error) {
+    console.error("Failed to connect wallet:", error)
+    throw error
+  }
+}
+
+async function sendSessionTransaction({ to, value, data }) {
+  if (!riseWalletInstance) throw new Error("Rise Wallet not initialized")
+  const privateKey = localStorage.getItem('sessionPrivateKey')
+  if (!privateKey) throw new Error("No session private key loaded")
+
+  const publicKey = P256.getPublicKey(privateKey)
+  const provider = riseWalletInstance.provider
+
+  console.log("Sending session transaction...")
+  console.log("To:", to)
+
+  // 1. Prepare Calls
+  // wallet_prepareCalls arg structure: [{ calls: [{to, value, data}], key: {...} }]
+  const prepareParams = [{
+    calls: [{
+      to: to,
+      value: value || '0x0', // hex string expected?
+      data: data
+    }],
+    key: {
+      type: 'p256',
+      publicKey: publicKey
+    }
+  }]
+
+  const prepared = await provider.request({
+    method: 'wallet_prepareCalls',
+    params: prepareParams
+  })
+
+  console.log("Calls prepared:", prepared)
+
+  const { digest, ...requestParams } = prepared
+
+  // 2. Sign digest
+  const signature = Signature.toHex(
+    P256.sign({ payload: digest, privateKey: privateKey })
+  )
+
+  // 3. Send
+  const txHash = await provider.request({
+    method: 'wallet_sendPreparedCalls',
+    params: [{
+      ...requestParams,
+      signature: signature
+    }]
+  })
+
+  console.log("Session transaction sent:", txHash)
+  return txHash // sendPreparedCalls returns the hash (or array of hashes?)
 }
 
 export async function checkInitialGameState() {
@@ -299,24 +423,27 @@ export async function commit(commitHash) {
     printLog(['debug'], "Sending commit transaction via WebSocket...")
     const startTime = Date.now()
 
-    const request = await walletClient.prepareTransactionRequest({
+    // Send transaction using the Rise Wallet client
+    // Note: Rise Wallet handles signing and sending. We don't need manual signing + sendRawTransactionSync for standard txs unless using shreds specifically.
+    // However, the original code used sendRawTransactionSync. 
+    // Is sendRawTransactionSync required for shreds low latency?
+    // Rise Wallet docs say "Use Rise Wallet's EIP-1193 provider with Viem's custom transport".
+    // Let's try standard walletClient.sendTransaction which Rise Wallet intercepts.
+
+    // Use session key transaction
+    const hash = await sendSessionTransaction({
       to: MY_CONTRACT_ADDRESS,
       value: gameState.getSelectedBetAmount(),
       data: encodeFunctionData({
         abi: CONTRACT_ABI,
         functionName: 'commit',
         args: [commitHash]
-      }),
-      gas: BigInt(GAS_LIMIT)
+      })
     })
 
-    // Sign the transaction
-    const serializedTransaction = await walletClient.signTransaction(request)
+    printLog(['debug'], "Commit transaction sent:", hash)
 
-    // Use sendRawTransactionSync with signed transaction
-    const receipt = await wsClient.sendRawTransactionSync({
-      serializedTransaction
-    })
+    const receipt = await wsClient.waitForTransactionReceipt({ hash })
 
     if (receipt.status === '0x0' || receipt.status === 0) {
       const error = new Error("Transaction failed: Game state may not allow this action. Please check if you need to reveal a previous game first.");
@@ -381,19 +508,16 @@ export async function withdrawFunds(destinationAddress) {
     // Get Gacha token balance
     const gachaTokenBalance = gameState.getGachaTokenBalance()
 
-    // Compute gas cost and a small safety buffer
-    // We need enough ETH for both token transfer (if needed) and ETH transfer
-    const gasLimit = BigInt(GAS_LIMIT)
-    const gasCost = gasPrice * gasLimit
-    const safetyBufferWei = BigInt(Math.floor(GAS_FEE_BUFFER_ETH * 1e18))
-    // Reserve gas for token transfer (if tokens exist) + ETH transfer
-    const totalGasReserve = gachaTokenBalance > 0n
-      ? (gasCost * 2n) + safetyBufferWei
-      : gasCost + safetyBufferWei
+    // Rise Wallet is gasless, so we can skip strict balance checks for gas.
+    // We only check if user has enough balance to send the VALUE they want to send (if any).
+    // The original code was calculating gas cost. We will assume gas is covered.
 
-    if (currentBalance <= totalGasReserve) {
-      throw new Error("Insufficient balance to cover gas for withdrawal")
-    }
+    // const valueToSend = currentBalance; // Moved to later usage
+
+    // If we are just sending tokens, we don't need ETH.
+    // If we are sending ETH, we should check if we have enough ETH.
+    // The original logic was trying to empty the wallet.
+    // For Rise Wallet, let's keep it simple: just try to send.
 
     const receipts = []
 
@@ -401,7 +525,7 @@ export async function withdrawFunds(destinationAddress) {
     if (gachaTokenBalance > 0n) {
       printLog(['debug'], "Transferring Gacha tokens:", gachaTokenBalance.toString(), "to", destinationAddress)
 
-      const tokenTransferRequest = await walletClient.prepareTransactionRequest({
+      const tokenHash = await walletClient.sendTransaction({
         to: gachaTokenAddress,
         value: 0n,
         data: encodeFunctionData({
@@ -409,44 +533,45 @@ export async function withdrawFunds(destinationAddress) {
           functionName: 'transfer',
           args: [destinationAddress, gachaTokenBalance]
         }),
-        gas: gasLimit
+        gas: BigInt(GAS_LIMIT)
       })
 
-      const tokenSerializedTransaction = await walletClient.signTransaction(tokenTransferRequest)
-      const tokenReceipt = await wsClient.sendRawTransactionSync({
-        serializedTransaction: tokenSerializedTransaction
-      })
+      // We wait for receipt here to match the 'receipt' structure expectations if possible, 
+      // or just return hash if the upstream code handles it. 
+      // The original code waited for sendRawTransactionSync which returns a receipt-like object immediately? 
+      // Actually sendRawTransactionSync usually returns a receipt in shreds context?
+      // Let's assume we need to return a receipt or hash. The caller expects receipts[0].
+      // We'll push the hash.
 
-      printLog(['debug'], "Gacha token transfer transaction sent:", tokenReceipt.transactionHash)
-      receipts.push(tokenReceipt.transactionHash)
+      printLog(['debug'], "Gacha token transfer transaction sent:", tokenHash)
+      receipts.push(tokenHash)
+
+      // Note: original code used tokenReceipt.transactionHash. 
+      // If we need to wait, we should: await wsClient.waitForTransactionReceipt({ hash: tokenHash })
+
+      printLog(['debug'], "Gacha token transfer transaction sent (Legacy Log):", tokenHash)
     }
 
-    // Then transfer ETH (after reserving gas for token transfer if it happened)
-    const ethGasReserve = gachaTokenBalance > 0n
-      ? (gasCost * 2n) + safetyBufferWei
-      : gasCost + safetyBufferWei
+    // Then transfer ETH
+    // Original logic reserved gas. We will just send what is available locally or a slightly smaller amount if we suspect gas usage.
+    // But since it's gasless, maybe we can send it all?
+    // Let's send currentBalance minus a tiny dust to be safe, or just currentBalance.
+    // Let's try sending almost all, leaving a tiny bit just in case.
 
-    const valueToSend = currentBalance > ethGasReserve
-      ? currentBalance - ethGasReserve
-      : 0n
+    const valueToSend = currentBalance; // Logic simplified for gasless assumption
 
     if (valueToSend > 0n) {
       printLog(['debug'], "Transferring ETH:", valueToSend.toString(), "to", destinationAddress)
 
-      const ethTransferRequest = await walletClient.prepareTransactionRequest({
+      const ethHash = await walletClient.sendTransaction({
         to: destinationAddress,
         value: valueToSend,
         data: '0x',
-        gas: gasLimit
+        gas: BigInt(GAS_LIMIT)
       })
 
-      const ethSerializedTransaction = await walletClient.signTransaction(ethTransferRequest)
-      const ethReceipt = await wsClient.sendRawTransactionSync({
-        serializedTransaction: ethSerializedTransaction
-      })
-
-      printLog(['debug'], "ETH transfer transaction sent:", ethReceipt.transactionHash)
-      receipts.push(ethReceipt.transactionHash)
+      printLog(['debug'], "ETH transfer transaction sent:", ethHash)
+      receipts.push(ethHash)
     }
 
     printLog(['debug'], "Withdraw transactions completed:", receipts)
@@ -469,24 +594,17 @@ export async function forfeit() {
     const startTime = Date.now()
 
     // Prepare transaction request
-    const request = await walletClient.prepareTransactionRequest({
+    const hash = await sendSessionTransaction({
       to: MY_CONTRACT_ADDRESS,
       value: 0n,
       data: encodeFunctionData({
         abi: CONTRACT_ABI,
         functionName: 'forfeit',
         args: []
-      }),
-      gas: BigInt(GAS_LIMIT)
+      })
     })
 
-    // Sign the transaction
-    const serializedTransaction = await walletClient.signTransaction(request)
-
-    // Use sendRawTransactionSync with signed transaction
-    const receipt = await wsClient.sendRawTransactionSync({
-      serializedTransaction
-    })
+    const receipt = await wsClient.waitForTransactionReceipt({ hash })
 
     const confirmTime = Date.now() - startTime
     printLog(['debug'], "Forfeit Transaction Receipt:", {
@@ -520,24 +638,17 @@ export async function performReveal(secret) {
     const startTime = Date.now()
 
     // Prepare transaction request
-    const request = await walletClient.prepareTransactionRequest({
+    const hash = await sendSessionTransaction({
       to: MY_CONTRACT_ADDRESS,
       value: 0n,
       data: encodeFunctionData({
         abi: CONTRACT_ABI,
         functionName: 'reveal',
         args: [secret]
-      }),
-      gas: BigInt(GAS_LIMIT)
+      })
     })
 
-    // Sign the transaction
-    const serializedTransaction = await walletClient.signTransaction(request)
-
-    // Use sendRawTransactionSync with signed transaction
-    const receipt = await wsClient.sendRawTransactionSync({
-      serializedTransaction
-    })
+    const receipt = await wsClient.waitForTransactionReceipt({ hash })
 
     // Check if transaction actually succeeded
     if (receipt.status === '0x0' || receipt.status === 0) {

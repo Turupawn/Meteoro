@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import dotenv from 'dotenv'
 dotenv.config()
 
@@ -10,5 +11,8 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['posthog-js']
-  }
+  },
+  plugins: [
+    basicSsl()
+  ]
 })
