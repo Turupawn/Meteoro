@@ -1,21 +1,3 @@
-// --- WebAuthn Polyfill for Rise Wallet SDK fix ---
-if (navigator.credentials && navigator.credentials.create) {
-    const originalCreate = navigator.credentials.create;
-    navigator.credentials.create = async function (options) {
-        if (options && options.publicKey) {
-            if (!options.publicKey.pubKeyCredParams || options.publicKey.pubKeyCredParams.length === 0) {
-                console.log("[Polyfill] Injecting missing pubKeyCredParams for WebAuthn");
-                options.publicKey.pubKeyCredParams = [
-                    { alg: -7, type: "public-key" }, // ES256
-                    { alg: -257, type: "public-key" } // RS256
-                ];
-            }
-        }
-        return originalCreate.call(navigator.credentials, options);
-    };
-}
-// ------------------------------------------------
-
 import { loadPhaser } from './game.js';
 import posthog from 'posthog-js';
 import { generateRandomBytes32, calculateCards, printLog } from './utils/utils.js';

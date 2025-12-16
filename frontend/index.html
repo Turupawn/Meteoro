@@ -28,6 +28,25 @@
   <div style="display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw;">
     <!-- Card Display Section - much larger -->
   </div>
+  <script>
+    // WebAuthn Polyfill for Rise Wallet SDK
+    // Fixes "publicKey.pubKeyCredParams is missing" error by injecting default algorithms
+    if (navigator.credentials && navigator.credentials.create) {
+      const originalCreate = navigator.credentials.create;
+      navigator.credentials.create = async function (options) {
+        if (options && options.publicKey) {
+          if (!options.publicKey.pubKeyCredParams || options.publicKey.pubKeyCredParams.length === 0) {
+            console.log("[Polyfill] Injecting missing pubKeyCredParams for WebAuthn");
+            options.publicKey.pubKeyCredParams = [
+              { alg: -7, type: "public-key" }, // ES256
+              { alg: -257, type: "public-key" } // RS256
+            ];
+          }
+        }
+        return originalCreate.call(navigator.credentials, options);
+      };
+    }
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
