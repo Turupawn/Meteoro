@@ -173,8 +173,6 @@ export class GameHistory {
     }
 
     initializeHistory(recentHistory) {
-        // Contract returns history in chronological order (oldest first)
-        // Frontend expects most recent first, so we reverse the array
         this.recentHistory = recentHistory ? [...recentHistory].reverse() : [];
     }
 

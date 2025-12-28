@@ -1,7 +1,7 @@
 import { loadPhaser } from './game.js';
 import posthog from 'posthog-js';
 import { generateRandomBytes32, calculateCards, printLog } from './utils/utils.js';
-import { keccak256 } from 'viem'; // Static import for performance - no more dynamic import
+import { keccak256 } from 'viem';
 import {
     initWeb3,
     getLocalWallet,
@@ -11,16 +11,8 @@ import {
     performReveal,
     startEventMonitoring,
     stopEventMonitoring,
-    connectWallet,
     warmupSdkAndCrypto
 } from './web3/blockchain_stuff.js';
-
-// Import session key utilities for UI status
-import {
-    hasUsableSessionKey,
-    getActiveSessionKey,
-    getSessionKeyTimeRemaining
-} from './web3/sessionKeyManager.js';
 
 import {
     captureError,
@@ -37,6 +29,8 @@ import {
     updateBalances
 } from './gameState.js';
 
+import { showConnectButton } from './hud/hudButtons/connectButton.js';
+
 var game
 var gameScene = null; // Reference to the main game scene
 
@@ -47,14 +41,9 @@ let commitStartTime = null;
 let gameState = null;
 let shouldProcessCommit = false;
 
-// ⚡ PERFORMANCE: Pre-computed commit data (ready before user clicks)
 let precomputedSecret = null;
 let precomputedHash = null;
 
-/**
- * Pre-compute next commit data for faster game start
- * Called after each game completes or during idle time
- */
 function precomputeNextCommit() {
     precomputedSecret = generateRandomBytes32();
     precomputedHash = keccak256(precomputedSecret);
@@ -237,9 +226,7 @@ async function loadGameData() {
         isGameDataReady = true;
         updateGameDataProgress(1);
         console.log("Starting game loop...")
-        // ⚡ PERFORMANCE: Warm up SDK and crypto to eliminate cold start latency
         await warmupSdkAndCrypto();
-        // ⚡ PERFORMANCE: Pre-compute first commit while player looks at UI
         precomputeNextCommit();
         startGameLoop();
     } catch (error) {
@@ -430,7 +417,6 @@ async function gameLoop() {
                 centralizedGameState.gameState === 4n /* Forfeited */) {
                 printLog(['debug'], "=== STARTING COMMIT PROCESS ===");
 
-                // ⚡ PERFORMANCE: Use pre-computed secret/hash if available
                 let secret, commitHash;
                 if (precomputedSecret && precomputedHash) {
                     secret = precomputedSecret;
@@ -466,7 +452,6 @@ async function gameLoop() {
                     updateGameDisplay();
                     printLog(['debug'], "Commit transaction completed successfully");
 
-                    // ⚡ PERFORMANCE: Pre-compute next commit while user plays
                     precomputeNextCommit();
 
                     // Track successful commit
@@ -475,9 +460,17 @@ async function gameLoop() {
                         player_balance: centralizedGameState.playerETHBalance?.toString()
                     });
 
+                    printLog(['debug'], "Starting polling for HashPosted state...");
+                    pollForHashPosted();
+
                 } catch (error) {
                     printLog(['error'], "Commit failed:", error);
                     shouldProcessCommit = false;
+                    
+                    // Unlock the play button on error so user can try again
+                    if (gameScene && gameScene.playButton) {
+                        gameScene.playButton.unlockButton();
+                    }
 
                     // Track commit failure
                     captureGameEvent('commit_transaction_failed', {
@@ -529,6 +522,69 @@ export async function updateGameDisplay() {
 function startGameLoop() {
     gameLoop();
     setInterval(gameLoop, GAME_LOOP_INTERVAL);
+}
+
+/**
+ * Poll for game state to change to HashPosted (state 2)
+ * This is a fallback mechanism in case WebSocket events don't fire
+ */
+async function pollForHashPosted() {
+    const POLL_INTERVAL = 100; // ms
+    const MAX_POLL_TIME = 30000; // 30 seconds max
+    const startTime = Date.now();
+    
+    printLog(['debug'], "=== POLL FOR HASHPOSTED START ===");
+    
+    const poll = async () => {
+        try {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > MAX_POLL_TIME) {
+                printLog(['error'], "Polling timeout - game state did not change to HashPosted");
+                captureGameEvent('hashposted_poll_timeout', {
+                    elapsed_ms: elapsed
+                });
+                return;
+            }
+            
+            // Fetch fresh game state from blockchain
+            const freshState = await checkGameState();
+            if (!freshState) {
+                printLog(['debug'], "Poll: No game state returned, retrying...");
+                setTimeout(poll, POLL_INTERVAL);
+                return;
+            }
+            
+            printLog(['debug'], `Poll: Current game state = ${freshState.gameState}`);
+            
+            // Check if state changed to HashPosted (2) or beyond
+            if (freshState.gameState >= 2n) {
+                printLog(['debug'], `Poll: State changed to ${freshState.gameState}, updating game state`);
+                printLog(['profile'], "=== HASHPOSTED DETECTED ===");
+                printLog(['profile'], "Time from commit to HashPosted:", Date.now() - startTime, "ms");
+                printLog(['profile'], "===========================");
+                
+                // Update the centralized game state
+                updateGameState(freshState);
+                
+                captureGameEvent('hashposted_detected', {
+                    elapsed_ms: elapsed,
+                    game_state: freshState.gameState.toString()
+                });
+                
+                return; // Stop polling
+            }
+            
+            // State not yet HashPosted, continue polling
+            setTimeout(poll, POLL_INTERVAL);
+        } catch (error) {
+            printLog(['error'], "Poll error:", error);
+            // Continue polling even on error
+            setTimeout(poll, POLL_INTERVAL);
+        }
+    };
+    
+    // Start polling
+    poll();
 }
 
 function storeCommit(secret) {
@@ -599,198 +655,3 @@ export async function commitGame() {
     });
 }
 
-function showConnectButton() {
-    // Create container for proper centering and overlay effect
-    const container = document.createElement('div');
-    container.id = 'connect-wallet-container';
-    container.style.position = 'absolute';
-    container.style.top = '0';
-    container.style.left = '0';
-    container.style.width = '100vw';
-    container.style.height = '100vh';
-    container.style.backgroundColor = 'rgba(0, 0, 0, 0.85)'; // Dark overlay
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.justifyContent = 'center';
-    container.style.alignItems = 'center';
-    container.style.zIndex = '9999';
-    container.style.backdropFilter = 'blur(5px)';
-
-    const content = document.createElement('div');
-    content.style.textAlign = 'center';
-    content.style.padding = '40px';
-    content.style.border = '2px solid #00f3ff'; // Cyan neon border
-    content.style.borderRadius = '15px';
-    content.style.boxShadow = '0 0 20px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.1)';
-    content.style.background = 'linear-gradient(135deg, rgba(0,0,0,0.9), rgba(20,20,30,0.95))';
-    content.style.maxWidth = '400px';
-
-    const title = document.createElement('h2');
-    title.innerText = 'INITIALIZE LINK';
-    title.style.color = '#00f3ff';
-    title.style.fontFamily = '"Orbitron", sans-serif';
-    title.style.fontSize = '24px';
-    title.style.marginBottom = '10px';
-    title.style.textShadow = '0 0 10px rgba(0, 243, 255, 0.8)';
-    title.style.letterSpacing = '2px';
-
-    const subtitle = document.createElement('p');
-    subtitle.innerText = 'Secure connection required to access Meteoro terminal.';
-    subtitle.style.color = '#aaaaaa';
-    subtitle.style.fontFamily = '"Orbitron", sans-serif';
-    subtitle.style.fontSize = '12px';
-    subtitle.style.marginBottom = '20px';
-    subtitle.style.lineHeight = '1.5';
-
-    // Session key info message
-    const sessionInfo = document.createElement('p');
-    sessionInfo.innerText = '⚡ Session keys enable popup-free gameplay';
-    sessionInfo.style.color = '#00ff88';
-    sessionInfo.style.fontFamily = '"Orbitron", sans-serif';
-    sessionInfo.style.fontSize = '10px';
-    sessionInfo.style.marginBottom = '30px';
-    sessionInfo.style.lineHeight = '1.5';
-    sessionInfo.style.opacity = '0.8';
-
-    const btn = document.createElement('button');
-    btn.innerText = 'CONNECT WALLET';
-    btn.id = 'connect-wallet-btn';
-    btn.style.padding = '15px 40px';
-    btn.style.fontSize = '18px';
-    btn.style.cursor = 'pointer';
-    btn.style.backgroundColor = 'rgba(0, 243, 255, 0.1)';
-    btn.style.color = '#00f3ff';
-    btn.style.border = '1px solid #00f3ff';
-    btn.style.borderRadius = '5px';
-    btn.style.fontFamily = '"Orbitron", sans-serif';
-    btn.style.transition = 'all 0.3s ease';
-    btn.style.textTransform = 'uppercase';
-    btn.style.letterSpacing = '1px';
-    btn.style.boxShadow = '0 0 10px rgba(0, 243, 255, 0.2)';
-
-    // Hover effect
-    btn.onmouseover = () => {
-        btn.style.backgroundColor = 'rgba(0, 243, 255, 0.3)';
-        btn.style.boxShadow = '0 0 20px rgba(0, 243, 255, 0.6)';
-    };
-    btn.onmouseout = () => {
-        btn.style.backgroundColor = 'rgba(0, 243, 255, 0.1)';
-        btn.style.boxShadow = '0 0 10px rgba(0, 243, 255, 0.2)';
-    };
-
-    btn.onclick = async () => {
-        try {
-            btn.innerText = 'ESTABLISHING...';
-            btn.style.opacity = '0.7';
-            btn.style.cursor = 'wait';
-
-            const wallet = await connectWallet();
-            if (wallet) {
-                // Check if session key was created
-                const hasSession = hasUsableSessionKey();
-
-                if (hasSession) {
-                    btn.innerText = '⚡ SESSION ACTIVE';
-                    sessionInfo.innerText = 'Popup-free mode enabled!';
-                    sessionInfo.style.color = '#00ff00';
-                } else {
-                    btn.innerText = 'LINK ESTABLISHED';
-                    sessionInfo.innerText = 'Connected (passkey mode)';
-                    sessionInfo.style.color = '#ffaa00';
-                }
-
-                btn.style.borderColor = '#00ff00';
-                btn.style.color = '#00ff00';
-                btn.style.boxShadow = '0 0 20px rgba(0, 255, 0, 0.5)';
-
-                setTimeout(() => {
-                    container.style.transition = 'opacity 0.5s ease';
-                    container.style.opacity = '0';
-                    setTimeout(() => {
-                        container.remove();
-                        // Create session key status indicator in the UI
-                        createSessionKeyIndicator();
-                    }, 500);
-                    window.location.reload();
-                }, 1500);
-            }
-        } catch (e) {
-            btn.innerText = 'CONNECTION FAILED';
-            btn.style.borderColor = '#ff0000';
-            btn.style.color = '#ff0000';
-            btn.style.boxShadow = '0 0 20px rgba(255, 0, 0, 0.5)';
-            console.error(e);
-
-            setTimeout(() => {
-                btn.innerText = 'RETRY CONNECTION';
-                btn.style.borderColor = '#00f3ff';
-                btn.style.color = '#00f3ff';
-                btn.style.boxShadow = '0 0 10px rgba(0, 243, 255, 0.2)';
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer';
-            }, 2000);
-        }
-    };
-
-    content.appendChild(title);
-    content.appendChild(subtitle);
-    content.appendChild(sessionInfo);
-    content.appendChild(btn);
-    container.appendChild(content);
-    document.body.appendChild(container);
-}
-
-/**
- * Create a small indicator showing session key status in the corner
- * This helps users know if they're in popup-free mode
- */
-function createSessionKeyIndicator() {
-    // Remove existing indicator if any
-    const existing = document.getElementById('session-key-indicator');
-    if (existing) existing.remove();
-
-    const sessionKey = getActiveSessionKey();
-    if (!sessionKey) return;
-
-    const timeRemaining = getSessionKeyTimeRemaining(sessionKey);
-    if (timeRemaining.expired) return;
-
-    const indicator = document.createElement('div');
-    indicator.id = 'session-key-indicator';
-    indicator.style.position = 'fixed';
-    indicator.style.bottom = '10px';
-    indicator.style.right = '10px';
-    indicator.style.padding = '8px 12px';
-    indicator.style.backgroundColor = 'rgba(0, 255, 136, 0.15)';
-    indicator.style.border = '1px solid #00ff88';
-    indicator.style.borderRadius = '5px';
-    indicator.style.color = '#00ff88';
-    indicator.style.fontFamily = '"Orbitron", sans-serif';
-    indicator.style.fontSize = '10px';
-    indicator.style.zIndex = '1000';
-    indicator.style.backdropFilter = 'blur(5px)';
-    indicator.style.boxShadow = '0 0 10px rgba(0, 255, 136, 0.2)';
-
-    const updateIndicator = () => {
-        const key = getActiveSessionKey();
-        if (!key) {
-            indicator.remove();
-            return;
-        }
-        const remaining = getSessionKeyTimeRemaining(key);
-        if (remaining.expired) {
-            indicator.innerHTML = '⚠️ Session Expired';
-            indicator.style.borderColor = '#ff6600';
-            indicator.style.color = '#ff6600';
-            indicator.style.backgroundColor = 'rgba(255, 102, 0, 0.15)';
-        } else {
-            indicator.innerHTML = `⚡ Session: ${remaining.hours}h ${remaining.minutes % 60}m`;
-        }
-    };
-
-    updateIndicator();
-    // Update every minute
-    setInterval(updateIndicator, 60000);
-
-    document.body.appendChild(indicator);
-}
