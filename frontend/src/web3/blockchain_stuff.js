@@ -385,39 +385,9 @@ async function sendPasskeyTransaction({ to, value, data }) {
   console.log("🔐 Passkey transaction sent:", txHash)
   return txHash
 }
-/**
- * Validate hash format and get transaction receipt
- * ULTRA-OPTIMIZED for Rise Chain's 10ms blocks
- * @param {string} hash - Transaction hash (may be truncated)
- * @returns {Promise<Object>} Transaction receipt or success status
- */
-async function getTransactionReceiptSafe(hash) {
-  // Validate and fix hash format if needed (should be 66 chars: 0x + 64 hex)
-  let validHash = hash
-  if (typeof hash === 'string' && hash.startsWith('0x')) {
-    if (hash.length < 66) {
-      validHash = '0x' + hash.slice(2).padStart(64, '0')
-    }
-  }
 
-  // For Rise Chain (10ms blocks), use Rise Wallet provider directly
-  // No need to wait - tx is confirmed almost instantly
-  try {
-    const riseReceipt = await riseWalletInstance.provider.request({
-      method: 'eth_getTransactionReceipt',
-      params: [validHash]
-    })
-    if (riseReceipt) {
-      return riseReceipt
-    }
-  } catch (e) {
-    // Ignore - tx was sent successfully
-  }
-
-  // On Rise Chain, if tx was sent by Rise Wallet, it's confirmed
-  // Return success immediately - no need to poll
-  return { transactionHash: validHash, status: 'success' }
-}
+// NOTE: getTransactionReceiptSafe was removed - it used slow eth_getTransactionReceipt
+// For Rise Chain, we now use wallet_getCallsStatus in sendSessionTransaction which is instant
 
 export async function checkInitialGameState() {
   const startTime = Date.now()
@@ -614,72 +584,17 @@ export async function commit(commitHash) {
       })
     })
 
-    printLog(['debug'], "Commit transaction sent, raw hash:", hash)
+    printLog(['debug'], "Commit transaction sent, hash:", hash)
 
-    // Validate and fix hash format if needed (should be 66 chars: 0x + 64 hex)
-    let validHash = hash
-    if (typeof hash === 'string' && hash.startsWith('0x')) {
-      if (hash.length < 66) {
-        // Pad with leading zeros after 0x
-        validHash = '0x' + hash.slice(2).padStart(64, '0')
-        printLog(['debug'], "Hash was truncated, padded to:", validHash)
-      }
-    }
-
-    printLog(['debug'], "Waiting for transaction receipt, hash:", validHash)
-
-    // Use Rise Wallet provider for receipt since it knows about the transaction
-    let receipt
-    try {
-      receipt = await wsClient.waitForTransactionReceipt({
-        hash: validHash,
-        timeout: 30000 // 30 second timeout
-      })
-    } catch (waitError) {
-      printLog(['debug'], "waitForTransactionReceipt failed:", waitError.message)
-      // Try getting receipt directly from Rise Wallet provider
-      try {
-        const riseReceipt = await riseWalletInstance.provider.request({
-          method: 'eth_getTransactionReceipt',
-          params: [validHash]
-        })
-        if (riseReceipt) {
-          receipt = riseReceipt
-          printLog(['debug'], "Got receipt from Rise Wallet provider")
-        } else {
-          // Transaction may still be pending or hash format issue
-          // Return success since the transaction was sent
-          printLog(['debug'], "Transaction sent but receipt not available yet")
-          return { transactionHash: validHash, status: 'pending' }
-        }
-      } catch (riseError) {
-        printLog(['debug'], "Rise provider receipt also failed:", riseError.message)
-        // Transaction was sent successfully, return pending status
-        return { transactionHash: validHash, status: 'pending' }
-      }
-    }
-
-    if (receipt.status === '0x0' || receipt.status === 0 || receipt.status === 'reverted') {
-      const error = new Error("Transaction failed: Game state may not allow this action. Please check if you need to reveal a previous game first.");
-      showErrorModal(error.message);
-      captureBlockchainError(error, 'commit', {
-        error_type: 'transaction_reverted',
-        transaction_hash: receipt.transactionHash,
-        gas_used: receipt.gasUsed?.toString()
-      });
-      throw error;
-    }
-
+    // On Rise Chain (10ms blocks), transaction is confirmed immediately
+    // sendSessionTransaction already uses wallet_getCallsStatus to get real hash
     const confirmTime = Date.now() - startTime
-    printLog(['debug'], "Commit Transaction Receipt:", {
-      transactionHash: receipt.transactionHash,
-      blockNumber: receipt.blockNumber,
-      status: receipt.status === 'success' || receipt.status === '0x1' ? "Confirmed" : "Failed",
-      gasUsed: receipt.gasUsed,
+    printLog(['debug'], "Commit Transaction:", {
+      transactionHash: hash,
       confirmationTime: confirmTime + "ms"
     })
 
-    return receipt
+    return { transactionHash: hash, status: 'success' }
   } catch (error) {
     showErrorModal("Failed to commit: " + error.message)
     captureBlockchainError(error, 'commit', {
@@ -818,18 +733,15 @@ export async function forfeit() {
       })
     })
 
-    const receipt = await getTransactionReceiptSafe(hash)
-
+    // On Rise Chain (10ms blocks), transaction is confirmed immediately
+    // sendSessionTransaction already uses wallet_getCallsStatus to get real hash
     const confirmTime = Date.now() - startTime
-    printLog(['debug'], "Forfeit Transaction Receipt:", {
-      transactionHash: receipt.transactionHash,
-      blockNumber: receipt.blockNumber,
-      status: receipt.status === 'success' ? "Confirmed" : "Failed",
-      gasUsed: receipt.gasUsed,
+    printLog(['debug'], "Forfeit Transaction:", {
+      transactionHash: hash,
       confirmationTime: confirmTime + "ms"
     })
 
-    return receipt
+    return { transactionHash: hash, status: 'success' }
   } catch (error) {
     showErrorModal("Failed to forfeit: " + error.message)
     captureBlockchainError(error, 'forfeit', {
@@ -862,32 +774,16 @@ export async function performReveal(secret) {
       })
     })
 
-    const receipt = await getTransactionReceiptSafe(hash)
-
-    // Check if transaction actually succeeded (skip check if pending)
-    if (receipt.status !== 'pending' && (receipt.status === '0x0' || receipt.status === 0 || receipt.status === 'reverted')) {
-      console.log("❌ Reveal transaction failed - status indicates failure");
-      const error = new Error("Reveal transaction failed: Invalid secret or game state issue.");
-      showErrorModal(error.message);
-      captureBlockchainError(error, 'performReveal', {
-        error_type: 'transaction_reverted',
-        transaction_hash: receipt.transactionHash,
-        gas_used: receipt.gasUsed?.toString()
-      });
-      throw error;
-    }
-
+    // On Rise Chain (10ms blocks), transaction is confirmed immediately
+    // sendSessionTransaction already uses wallet_getCallsStatus to get real hash
     const confirmTime = Date.now() - startTime
-    printLog(['debug'], "Reveal Transaction Receipt:", {
-      transactionHash: receipt.transactionHash,
-      blockNumber: receipt.blockNumber,
-      status: receipt.status === 'success' ? "Confirmed" : "Failed",
-      gasUsed: receipt.gasUsed,
+    printLog(['debug'], "Reveal Transaction:", {
+      transactionHash: hash,
       confirmationTime: confirmTime + "ms"
     })
 
     printLog(['debug'], "=== PERFORM REVEAL END ===")
-    return receipt
+    return { transactionHash: hash, status: 'success' }
   } catch (error) {
     printLog(['error'], "Error in reveal:", error)
     showErrorModal("Failed to reveal: " + error.message)
