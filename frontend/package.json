@@ -10,9 +10,9 @@
     "start": "npx http-server ./dist"
   },
   "devDependencies": {
-    "@vitejs/plugin-basic-ssl": "^1.1.0",
     "typescript": "^5.9.3",
-    "vite": "^4.5.0"
+    "vite": "^4.5.0",
+    "vite-plugin-mkcert": "^1.17.9"
   },
   "dependencies": {
     "dotenv": "^17.2.1",
@@ -22,7 +22,6 @@
     "rise-wallet": "0.3.0",
     "shreds": "^0.2.3",
     "viem": "2.38.3",
-    "vite-plugin-mkcert": "^1.17.9",
     "web3": "^4.16.0"
   },
   "overrides": {
