@@ -1,6 +1,7 @@
 import { loadPhaser } from './game.js';
 import posthog from 'posthog-js';
 import { generateRandomBytes32, calculateCards, printLog } from './utils/utils.js';
+import { keccak256 } from 'viem'; // Static import for performance - no more dynamic import
 import {
     initWeb3,
     getLocalWallet,
@@ -44,6 +45,19 @@ let commitStartTime = null;
 
 let gameState = null;
 let shouldProcessCommit = false;
+
+// ⚡ PERFORMANCE: Pre-computed commit data (ready before user clicks)
+let precomputedSecret = null;
+let precomputedHash = null;
+
+/**
+ * Pre-compute next commit data for faster game start
+ * Called after each game completes or during idle time
+ */
+function precomputeNextCommit() {
+    precomputedSecret = generateRandomBytes32();
+    precomputedHash = keccak256(precomputedSecret);
+}
 
 // Loading coordination
 let web3LoadingProgress = 0;
@@ -222,6 +236,8 @@ async function loadGameData() {
         isGameDataReady = true;
         updateGameDataProgress(1);
         console.log("Starting game loop...")
+        // ⚡ PERFORMANCE: Pre-compute first commit while player looks at UI
+        precomputeNextCommit();
         startGameLoop();
     } catch (error) {
         console.error("Error loading game data:", error);
@@ -412,7 +428,21 @@ async function gameLoop() {
                 centralizedGameState.gameState === 3n /* Revealed */ ||
                 centralizedGameState.gameState === 4n /* Forfeited */) {
                 printLog(['debug'], "=== STARTING COMMIT PROCESS ===");
-                const secret = generateRandomBytes32();
+
+                // ⚡ PERFORMANCE: Use pre-computed secret/hash if available
+                let secret, commitHash;
+                if (precomputedSecret && precomputedHash) {
+                    secret = precomputedSecret;
+                    commitHash = precomputedHash;
+                    precomputedSecret = null; // Clear after use
+                    precomputedHash = null;
+                    printLog(['debug'], "Using pre-computed commit (faster)");
+                } else {
+                    secret = generateRandomBytes32();
+                    commitHash = keccak256(secret);
+                    printLog(['debug'], "Computing commit on-the-fly");
+                }
+
                 storeCommit(secret);
                 commitStartTime = Date.now();
                 printLog(['profile'], "=== COMMIT REQUESTED ===");
@@ -430,13 +460,13 @@ async function gameLoop() {
                 // Mark transaction as in progress
                 isTransactionInProgress = true;
                 try {
-                    // Use keccak256 hash instead of web3.utils.soliditySha3
-                    const { keccak256 } = await import('viem')
-                    const commitHash = keccak256(secret);
                     await commit(commitHash);
                     shouldProcessCommit = false;
                     updateGameDisplay();
                     printLog(['debug'], "Commit transaction completed successfully");
+
+                    // ⚡ PERFORMANCE: Pre-compute next commit while user plays
+                    precomputeNextCommit();
 
                     // Track successful commit
                     captureGameEvent('commit_transaction_success', {

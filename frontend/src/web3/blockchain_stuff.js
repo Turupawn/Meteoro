@@ -312,7 +312,6 @@ async function sendSessionTransaction({ to, value, data, requiresSessionKey = fa
     console.log("🔑 Session transaction response:", response)
 
     // wallet_sendPreparedCalls returns [{id: "..."}]
-    // Use wallet_getCallsStatus to get the actual transaction hash (like wallet-demo)
     let callId
     if (Array.isArray(response) && response.length > 0 && response[0].id) {
       callId = response[0].id
@@ -323,22 +322,20 @@ async function sendSessionTransaction({ to, value, data, requiresSessionKey = fa
       return response
     }
 
-    // Use wallet_getCallsStatus to get the actual tx hash - this is instant on Rise Chain
-    const callStatus = await provider.request({
+    // ⚡ PERFORMANCE: Don't wait for wallet_getCallsStatus
+    // On Rise Chain (10ms blocks), transaction is already confirmed
+    // Fire-and-forget - the WebSocket event will confirm the transaction
+    provider.request({
       method: 'wallet_getCallsStatus',
       params: [callId]
-    })
+    }).then(callStatus => {
+      if (callStatus?.receipts?.[0]?.transactionHash) {
+        console.log("🔑 Confirmed hash:", callStatus.receipts[0].transactionHash)
+      }
+    }).catch(() => { }) // Ignore errors - transaction is already sent
 
-    console.log("🔑 Call status:", callStatus)
-
-    // Extract the actual transaction hash from the call status
-    let txHash = callId
-    if (callStatus && callStatus.receipts && callStatus.receipts.length > 0) {
-      txHash = callStatus.receipts[0].transactionHash
-    }
-
-    console.log("🔑 Session transaction sent, hash:", txHash)
-    return txHash
+    console.log("🔑 Session transaction sent, callId:", callId)
+    return callId
 
   } catch (error) {
     console.error("❌ Session transaction failed:", error.message)
