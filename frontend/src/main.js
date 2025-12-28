@@ -11,7 +11,8 @@ import {
     performReveal,
     startEventMonitoring,
     stopEventMonitoring,
-    connectWallet
+    connectWallet,
+    warmupSdkAndCrypto
 } from './web3/blockchain_stuff.js';
 
 // Import session key utilities for UI status
@@ -236,6 +237,8 @@ async function loadGameData() {
         isGameDataReady = true;
         updateGameDataProgress(1);
         console.log("Starting game loop...")
+        // ⚡ PERFORMANCE: Warm up SDK and crypto to eliminate cold start latency
+        await warmupSdkAndCrypto();
         // ⚡ PERFORMANCE: Pre-compute first commit while player looks at UI
         precomputeNextCommit();
         startGameLoop();

@@ -161,6 +161,69 @@ export async function initWeb3() {
   }
 }
 
+/**
+ * ⚡ PERFORMANCE: Pre-warm the Rise Wallet SDK and P256 crypto library
+ * This eliminates cold start latency on the first game
+ * Should be called after wallet is connected
+ */
+export async function warmupSdkAndCrypto() {
+  const wallet = getLocalWallet()
+  if (!wallet || !riseWalletInstance) {
+    console.log("⚡ Cannot warmup - wallet not connected")
+    return
+  }
+
+  console.log("⚡ Warming up SDK and crypto libraries...")
+  const t0 = performance.now()
+
+  try {
+    // Get or create session key to warm up the key manager
+    let sessionKey = getActiveSessionKey()
+    if (!sessionKey || !isSessionKeyValid(sessionKey)) {
+      console.log("⚡ No session key for warmup, skipping")
+      return
+    }
+
+    // 1. Warmup P256 crypto by doing a dummy sign
+    const dummyDigest = '0x' + '0'.repeat(64)
+    try {
+      signWithSessionKey(dummyDigest, sessionKey)
+      console.log(`⚡ P256 crypto warmed up: ${Math.round(performance.now() - t0)}ms`)
+    } catch (e) {
+      // Ignore - just warming up
+    }
+
+    // 2. Warmup wallet_prepareCalls with a minimal dummy call
+    const provider = riseWalletInstance.provider
+    const dummyParams = [{
+      calls: [{
+        to: wallet.address, // Send to self (won't execute)
+        value: '0x0',
+        data: '0x'
+      }],
+      key: {
+        type: 'p256',
+        publicKey: sessionKey.publicKey
+      }
+    }]
+
+    try {
+      await provider.request({
+        method: 'wallet_prepareCalls',
+        params: dummyParams
+      })
+      console.log(`⚡ Rise Wallet SDK warmed up: ${Math.round(performance.now() - t0)}ms`)
+    } catch (e) {
+      // Ignore errors - we just want to warm up the SDK
+      console.log(`⚡ Warmup prepareCalls failed (expected): ${Math.round(performance.now() - t0)}ms`)
+    }
+
+    console.log(`⚡ Total warmup time: ${Math.round(performance.now() - t0)}ms`)
+  } catch (e) {
+    console.log("⚡ Warmup error (non-critical):", e.message)
+  }
+}
+
 export async function connectWallet() {
   try {
     if (!riseWalletInstance) {
@@ -266,9 +329,8 @@ async function sendSessionTransaction({ to, value, data, requiresSessionKey = fa
 
   // Log session key status
   const timeRemaining = getSessionKeyTimeRemaining(sessionKey)
-  console.log(`🔑 Using session key (expires in ${timeRemaining.hours}h ${timeRemaining.minutes % 60}m)`)
-  console.log("   To:", to)
-  console.log("   Value:", value ? value.toString() : '0')
+  const t0 = performance.now()
+  console.log(`⚡ [T+0ms] Using session key (expires in ${timeRemaining.hours}h ${timeRemaining.minutes % 60}m)`)
 
   // Convert value to hex string format expected by wallet
   const hexValue = value ? `0x${BigInt(value).toString(16)}` : '0x0'
@@ -287,18 +349,20 @@ async function sendSessionTransaction({ to, value, data, requiresSessionKey = fa
   }]
 
   try {
+    const t1 = performance.now()
     const prepared = await provider.request({
       method: 'wallet_prepareCalls',
       params: prepareParams
     })
-
-    console.log("🔑 Calls prepared successfully")
+    const t2 = performance.now()
+    console.log(`⚡ [T+${Math.round(t2 - t0)}ms] wallet_prepareCalls: ${Math.round(t2 - t1)}ms`)
 
     const { digest, ...requestParams } = prepared
 
     // 2. Sign digest using session key (local, no popup)
     const signature = signWithSessionKey(digest, sessionKey)
-    console.log("🔑 Transaction signed with session key")
+    const t3 = performance.now()
+    console.log(`⚡ [T+${Math.round(t3 - t0)}ms] P256 sign: ${Math.round(t3 - t2)}ms`)
 
     // 3. Send prepared calls
     const response = await provider.request({
@@ -308,8 +372,8 @@ async function sendSessionTransaction({ to, value, data, requiresSessionKey = fa
         signature: signature
       }]
     })
-
-    console.log("🔑 Session transaction response:", response)
+    const t4 = performance.now()
+    console.log(`⚡ [T+${Math.round(t4 - t0)}ms] wallet_sendPreparedCalls: ${Math.round(t4 - t3)}ms`)
 
     // wallet_sendPreparedCalls returns [{id: "..."}]
     let callId
@@ -322,19 +386,16 @@ async function sendSessionTransaction({ to, value, data, requiresSessionKey = fa
       return response
     }
 
-    // ⚡ PERFORMANCE: Don't wait for wallet_getCallsStatus
-    // On Rise Chain (10ms blocks), transaction is already confirmed
-    // Fire-and-forget - the WebSocket event will confirm the transaction
+    // ⚡ Fire-and-forget - don't wait
     provider.request({
       method: 'wallet_getCallsStatus',
       params: [callId]
     }).then(callStatus => {
-      if (callStatus?.receipts?.[0]?.transactionHash) {
-        console.log("🔑 Confirmed hash:", callStatus.receipts[0].transactionHash)
-      }
-    }).catch(() => { }) // Ignore errors - transaction is already sent
+      const t5 = performance.now()
+      console.log(`⚡ [T+${Math.round(t5 - t0)}ms] wallet_getCallsStatus completed (async)`)
+    }).catch(() => { })
 
-    console.log("🔑 Session transaction sent, callId:", callId)
+    console.log(`⚡ [T+${Math.round(performance.now() - t0)}ms] TOTAL sendSessionTransaction`)
     return callId
 
   } catch (error) {
