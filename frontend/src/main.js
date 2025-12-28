@@ -361,13 +361,11 @@ async function gameLoop() {
             } catch (error) {
                 printLog(['error'], "Reveal failed:", error);
 
-                // Track reveal failure
                 captureGameEvent('reveal_transaction_failed', {
                     game_id: centralizedGameState.gameId?.toString(),
                     error: error.message
                 });
 
-                // If it's an "already known" error, clear the pending reveal
                 if (error.message && error.message.includes('already known')) {
                     printLog(['debug'], "Transaction already known, clearing pending reveal");
                     clearPendingReveal();
