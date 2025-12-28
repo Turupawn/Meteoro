@@ -16,12 +16,16 @@
   },
   "dependencies": {
     "dotenv": "^17.2.1",
-    "ox": "^0.10.2",
+    "ox": "0.9.8",
     "phaser": "^3.90.0",
     "posthog-js": "^1.258.6",
-    "rise-wallet": "^0.3.0",
+    "rise-wallet": "0.3.0",
     "shreds": "^0.2.3",
-    "viem": "^2.38.4",
+    "viem": "2.38.3",
+    "vite-plugin-mkcert": "^1.17.9",
     "web3": "^4.16.0"
+  },
+  "overrides": {
+    "ox": "0.9.8"
   }
 }

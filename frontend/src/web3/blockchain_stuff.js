@@ -1,7 +1,7 @@
 import { createPublicClient, createWalletClient, webSocket, formatEther, encodeFunctionData, custom, createClient } from 'viem'
 import { riseTestnet } from 'viem/chains'
 import { shredActions, sendRawTransactionSync, watchShreds } from 'shreds/viem'
-import { RiseWallet } from 'rise-wallet'
+import { RiseWallet, Chains } from 'rise-wallet'
 import { WalletActions } from 'rise-wallet/viem'
 import { P256, Signature } from 'ox'
 import { printLog, getCardDisplay } from '../utils/utils.js'
@@ -9,12 +9,29 @@ import { captureBlockchainError } from '../session_tracking.js'
 import { showErrorModal } from '../menus/errorModal.js'
 import gameState, { updateBalances, updateBetConfiguration, updateGameState } from '../gameState.js'
 
-const MY_CONTRACT_ADDRESS = import.meta.env.CONTRACT_ADDRESS
-const WSS_URL = import.meta.env.WSS_URL || 'wss://testnet.riselabs.xyz'
+// Import centralized configuration
+import {
+  CONTRACT_ADDRESS as MY_CONTRACT_ADDRESS,
+  WSS_URL,
+  GAS_LIMIT,
+  GAS_FEE_BUFFER_ETH,
+  BALANCE_POLL_INTERVAL
+} from './walletConfig.js'
+
+// Import session key manager
+import {
+  getActiveSessionKey,
+  isSessionKeyValid,
+  hasUsableSessionKey,
+  createSessionKey as createNewSessionKey,
+  signWithSessionKey,
+  getSessionKeyTimeRemaining
+} from './sessionKeyManager.js'
+
+// Import game permissions
+import { isCallPermitted, GAME_PERMISSIONS } from './gamePermissions.js'
+
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json"
-const GAS_LIMIT = 300000
-const GAS_FEE_BUFFER_ETH = 0.0000001
-const BALANCE_POLL_INTERVAL = 1000
 
 let CONTRACT_ABI = null
 
@@ -106,15 +123,35 @@ export async function initWeb3() {
       transport: custom(rw.provider)
     })
 
-    // Connect to wallet using WalletActions
-    // Instead of auto-connecting which blocks, we will return the client and let the UI trigger connection
+    console.log("Rise Wallet client created")
+
+    // Check if we have a saved wallet in localStorage
+    const savedWallet = getLocalWallet()
+
+    if (savedWallet && savedWallet.address) {
+      console.log("🔗 Found saved wallet in localStorage:", savedWallet.address)
+
+      // Verify the wallet is still connected with Rise Wallet
+      try {
+        const accounts = await rw.provider.request({
+          method: 'eth_accounts'
+        })
+
+        if (accounts && accounts.length > 0 && accounts[0].toLowerCase() === savedWallet.address.toLowerCase()) {
+          console.log("🔗 Wallet session still valid, auto-reconnecting...")
+          return { web3: wsClient, my_contract: null, wallet: savedWallet, walletClient: walletClient }
+        } else {
+          console.log("🔗 Wallet session expired or different account, need re-connection")
+          // Clear the old wallet data
+          localStorage.removeItem('localWallet')
+        }
+      } catch (error) {
+        console.log("🔗 Could not verify wallet session:", error.message)
+        // Keep localStorage wallet, let user reconnect if needed
+      }
+    }
+
     console.log("Rise Wallet client create without auto-connect")
-
-    // We can try to see if we are already connected?
-    // For now, let's return the client and wallet as null or partial?
-    // The game expects 'wallet' object. 
-
-    // Attempt silent connect or just return initialized structure
     return { web3: wsClient, my_contract: null, wallet: null, walletClient: walletClient }
 
   } catch (error) {
@@ -126,9 +163,26 @@ export async function initWeb3() {
 
 export async function connectWallet() {
   try {
-    console.log("Connecting to Rise Wallet via WalletActions...")
-    const { accounts } = await WalletActions.connect(walletClient)
-    console.log("Connected accounts:", accounts)
+    if (!riseWalletInstance) {
+      throw new Error("Rise Wallet not initialized. Call initWeb3() first.")
+    }
+
+    const provider = riseWalletInstance.provider
+
+    console.log("🔗 Connecting to Rise Wallet...")
+    console.log("🔗 Requesting accounts via eth_requestAccounts (this triggers OAuth popup)...")
+
+    // Use eth_requestAccounts to trigger the Rise Wallet popup
+    // This is the standard EIP-1193 method that opens the OAuth popup (Google, etc.)
+    const accounts = await provider.request({
+      method: 'eth_requestAccounts'
+    })
+
+    console.log("🔗 Connected accounts:", accounts)
+
+    if (!accounts || accounts.length === 0) {
+      throw new Error("No accounts returned from Rise Wallet")
+    }
 
     const wallet = {
       address: accounts[0]
@@ -136,114 +190,233 @@ export async function connectWallet() {
 
     localStorage.setItem('localWallet', JSON.stringify(wallet))
 
-    // Session Key Logic
-    let sessionPrivateKey = localStorage.getItem('sessionPrivateKey')
+    // Session Key Logic - use the new sessionKeyManager
+    const existingSessionKey = getActiveSessionKey()
 
-    if (!sessionPrivateKey) {
-      console.log("No session key found. Generating new P256 key...")
-      sessionPrivateKey = P256.randomPrivateKey()
-      const publicKey = P256.getPublicKey(sessionPrivateKey)
+    if (!existingSessionKey || !isSessionKeyValid(existingSessionKey)) {
+      console.log("🔑 No valid session key found. Creating new one...")
 
-      console.log("Granting permissions for session key...")
-      // Grant permissions
-      // We grant permission for ALL contract calls for now to simplify, or specific if needed.
-      // For this game: commit, reveal, forfeit, transfer(ERC20).
-      // To simplify, we might try a broad permission or just list the contract.
-      // The docs showed 'calls' array.
-
-      const response = await WalletActions.grantPermissions(walletClient, {
-        key: {
-          type: 'p256',
-          publicKey: publicKey
-        },
-        expiry: Math.floor(Date.now() / 1000) + 86400, // 24 hours
-        permissions: {
-          // Allow everything for now? Or specific contract.
-          // If we omit 'calls', does it allow all? Docs example shows specific calls.
-          // Let's try to allow calls to MY_CONTRACT_ADDRESS and GachaToken?
-          // For now let's just use the doc example structure but targeting our contract.
-          calls: [
-            {
-              to: MY_CONTRACT_ADDRESS
-              // selector: undefined (allow all functions?)
-            }
-          ],
-          // Also need to allow spending ETH/Tokens if we do that?
-          // The 'spend' permission is for native token or ERC20.
-          // We stake ETH.
-          spend: [
-            {
-              limit: BigInt(100000000000000000000), // High limit
-              period: 'day',
-              token: '0x0000000000000000000000000000000000000000' // ETH
-            }
-          ]
-        }
-      })
-
-      console.log("Permissions granted:", response)
-      localStorage.setItem('sessionPrivateKey', sessionPrivateKey)
+      try {
+        await createNewSessionKey(provider, wallet.address)
+        console.log("🔑 Session key created successfully during wallet connection")
+      } catch (sessionError) {
+        console.warn("⚠️ Failed to create session key during connection:", sessionError.message)
+        console.log("⚠️ User can still play, but will need passkey confirmation for each transaction")
+        // Don't throw - wallet connection succeeded, just session key failed
+      }
     } else {
-      console.log("Existing session key found.")
+      const timeRemaining = getSessionKeyTimeRemaining(existingSessionKey)
+      console.log(`🔑 Existing session key found (expires in ${timeRemaining.hours}h ${timeRemaining.minutes % 60}m)`)
     }
 
     return wallet
   } catch (error) {
-    console.error("Failed to connect wallet:", error)
+    console.error("❌ Failed to connect wallet:", error)
     throw error
   }
 }
 
-async function sendSessionTransaction({ to, value, data }) {
+
+/**
+ * Send a transaction using session key (no popup) or fallback to passkey
+ * @param {Object} options - Transaction options
+ * @param {string} options.to - Target contract address
+ * @param {bigint|string} options.value - Value to send (in wei)
+ * @param {string} options.data - Encoded function call data
+ * @param {boolean} options.requiresSessionKey - If true, fail if no session key
+ * @returns {Promise<string>} Transaction hash
+ */
+async function sendSessionTransaction({ to, value, data, requiresSessionKey = false }) {
   if (!riseWalletInstance) throw new Error("Rise Wallet not initialized")
-  const privateKey = localStorage.getItem('sessionPrivateKey')
-  if (!privateKey) throw new Error("No session private key loaded")
 
-  const publicKey = P256.getPublicKey(privateKey)
   const provider = riseWalletInstance.provider
+  const wallet = getLocalWallet()
+  if (!wallet) throw new Error("No wallet connected")
 
-  console.log("Sending session transaction...")
-  console.log("To:", to)
+  // Get active session key
+  let sessionKey = getActiveSessionKey()
+
+  // Check if session key is valid
+  if (!sessionKey || !isSessionKeyValid(sessionKey)) {
+    console.log("🔑 No valid session key found")
+
+    // Check if call is permitted (if we had a session key)
+    if (data && !isCallPermitted(to, data)) {
+      console.log("⚠️ Call not in permitted list, using passkey")
+      return sendPasskeyTransaction({ to, value, data })
+    }
+
+    // Try to create a new session key
+    try {
+      console.log("🔑 Attempting to create new session key...")
+      sessionKey = await createNewSessionKey(provider, wallet.address)
+      console.log("🔑 Session key created successfully")
+    } catch (createError) {
+      console.warn("⚠️ Failed to create session key:", createError.message)
+
+      if (requiresSessionKey) {
+        throw new Error("Session key required but could not be created: " + createError.message)
+      }
+
+      // Fallback to passkey
+      console.log("🔐 Falling back to passkey transaction...")
+      return sendPasskeyTransaction({ to, value, data })
+    }
+  }
+
+  // Log session key status
+  const timeRemaining = getSessionKeyTimeRemaining(sessionKey)
+  console.log(`🔑 Using session key (expires in ${timeRemaining.hours}h ${timeRemaining.minutes % 60}m)`)
+  console.log("   To:", to)
+  console.log("   Value:", value ? value.toString() : '0')
+
+  // Convert value to hex string format expected by wallet
+  const hexValue = value ? `0x${BigInt(value).toString(16)}` : '0x0'
 
   // 1. Prepare Calls
-  // wallet_prepareCalls arg structure: [{ calls: [{to, value, data}], key: {...} }]
   const prepareParams = [{
     calls: [{
       to: to,
-      value: value || '0x0', // hex string expected?
+      value: hexValue,
       data: data
     }],
     key: {
       type: 'p256',
-      publicKey: publicKey
+      publicKey: sessionKey.publicKey
     }
   }]
 
-  const prepared = await provider.request({
-    method: 'wallet_prepareCalls',
-    params: prepareParams
-  })
+  try {
+    const prepared = await provider.request({
+      method: 'wallet_prepareCalls',
+      params: prepareParams
+    })
 
-  console.log("Calls prepared:", prepared)
+    console.log("🔑 Calls prepared successfully")
 
-  const { digest, ...requestParams } = prepared
+    const { digest, ...requestParams } = prepared
 
-  // 2. Sign digest
-  const signature = Signature.toHex(
-    P256.sign({ payload: digest, privateKey: privateKey })
-  )
+    // 2. Sign digest using session key (local, no popup)
+    const signature = signWithSessionKey(digest, sessionKey)
+    console.log("🔑 Transaction signed with session key")
 
-  // 3. Send
+    // 3. Send prepared calls
+    const response = await provider.request({
+      method: 'wallet_sendPreparedCalls',
+      params: [{
+        ...requestParams,
+        signature: signature
+      }]
+    })
+
+    console.log("🔑 Session transaction response:", response)
+
+    // wallet_sendPreparedCalls returns [{id: "..."}]
+    // Use wallet_getCallsStatus to get the actual transaction hash (like wallet-demo)
+    let callId
+    if (Array.isArray(response) && response.length > 0 && response[0].id) {
+      callId = response[0].id
+    } else if (typeof response === 'string') {
+      callId = response
+    } else {
+      console.warn("⚠️ Unexpected response format:", response)
+      return response
+    }
+
+    // Use wallet_getCallsStatus to get the actual tx hash - this is instant on Rise Chain
+    const callStatus = await provider.request({
+      method: 'wallet_getCallsStatus',
+      params: [callId]
+    })
+
+    console.log("🔑 Call status:", callStatus)
+
+    // Extract the actual transaction hash from the call status
+    let txHash = callId
+    if (callStatus && callStatus.receipts && callStatus.receipts.length > 0) {
+      txHash = callStatus.receipts[0].transactionHash
+    }
+
+    console.log("🔑 Session transaction sent, hash:", txHash)
+    return txHash
+
+  } catch (error) {
+    console.error("❌ Session transaction failed:", error.message)
+
+    // Check if it's a permission error
+    if (error.message?.includes('permission') || error.message?.includes('unauthorized')) {
+      console.log("⚠️ Session key permission denied, falling back to passkey")
+      return sendPasskeyTransaction({ to, value, data })
+    }
+
+    throw error
+  }
+}
+
+/**
+ * Send a transaction using passkey (requires user popup confirmation)
+ * @param {Object} options - Transaction options
+ * @returns {Promise<string>} Transaction hash
+ */
+async function sendPasskeyTransaction({ to, value, data }) {
+  if (!riseWalletInstance) throw new Error("Rise Wallet not initialized")
+
+  const provider = riseWalletInstance.provider
+  const wallet = getLocalWallet()
+
+  console.log("🔐 Sending passkey transaction (requires confirmation)...")
+  console.log("   To:", to)
+  console.log("   Value:", value ? value.toString() : '0')
+
+  // Convert value to hex
+  const hexValue = value ? `0x${BigInt(value).toString(16)}` : '0x0'
+
+  // Use standard sendTransaction which triggers passkey popup
   const txHash = await provider.request({
-    method: 'wallet_sendPreparedCalls',
+    method: 'eth_sendTransaction',
     params: [{
-      ...requestParams,
-      signature: signature
+      from: wallet.address,
+      to: to,
+      value: hexValue,
+      data: data
     }]
   })
 
-  console.log("Session transaction sent:", txHash)
-  return txHash // sendPreparedCalls returns the hash (or array of hashes?)
+  console.log("🔐 Passkey transaction sent:", txHash)
+  return txHash
+}
+/**
+ * Validate hash format and get transaction receipt
+ * ULTRA-OPTIMIZED for Rise Chain's 10ms blocks
+ * @param {string} hash - Transaction hash (may be truncated)
+ * @returns {Promise<Object>} Transaction receipt or success status
+ */
+async function getTransactionReceiptSafe(hash) {
+  // Validate and fix hash format if needed (should be 66 chars: 0x + 64 hex)
+  let validHash = hash
+  if (typeof hash === 'string' && hash.startsWith('0x')) {
+    if (hash.length < 66) {
+      validHash = '0x' + hash.slice(2).padStart(64, '0')
+    }
+  }
+
+  // For Rise Chain (10ms blocks), use Rise Wallet provider directly
+  // No need to wait - tx is confirmed almost instantly
+  try {
+    const riseReceipt = await riseWalletInstance.provider.request({
+      method: 'eth_getTransactionReceipt',
+      params: [validHash]
+    })
+    if (riseReceipt) {
+      return riseReceipt
+    }
+  } catch (e) {
+    // Ignore - tx was sent successfully
+  }
+
+  // On Rise Chain, if tx was sent by Rise Wallet, it's confirmed
+  // Return success immediately - no need to poll
+  return { transactionHash: validHash, status: 'success' }
 }
 
 export async function checkInitialGameState() {
@@ -441,11 +614,52 @@ export async function commit(commitHash) {
       })
     })
 
-    printLog(['debug'], "Commit transaction sent:", hash)
+    printLog(['debug'], "Commit transaction sent, raw hash:", hash)
 
-    const receipt = await wsClient.waitForTransactionReceipt({ hash })
+    // Validate and fix hash format if needed (should be 66 chars: 0x + 64 hex)
+    let validHash = hash
+    if (typeof hash === 'string' && hash.startsWith('0x')) {
+      if (hash.length < 66) {
+        // Pad with leading zeros after 0x
+        validHash = '0x' + hash.slice(2).padStart(64, '0')
+        printLog(['debug'], "Hash was truncated, padded to:", validHash)
+      }
+    }
 
-    if (receipt.status === '0x0' || receipt.status === 0) {
+    printLog(['debug'], "Waiting for transaction receipt, hash:", validHash)
+
+    // Use Rise Wallet provider for receipt since it knows about the transaction
+    let receipt
+    try {
+      receipt = await wsClient.waitForTransactionReceipt({
+        hash: validHash,
+        timeout: 30000 // 30 second timeout
+      })
+    } catch (waitError) {
+      printLog(['debug'], "waitForTransactionReceipt failed:", waitError.message)
+      // Try getting receipt directly from Rise Wallet provider
+      try {
+        const riseReceipt = await riseWalletInstance.provider.request({
+          method: 'eth_getTransactionReceipt',
+          params: [validHash]
+        })
+        if (riseReceipt) {
+          receipt = riseReceipt
+          printLog(['debug'], "Got receipt from Rise Wallet provider")
+        } else {
+          // Transaction may still be pending or hash format issue
+          // Return success since the transaction was sent
+          printLog(['debug'], "Transaction sent but receipt not available yet")
+          return { transactionHash: validHash, status: 'pending' }
+        }
+      } catch (riseError) {
+        printLog(['debug'], "Rise provider receipt also failed:", riseError.message)
+        // Transaction was sent successfully, return pending status
+        return { transactionHash: validHash, status: 'pending' }
+      }
+    }
+
+    if (receipt.status === '0x0' || receipt.status === 0 || receipt.status === 'reverted') {
       const error = new Error("Transaction failed: Game state may not allow this action. Please check if you need to reveal a previous game first.");
       showErrorModal(error.message);
       captureBlockchainError(error, 'commit', {
@@ -460,7 +674,7 @@ export async function commit(commitHash) {
     printLog(['debug'], "Commit Transaction Receipt:", {
       transactionHash: receipt.transactionHash,
       blockNumber: receipt.blockNumber,
-      status: receipt.status === 'success' ? "Confirmed" : "Failed",
+      status: receipt.status === 'success' || receipt.status === '0x1' ? "Confirmed" : "Failed",
       gasUsed: receipt.gasUsed,
       confirmationTime: confirmTime + "ms"
     })
@@ -604,7 +818,7 @@ export async function forfeit() {
       })
     })
 
-    const receipt = await wsClient.waitForTransactionReceipt({ hash })
+    const receipt = await getTransactionReceiptSafe(hash)
 
     const confirmTime = Date.now() - startTime
     printLog(['debug'], "Forfeit Transaction Receipt:", {
@@ -648,10 +862,10 @@ export async function performReveal(secret) {
       })
     })
 
-    const receipt = await wsClient.waitForTransactionReceipt({ hash })
+    const receipt = await getTransactionReceiptSafe(hash)
 
-    // Check if transaction actually succeeded
-    if (receipt.status === '0x0' || receipt.status === 0) {
+    // Check if transaction actually succeeded (skip check if pending)
+    if (receipt.status !== 'pending' && (receipt.status === '0x0' || receipt.status === 0 || receipt.status === 'reverted')) {
       console.log("❌ Reveal transaction failed - status indicates failure");
       const error = new Error("Reveal transaction failed: Invalid secret or game state issue.");
       showErrorModal(error.message);

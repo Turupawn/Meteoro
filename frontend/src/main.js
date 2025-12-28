@@ -13,6 +13,13 @@ import {
     connectWallet
 } from './web3/blockchain_stuff.js';
 
+// Import session key utilities for UI status
+import {
+    hasUsableSessionKey,
+    getActiveSessionKey,
+    getSessionKeyTimeRemaining
+} from './web3/sessionKeyManager.js';
+
 import {
     captureError,
     captureEvent,
@@ -477,6 +484,8 @@ export async function updateGameDisplay() {
         const centralizedGameState = getGameState()
         if (!centralizedGameState) return;
         const wallet = getLocalWallet()
+        // Only update display if wallet is connected
+        if (!wallet) return;
         // Use the game scene reference instead of hardcoded index
         if (gameScene) {
             gameScene.updateDisplay(centralizedGameState.playerETHBalance, centralizedGameState.playerGachaTokenBalance, wallet.address, centralizedGameState);
@@ -599,8 +608,18 @@ function showConnectButton() {
     subtitle.style.color = '#aaaaaa';
     subtitle.style.fontFamily = '"Orbitron", sans-serif';
     subtitle.style.fontSize = '12px';
-    subtitle.style.marginBottom = '30px';
+    subtitle.style.marginBottom = '20px';
     subtitle.style.lineHeight = '1.5';
+
+    // Session key info message
+    const sessionInfo = document.createElement('p');
+    sessionInfo.innerText = '⚡ Session keys enable popup-free gameplay';
+    sessionInfo.style.color = '#00ff88';
+    sessionInfo.style.fontFamily = '"Orbitron", sans-serif';
+    sessionInfo.style.fontSize = '10px';
+    sessionInfo.style.marginBottom = '30px';
+    sessionInfo.style.lineHeight = '1.5';
+    sessionInfo.style.opacity = '0.8';
 
     const btn = document.createElement('button');
     btn.innerText = 'CONNECT WALLET';
@@ -636,8 +655,19 @@ function showConnectButton() {
 
             const wallet = await connectWallet();
             if (wallet) {
-                // Success animation or message
-                btn.innerText = 'LINK ESTABLISHED';
+                // Check if session key was created
+                const hasSession = hasUsableSessionKey();
+
+                if (hasSession) {
+                    btn.innerText = '⚡ SESSION ACTIVE';
+                    sessionInfo.innerText = 'Popup-free mode enabled!';
+                    sessionInfo.style.color = '#00ff00';
+                } else {
+                    btn.innerText = 'LINK ESTABLISHED';
+                    sessionInfo.innerText = 'Connected (passkey mode)';
+                    sessionInfo.style.color = '#ffaa00';
+                }
+
                 btn.style.borderColor = '#00ff00';
                 btn.style.color = '#00ff00';
                 btn.style.boxShadow = '0 0 20px rgba(0, 255, 0, 0.5)';
@@ -645,9 +675,13 @@ function showConnectButton() {
                 setTimeout(() => {
                     container.style.transition = 'opacity 0.5s ease';
                     container.style.opacity = '0';
-                    setTimeout(() => container.remove(), 500);
+                    setTimeout(() => {
+                        container.remove();
+                        // Create session key status indicator in the UI
+                        createSessionKeyIndicator();
+                    }, 500);
                     window.location.reload();
-                }, 1000);
+                }, 1500);
             }
         } catch (e) {
             btn.innerText = 'CONNECTION FAILED';
@@ -669,7 +703,63 @@ function showConnectButton() {
 
     content.appendChild(title);
     content.appendChild(subtitle);
+    content.appendChild(sessionInfo);
     content.appendChild(btn);
     container.appendChild(content);
     document.body.appendChild(container);
+}
+
+/**
+ * Create a small indicator showing session key status in the corner
+ * This helps users know if they're in popup-free mode
+ */
+function createSessionKeyIndicator() {
+    // Remove existing indicator if any
+    const existing = document.getElementById('session-key-indicator');
+    if (existing) existing.remove();
+
+    const sessionKey = getActiveSessionKey();
+    if (!sessionKey) return;
+
+    const timeRemaining = getSessionKeyTimeRemaining(sessionKey);
+    if (timeRemaining.expired) return;
+
+    const indicator = document.createElement('div');
+    indicator.id = 'session-key-indicator';
+    indicator.style.position = 'fixed';
+    indicator.style.bottom = '10px';
+    indicator.style.right = '10px';
+    indicator.style.padding = '8px 12px';
+    indicator.style.backgroundColor = 'rgba(0, 255, 136, 0.15)';
+    indicator.style.border = '1px solid #00ff88';
+    indicator.style.borderRadius = '5px';
+    indicator.style.color = '#00ff88';
+    indicator.style.fontFamily = '"Orbitron", sans-serif';
+    indicator.style.fontSize = '10px';
+    indicator.style.zIndex = '1000';
+    indicator.style.backdropFilter = 'blur(5px)';
+    indicator.style.boxShadow = '0 0 10px rgba(0, 255, 136, 0.2)';
+
+    const updateIndicator = () => {
+        const key = getActiveSessionKey();
+        if (!key) {
+            indicator.remove();
+            return;
+        }
+        const remaining = getSessionKeyTimeRemaining(key);
+        if (remaining.expired) {
+            indicator.innerHTML = '⚠️ Session Expired';
+            indicator.style.borderColor = '#ff6600';
+            indicator.style.color = '#ff6600';
+            indicator.style.backgroundColor = 'rgba(255, 102, 0, 0.15)';
+        } else {
+            indicator.innerHTML = `⚡ Session: ${remaining.hours}h ${remaining.minutes % 60}m`;
+        }
+    };
+
+    updateIndicator();
+    // Update every minute
+    setInterval(updateIndicator, 60000);
+
+    document.body.appendChild(indicator);
 }
