@@ -11,14 +11,20 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "vite": "^4.5.0"
+    "vite": "^4.5.0",
+    "vite-plugin-mkcert": "^1.17.9"
   },
   "dependencies": {
     "dotenv": "^17.2.1",
+    "ox": "0.9.8",
     "phaser": "^3.90.0",
     "posthog-js": "^1.258.6",
+    "rise-wallet": "0.3.0",
     "shreds": "^0.2.3",
-    "viem": "^2.38.4",
+    "viem": "2.38.3",
     "web3": "^4.16.0"
+  },
+  "overrides": {
+    "ox": "0.9.8"
   }
 }
