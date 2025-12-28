@@ -2,7 +2,7 @@ import { applyPerspectiveToQuadImageToRight, isLandscape, getCardDisplay } from 
 
 export class GameHistory {
     recentHistory = [];
-    
+
     constructor(scene) {
         this.scene = scene;
         this.createGameHistory();
@@ -22,7 +22,7 @@ export class GameHistory {
 
     createGameHistoryTexture() {
         this.renderTexture = this.scene.add.renderTexture(0, 0, 300, 400);
-        
+
         const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
             font: 'bold 28px Orbitron',
             fill: '#E0F6FF',
@@ -38,7 +38,7 @@ export class GameHistory {
             }
         });
         titleText.setVisible(false);
-        
+
         this.renderTexture.draw(titleText, 10, 10);
         titleText.destroy();
 
@@ -56,16 +56,16 @@ export class GameHistory {
         this.renderTexture.saveTexture('gameHistoryTexture');
 
         // Only create quadImage in landscape mode
-        if(isLandscape()) {
+        if (isLandscape()) {
             this.quadImage = this.scene.add.rexQuadImage({
-                x: 236+50,
+                x: 236 + 50,
                 y: 300,
                 texture: 'gameHistoryTexture',
                 ninePointMode: true
-            
+
             });
 
-            this.quadImage.setScale(16,16);
+            this.quadImage.setScale(16, 16);
             this.quadImage.setAlpha(0.85);
 
             let perspectiveX = this.quadImage.topLeft.x + 1200;
@@ -84,7 +84,7 @@ export class GameHistory {
             if (!this.renderTexture) {
                 return;
             }
-            
+
             // Don't update game history in portrait mode
             if (!isLandscape()) {
                 return;
@@ -92,7 +92,7 @@ export class GameHistory {
 
             this.renderTexture.clear();
 
-            if(isLandscape()) {
+            if (isLandscape()) {
                 const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
                     font: 'bold 24px Orbitron',
                     fill: '#E0F6FF',
@@ -111,7 +111,7 @@ export class GameHistory {
                 this.renderTexture.draw(titleText, 10, 10);
                 titleText.destroy();
             }
-            
+
             let yOffset = 40;
             this.recentHistory.forEach((game, index) => {
                 let isWin = false;
@@ -141,9 +141,9 @@ export class GameHistory {
                         isWin = playerCard > houseCard;
                     }
                 }
-                
+
                 const score = `${getCardDisplay(game.playerCard)}-${getCardDisplay(game.houseCard)}`;
-                
+
                 // Set color based on game state
                 let textColor;
                 if (isPending || isTie) {
@@ -161,7 +161,7 @@ export class GameHistory {
                 gameText.setVisible(false);
                 this.renderTexture.draw(gameText, 10, yOffset);
                 gameText.destroy();
-                
+
                 yOffset += 25;
             });
 
@@ -173,7 +173,9 @@ export class GameHistory {
     }
 
     initializeHistory(recentHistory) {
-        this.recentHistory = recentHistory;
+        // Contract returns history in chronological order (oldest first)
+        // Frontend expects most recent first, so we reverse the array
+        this.recentHistory = recentHistory ? [...recentHistory].reverse() : [];
     }
 
     addPendingGameToHistory() {
@@ -181,7 +183,7 @@ export class GameHistory {
         if (!isLandscape()) {
             return;
         }
-        
+
         // Check if there's already a pending game (most recent game with ?-?)
         if (this.recentHistory.length > 0) {
             const mostRecentGame = this.recentHistory[0];
@@ -190,7 +192,7 @@ export class GameHistory {
                 return;
             }
         }
-        
+
         const newGame = {
             gameState: 1, // Committed state
             playerAddress: "0x0", // Will be updated when we have access to wallet
@@ -204,25 +206,25 @@ export class GameHistory {
             houseCard: "?", // Placeholder
             revealTimestamp: 0
         };
-        
+
         // Add to the beginning of the array (most recent first)
         this.recentHistory.unshift(newGame);
-        
+
         // Keep only the first 10 games
         if (this.recentHistory.length > 10) {
             this.recentHistory = this.recentHistory.slice(0, 10);
         }
-        
+
         // Update the display
         this.updateGameHistory(this.recentHistory);
     }
-    
+
     updateLastGameInHistory(playerCard, houseCard) {
         // Don't update history in portrait mode
         if (!isLandscape()) {
             return;
         }
-        
+
         if (!this.recentHistory || this.recentHistory.length === 0) {
             return;
         }
@@ -233,7 +235,7 @@ export class GameHistory {
             lastGame.playerCard = getCardDisplay(playerCard);
             lastGame.houseCard = getCardDisplay(houseCard);
             lastGame.revealTimestamp = Math.floor(Date.now() / 1000);
-            
+
             // Update the display
             this.updateGameHistory(this.recentHistory);
         }
