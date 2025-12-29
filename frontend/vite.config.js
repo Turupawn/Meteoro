@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import mkcert from 'vite-plugin-mkcert' // Recommended by Porto/Rise Wallet for HTTPS
 import dotenv from 'dotenv'
 dotenv.config()
 
@@ -10,5 +11,8 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['posthog-js']
-  }
+  },
+  plugins: [
+    mkcert() // Creates valid local SSL certificates for HTTPS - required for Rise Wallet iframe
+  ]
 })

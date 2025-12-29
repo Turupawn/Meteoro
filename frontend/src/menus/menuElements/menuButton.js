@@ -1,13 +1,14 @@
 import { isLandscape } from '../../utils/utils.js';
 
 export class MenuButton {
-    constructor(scene, x, y, text, fontSize, onClick) {
+    constructor(scene, x, y, text, fontSize, onClick, options = {}) {
         this.scene = scene;
         this.x = x;
         this.y = y;
         this.text = text;
         this.fontSize = fontSize;
         this.onClick = onClick;
+        this.options = options;
         
         this.createButton();
     }
@@ -19,23 +20,29 @@ export class MenuButton {
             : Math.max(800, this.text.length * 50);
         const buttonHeight = isLandscapeMode ? 80 : 100;
         
+        // Support custom colors via options
+        const bgColor = this.options.bgColor || 0x0066CC;
+        const strokeColor = this.options.strokeColor || 0x00FFFF;
+        const textColor = this.options.color || '#E0F6FF';
+        const textStrokeColor = this.options.textStroke || '#0066CC';
+        
         this.buttonBg = this.scene.add.rectangle(
             this.x,
             this.y,
             buttonWidth,
             buttonHeight,
-            0x0066CC,
+            bgColor,
             0.4
         );
-        this.buttonBg.setStrokeStyle(3, 0x00FFFF);
+        this.buttonBg.setStrokeStyle(3, strokeColor);
         this.buttonBg.setDepth(255);
         
         this.buttonBg.setInteractive();
         
         this.button = this.scene.add.text(this.x, this.y, this.text, {
             font: `bold ${this.fontSize}px Orbitron`,
-            fill: '#E0F6FF',
-            stroke: '#0066CC',
+            fill: textColor,
+            stroke: textStrokeColor,
             strokeThickness: 3,
             alpha: 0.95,
             shadow: {
