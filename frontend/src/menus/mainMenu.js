@@ -3,6 +3,7 @@ import { isLandscape, ETH_BALANCE_DECIMALS, GACHA_BALANCE_DECIMALS } from '../ut
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuInput } from './menuElements/menuInput.js';
 import { MenuText } from './menuElements/menuText.js';
+import { clearAllGameData } from '../web3/sessionKeyManager.js';
 
 const NETWORK = import.meta.env.NETWORK || 'rise testnet';
 
@@ -140,17 +141,7 @@ export class MainMenu {
             () => this.showWithdrawSubmenu()
         );
 
-        const privateKeyY = startY + buttonSpacing * 2;
-        this.privateKeyButton = new MenuButton(
-            this.scene,
-            this.scene.centerX, 
-            privateKeyY, 
-            "PRIVATE KEY", 
-            buttonFontSize,
-            () => this.showPrivateKeySubmenu()
-        );
-
-        const forfeitY = startY + buttonSpacing * 3;
+        const forfeitY = startY + buttonSpacing * 2;
         this.forfeitButton = new MenuButton(
             this.scene,
             this.scene.centerX, 
@@ -160,11 +151,21 @@ export class MainMenu {
             () => this.showForfeitSubmenu()
         );
 
+        const disconnectY = startY + buttonSpacing * 3;
+        this.disconnectButton = new MenuButton(
+            this.scene,
+            this.scene.centerX, 
+            disconnectY, 
+            "DISCONNECT", 
+            buttonFontSize,
+            () => this.showDisconnectSubmenu()
+        );
+
         this.menuButtons = [
             this.depositButton, 
             this.withdrawButton, 
-            this.privateKeyButton,
-            this.forfeitButton
+            this.forfeitButton,
+            this.disconnectButton
         ];
     }
 
@@ -433,94 +434,6 @@ export class MainMenu {
         ];
     }
 
-    showPrivateKeySubmenu() {
-        this.currentSubmenu = 'privateKey';
-        
-        this.clearMainMenu();
-        
-        const isLandscapeMode = isLandscape();
-        this.submenuWidth = isLandscapeMode
-            ? Math.min(1000, this.scene.screenWidth * 0.95)
-            : Math.min(850, this.scene.screenWidth * 0.97);
-        this.submenuHeight = isLandscapeMode
-            ? Math.min(700, this.scene.screenHeight * 0.85)
-            : Math.min(600, this.scene.screenHeight * 0.8);
-        
-        this.submenuContainer = this.scene.add.rectangle(
-            this.scene.centerX, 
-            this.scene.centerY, 
-            this.submenuWidth, 
-            this.submenuHeight, 
-            0x000000, 
-            0.95
-        );
-        this.submenuContainer.setStrokeStyle(2, 0x00FFFF);
-        this.submenuContainer.setDepth(253);
-
-        this.createSubmenuXButton(this.submenuWidth, this.submenuHeight);
-
-        const titleFontSize = isLandscapeMode
-            ? Math.max(22, this.scene.screenWidth / 50)
-            : Math.max(32, this.scene.screenWidth / 25);
-        
-        const titleY = this.scene.centerY - this.submenuHeight/2 + 40;
-        const privateKeyY = this.scene.centerY - (isLandscapeMode ? 80 : 100);
-        const instructionY = this.scene.centerY + (isLandscapeMode ? 100 : 80);
-        
-        this.submenuTitle = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            titleY, 
-            "YOUR PRIVATE KEY", 
-            titleFontSize,
-            { depth: 254 }
-        );
-        
-        const wallet = getLocalWallet();
-        const privateKey = wallet ? wallet.privateKey : 'No wallet';
-
-        // Private key input (read-only) - wider input, smaller font, white color
-        const privateKeyInputWidth = isLandscapeMode 
-            ? Math.min(800, this.scene.screenWidth * 0.85)
-            : Math.min(700, this.scene.screenWidth * 0.95);
-        
-        this.privateKeyInput = new MenuInput(
-            this.scene,
-            this.scene.centerX,
-            privateKeyY,
-            '',
-            isLandscapeMode ? titleFontSize - 14 : titleFontSize - 8,
-            {
-                readOnly: true,
-                value: privateKey,
-                width: privateKeyInputWidth
-            }
-        );
-        // Override color to white
-        this.privateKeyInput.inputElement.style.color = '#FFFFFF';
-
-        this.instructionText = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            instructionY, 
-            "Back up your private key. This is a local storage wallet, don't use it for large amounts.", 
-            titleFontSize - 4,
-            { 
-                depth: 254,
-                wordWrap: { width: this.submenuWidth - 100 },
-                align: 'center'
-            }
-        );
-
-        this.submenuElements = [
-            this.submenuContainer,
-            this.submenuTitle,
-            this.privateKeyInput,
-            this.instructionText,
-            this.submenuXButton
-        ];
-    }
-
     showForfeitSubmenu() {
         this.currentSubmenu = 'cleanup';
         
@@ -593,6 +506,93 @@ export class MainMenu {
             this.confirmButton,
             this.submenuXButton
         ];
+    }
+
+    showDisconnectSubmenu() {
+        this.currentSubmenu = 'disconnect';
+        
+        this.clearMainMenu();
+        
+        const isLandscapeMode = isLandscape();
+        this.submenuWidth = isLandscapeMode
+            ? Math.min(1100, this.scene.screenWidth * 0.96)
+            : Math.min(900, this.scene.screenWidth * 0.98);
+        this.submenuHeight = isLandscapeMode
+            ? Math.min(700, this.scene.screenHeight * 0.85)
+            : Math.min(600, this.scene.screenHeight * 0.8);
+        
+        this.submenuContainer = this.scene.add.rectangle(
+            this.scene.centerX, 
+            this.scene.centerY, 
+            this.submenuWidth, 
+            this.submenuHeight, 
+            0x000000, 
+            0.95
+        );
+        this.submenuContainer.setStrokeStyle(2, 0x00FFFF);
+        this.submenuContainer.setDepth(253);
+
+        this.createSubmenuXButton(this.submenuWidth, this.submenuHeight);
+
+        const titleFontSize = isLandscapeMode
+            ? Math.max(22, this.scene.screenWidth / 50)
+            : Math.max(32, this.scene.screenWidth / 25);
+        
+        const titleY = this.scene.centerY - this.submenuHeight/2 + 30;
+        const warningY = this.scene.centerY - (isLandscapeMode ? 100 : 60);
+        const confirmButtonY = this.scene.centerY + (isLandscapeMode ? 120 : 100);
+        
+        this.submenuTitle = new MenuText(
+            this.scene,
+            this.scene.centerX, 
+            titleY, 
+            "DISCONNECT WALLET", 
+            titleFontSize,
+            { depth: 254 }
+        );
+
+        this.warningText = new MenuText(
+            this.scene,
+            this.scene.centerX, 
+            warningY,
+            "This will disconnect your wallet,\nclear all session keys, and\nreset all game data.\n\nYou will need to reconnect to play.", 
+            titleFontSize - 4,
+            {
+                depth: 254,
+                wordWrap: { width: this.submenuWidth - 100 },
+                align: 'center'
+            }
+        );
+        
+        this.confirmButton = new MenuButton(
+            this.scene,
+            this.scene.centerX,
+            confirmButtonY,
+            "CONFIRM DISCONNECT", 
+            titleFontSize,
+            () => this.executeDisconnect()
+        );
+        
+        this.submenuElements = [
+            this.submenuContainer,
+            this.submenuTitle,
+            this.warningText,
+            this.confirmButton,
+            this.submenuXButton
+        ];
+    }
+
+    executeDisconnect() {
+        console.log('🔌 Disconnecting wallet...');
+        
+        // Clear all game data (session keys, wallet, pending commits, etc.)
+        clearAllGameData();
+        
+        // Close the menu
+        this.closeMenu();
+        
+        // Reload the page to show connect button
+        window.location.reload();
     }
 
     handleBackgroundClick(pointer, submenuWidth, submenuHeight) {

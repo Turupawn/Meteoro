@@ -1,15 +1,12 @@
 import { createPublicClient, createWalletClient, webSocket, formatEther, encodeFunctionData, custom, createClient } from 'viem'
 import { riseTestnet } from 'viem/chains'
 import { shredActions, sendRawTransactionSync, watchShreds } from 'shreds/viem'
-import { RiseWallet, Chains } from 'rise-wallet'
-import { WalletActions } from 'rise-wallet/viem'
-import { P256, Signature } from 'ox'
-import { printLog, getCardDisplay } from '../utils/utils.js'
+import { RiseWallet } from 'rise-wallet'
+import { printLog } from '../utils/utils.js'
 import { captureBlockchainError } from '../session_tracking.js'
 import { showErrorModal } from '../menus/errorModal.js'
 import gameState, { updateBalances, updateBetConfiguration, updateGameState } from '../gameState.js'
 
-// Import centralized configuration
 import {
   CONTRACT_ADDRESS as MY_CONTRACT_ADDRESS,
   WSS_URL,
@@ -18,24 +15,18 @@ import {
   BALANCE_POLL_INTERVAL
 } from './walletConfig.js'
 
-// Import session key manager
 import {
   getActiveSessionKey,
   isSessionKeyValid,
-  hasUsableSessionKey,
   createSessionKey as createNewSessionKey,
   signWithSessionKey,
   getSessionKeyTimeRemaining
 } from './sessionKeyManager.js'
 
-// Import game permissions
-import { isCallPermitted, GAME_PERMISSIONS } from './gamePermissions.js'
-
 const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json"
 
 let CONTRACT_ABI = null
 
-// ERC20 ABI for token transfers
 const ERC20_ABI = [
   {
     type: 'function',
@@ -108,7 +99,6 @@ export async function initWeb3() {
 
     await loadContractABI()
 
-    // Create Rise Wallet instance
     const rw = RiseWallet.create();
     riseWalletInstance = rw;
 
@@ -117,7 +107,6 @@ export async function initWeb3() {
       transport: webSocket(WSS_URL)
     }).extend(shredActions)
 
-    // Create Viem client with Rise Wallet provider
     walletClient = createClient({
       chain: riseTestnet,
       transport: custom(rw.provider)
@@ -125,28 +114,26 @@ export async function initWeb3() {
 
     console.log("Rise Wallet client created")
 
-    // Check if we have a saved wallet in localStorage
     const savedWallet = getLocalWallet()
 
     if (savedWallet && savedWallet.address) {
-      console.log("🔗 Found saved wallet in localStorage:", savedWallet.address)
+      console.log("Found saved wallet in localStorage:", savedWallet.address)
 
-      // Verify the wallet is still connected with Rise Wallet
       try {
         const accounts = await rw.provider.request({
           method: 'eth_accounts'
         })
 
         if (accounts && accounts.length > 0 && accounts[0].toLowerCase() === savedWallet.address.toLowerCase()) {
-          console.log("🔗 Wallet session still valid, auto-reconnecting...")
+          console.log("Wallet session still valid, auto-reconnecting...")
           return { web3: wsClient, my_contract: null, wallet: savedWallet, walletClient: walletClient }
         } else {
-          console.log("🔗 Wallet session expired or different account, need re-connection")
+          console.log("Wallet session expired or different account, need re-connection")
           // Clear the old wallet data
           localStorage.removeItem('localWallet')
         }
       } catch (error) {
-        console.log("🔗 Could not verify wallet session:", error.message)
+        console.log("Could not verify wallet session:", error.message)
         // Keep localStorage wallet, let user reconnect if needed
       }
     }
@@ -161,39 +148,30 @@ export async function initWeb3() {
   }
 }
 
-/**
- * ⚡ PERFORMANCE: Pre-warm the Rise Wallet SDK and P256 crypto library
- * This eliminates cold start latency on the first game
- * Should be called after wallet is connected
- */
 export async function warmupSdkAndCrypto() {
   const wallet = getLocalWallet()
   if (!wallet || !riseWalletInstance) {
-    console.log("⚡ Cannot warmup - wallet not connected")
+    console.log("Cannot warmup - wallet not connected")
     return
   }
 
-  console.log("⚡ Warming up SDK and crypto libraries...")
+  console.log("Warming up SDK and crypto libraries...")
   const t0 = performance.now()
 
   try {
-    // Get or create session key to warm up the key manager
-    let sessionKey = getActiveSessionKey()
-    if (!sessionKey || !isSessionKeyValid(sessionKey)) {
-      console.log("⚡ No session key for warmup, skipping")
+    let sessionKey = getActiveSessionKey(wallet.address)
+    if (!sessionKey || !isSessionKeyValid(sessionKey, wallet.address)) {
+      console.log("No valid session key for warmup, skipping")
       return
     }
 
-    // 1. Warmup P256 crypto by doing a dummy sign
     const dummyDigest = '0x' + '0'.repeat(64)
     try {
       signWithSessionKey(dummyDigest, sessionKey)
-      console.log(`⚡ P256 crypto warmed up: ${Math.round(performance.now() - t0)}ms`)
+      console.log(`P256 crypto warmed up: ${Math.round(performance.now() - t0)}ms`)
     } catch (e) {
-      // Ignore - just warming up
     }
 
-    // 2. Warmup wallet_prepareCalls with a minimal dummy call
     const provider = riseWalletInstance.provider
     const dummyParams = [{
       calls: [{
@@ -212,15 +190,15 @@ export async function warmupSdkAndCrypto() {
         method: 'wallet_prepareCalls',
         params: dummyParams
       })
-      console.log(`⚡ Rise Wallet SDK warmed up: ${Math.round(performance.now() - t0)}ms`)
+      console.log(`Rise Wallet SDK warmed up: ${Math.round(performance.now() - t0)}ms`)
     } catch (e) {
       // Ignore errors - we just want to warm up the SDK
-      console.log(`⚡ Warmup prepareCalls failed (expected): ${Math.round(performance.now() - t0)}ms`)
+      console.log(`Warmup prepareCalls failed (expected): ${Math.round(performance.now() - t0)}ms`)
     }
 
-    console.log(`⚡ Total warmup time: ${Math.round(performance.now() - t0)}ms`)
+    console.log(`Total warmup time: ${Math.round(performance.now() - t0)}ms`)
   } catch (e) {
-    console.log("⚡ Warmup error (non-critical):", e.message)
+    console.log("Warmup error (non-critical):", e.message)
   }
 }
 
@@ -232,8 +210,8 @@ export async function connectWallet() {
 
     const provider = riseWalletInstance.provider
 
-    console.log("🔗 Connecting to Rise Wallet...")
-    console.log("🔗 Requesting accounts via eth_requestAccounts (this triggers OAuth popup)...")
+    console.log("Connecting to Rise Wallet...")
+    console.log("Requesting accounts via eth_requestAccounts (this triggers OAuth popup)...")
 
     // Use eth_requestAccounts to trigger the Rise Wallet popup
     // This is the standard EIP-1193 method that opens the OAuth popup (Google, etc.)
@@ -241,7 +219,7 @@ export async function connectWallet() {
       method: 'eth_requestAccounts'
     })
 
-    console.log("🔗 Connected accounts:", accounts)
+    console.log("Connected accounts:", accounts)
 
     if (!accounts || accounts.length === 0) {
       throw new Error("No accounts returned from Rise Wallet")
@@ -254,10 +232,11 @@ export async function connectWallet() {
     localStorage.setItem('localWallet', JSON.stringify(wallet))
 
     // Session Key Logic - use the new sessionKeyManager
-    const existingSessionKey = getActiveSessionKey()
+    // Pass wallet address to ensure we get a session key for THIS wallet
+    const existingSessionKey = getActiveSessionKey(wallet.address)
 
-    if (!existingSessionKey || !isSessionKeyValid(existingSessionKey)) {
-      console.log("🔑 No valid session key found. Creating new one...")
+    if (!existingSessionKey || !isSessionKeyValid(existingSessionKey, wallet.address)) {
+      console.log("🔑 No valid session key found for wallet:", wallet.address, "- Creating new one...")
 
       try {
         await createNewSessionKey(provider, wallet.address)
@@ -279,169 +258,52 @@ export async function connectWallet() {
   }
 }
 
-
-/**
- * Send a transaction using session key (no popup) or fallback to passkey
- * @param {Object} options - Transaction options
- * @param {string} options.to - Target contract address
- * @param {bigint|string} options.value - Value to send (in wei)
- * @param {string} options.data - Encoded function call data
- * @param {boolean} options.requiresSessionKey - If true, fail if no session key
- * @returns {Promise<string>} Transaction hash
- */
-async function sendSessionTransaction({ to, value, data, requiresSessionKey = false }) {
+async function sendSessionTransaction({ to, value, data }) {
   if (!riseWalletInstance) throw new Error("Rise Wallet not initialized")
 
   const provider = riseWalletInstance.provider
   const wallet = getLocalWallet()
   if (!wallet) throw new Error("No wallet connected")
 
-  // Get active session key
-  let sessionKey = getActiveSessionKey()
+  let sessionKey = getActiveSessionKey(wallet.address)
 
-  // Check if session key is valid
-  if (!sessionKey || !isSessionKeyValid(sessionKey)) {
-    console.log("🔑 No valid session key found")
-
-    // Check if call is permitted (if we had a session key)
-    if (data && !isCallPermitted(to, data)) {
-      console.log("⚠️ Call not in permitted list, using passkey")
-      return sendPasskeyTransaction({ to, value, data })
-    }
-
-    // Try to create a new session key
-    try {
-      console.log("🔑 Attempting to create new session key...")
-      sessionKey = await createNewSessionKey(provider, wallet.address)
-      console.log("🔑 Session key created successfully")
-    } catch (createError) {
-      console.warn("⚠️ Failed to create session key:", createError.message)
-
-      if (requiresSessionKey) {
-        throw new Error("Session key required but could not be created: " + createError.message)
-      }
-
-      // Fallback to passkey
-      console.log("🔐 Falling back to passkey transaction...")
-      return sendPasskeyTransaction({ to, value, data })
-    }
+  if (!sessionKey || !isSessionKeyValid(sessionKey, wallet.address)) {
+    sessionKey = await createNewSessionKey(provider, wallet.address)
   }
 
-  // Log session key status
-  const timeRemaining = getSessionKeyTimeRemaining(sessionKey)
-  const t0 = performance.now()
-  console.log(`⚡ [T+0ms] Using session key (expires in ${timeRemaining.hours}h ${timeRemaining.minutes % 60}m)`)
-
-  // Convert value to hex string format expected by wallet
   const hexValue = value ? `0x${BigInt(value).toString(16)}` : '0x0'
 
-  // 1. Prepare Calls
-  const prepareParams = [{
-    calls: [{
-      to: to,
-      value: hexValue,
-      data: data
-    }],
-    key: {
-      type: 'p256',
-      publicKey: sessionKey.publicKey
-    }
-  }]
-
-  try {
-    const t1 = performance.now()
-    const prepared = await provider.request({
-      method: 'wallet_prepareCalls',
-      params: prepareParams
-    })
-    const t2 = performance.now()
-    console.log(`⚡ [T+${Math.round(t2 - t0)}ms] wallet_prepareCalls: ${Math.round(t2 - t1)}ms`)
-
-    const { digest, ...requestParams } = prepared
-
-    // 2. Sign digest using session key (local, no popup)
-    const signature = signWithSessionKey(digest, sessionKey)
-    const t3 = performance.now()
-    console.log(`⚡ [T+${Math.round(t3 - t0)}ms] P256 sign: ${Math.round(t3 - t2)}ms`)
-
-    // 3. Send prepared calls
-    const response = await provider.request({
-      method: 'wallet_sendPreparedCalls',
-      params: [{
-        ...requestParams,
-        signature: signature
-      }]
-    })
-    const t4 = performance.now()
-    console.log(`⚡ [T+${Math.round(t4 - t0)}ms] wallet_sendPreparedCalls: ${Math.round(t4 - t3)}ms`)
-
-    // wallet_sendPreparedCalls returns [{id: "..."}]
-    let callId
-    if (Array.isArray(response) && response.length > 0 && response[0].id) {
-      callId = response[0].id
-    } else if (typeof response === 'string') {
-      callId = response
-    } else {
-      console.warn("⚠️ Unexpected response format:", response)
-      return response
-    }
-
-    // ⚡ Fire-and-forget - don't wait
-    provider.request({
-      method: 'wallet_getCallsStatus',
-      params: [callId]
-    }).then(callStatus => {
-      const t5 = performance.now()
-      console.log(`⚡ [T+${Math.round(t5 - t0)}ms] wallet_getCallsStatus completed (async)`)
-    }).catch(() => { })
-
-    console.log(`⚡ [T+${Math.round(performance.now() - t0)}ms] TOTAL sendSessionTransaction`)
-    return callId
-
-  } catch (error) {
-    console.error("❌ Session transaction failed:", error.message)
-
-    // Check if it's a permission error
-    if (error.message?.includes('permission') || error.message?.includes('unauthorized')) {
-      console.log("⚠️ Session key permission denied, falling back to passkey")
-      return sendPasskeyTransaction({ to, value, data })
-    }
-
-    throw error
-  }
-}
-
-/**
- * Send a transaction using passkey (requires user popup confirmation)
- * @param {Object} options - Transaction options
- * @returns {Promise<string>} Transaction hash
- */
-async function sendPasskeyTransaction({ to, value, data }) {
-  if (!riseWalletInstance) throw new Error("Rise Wallet not initialized")
-
-  const provider = riseWalletInstance.provider
-  const wallet = getLocalWallet()
-
-  console.log("🔐 Sending passkey transaction (requires confirmation)...")
-  console.log("   To:", to)
-  console.log("   Value:", value ? value.toString() : '0')
-
-  // Convert value to hex
-  const hexValue = value ? `0x${BigInt(value).toString(16)}` : '0x0'
-
-  // Use standard sendTransaction which triggers passkey popup
-  const txHash = await provider.request({
-    method: 'eth_sendTransaction',
+  const prepared = await provider.request({
+    method: 'wallet_prepareCalls',
     params: [{
-      from: wallet.address,
-      to: to,
-      value: hexValue,
-      data: data
+      calls: [{ to, value: hexValue, data }],
+      key: { type: 'p256', publicKey: sessionKey.publicKey }
     }]
   })
 
-  console.log("🔐 Passkey transaction sent:", txHash)
-  return txHash
+  const { digest, ...requestParams } = prepared
+  const signature = signWithSessionKey(digest, sessionKey)
+
+  const response = await provider.request({
+    method: 'wallet_sendPreparedCalls',
+    params: [{ ...requestParams, signature }]
+  })
+
+  let callId
+  if (Array.isArray(response) && response.length > 0 && response[0].id) {
+    callId = response[0].id
+  } else if (typeof response === 'string') {
+    callId = response
+  } else {
+    return response
+  }
+
+  provider.request({
+    method: 'wallet_getCallsStatus',
+    params: [callId]
+  }).catch(() => {})
+
+  return callId
 }
 
 // NOTE: getTransactionReceiptSafe was removed - it used slow eth_getTransactionReceipt
@@ -871,14 +733,23 @@ export async function startEventMonitoring() {
         player: wallet.address
       },
       onLogs: async (logs) => {
-        printLog(['debug'], "Event monitoring started successfully")
-        updateGameState(await checkGameState())
+        printLog(['debug'], "🔔 GameStateChanged event received! Logs:", logs?.length || 0)
+        try {
+          const freshState = await checkGameState()
+          printLog(['debug'], "🔔 Fresh game state after event:", freshState?.gameState?.toString())
+          updateGameState(freshState)
+        } catch (err) {
+          printLog(['error'], "Error updating game state after event:", err)
+        }
       },
+      onError: (error) => {
+        printLog(['error'], "WebSocket event monitoring error:", error)
+      }
     });
 
     eventUnwatch = unwatch
 
-    printLog(['debug'], "Event monitoring started successfully")
+    printLog(['debug'], "✅ Event monitoring watcher created successfully")
 
     balancePoll = setInterval(async () => {
       const ethBalance = await wsClient.getBalance({ address: wallet.address })
