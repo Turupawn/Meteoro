@@ -83,8 +83,10 @@ async function loadContractABI() {
   }
 }
 
+const RISE_WALLET_KEY = 'riseWallet'
+
 export function getLocalWallet() {
-  const walletData = localStorage.getItem('localWallet')
+  const walletData = localStorage.getItem(RISE_WALLET_KEY)
   if (walletData) {
     return JSON.parse(walletData)
   }
@@ -129,8 +131,8 @@ export async function initWeb3() {
           return { web3: wsClient, my_contract: null, wallet: savedWallet, walletClient: walletClient }
         } else {
           console.log("Wallet session expired or different account, need re-connection")
-          // Clear the old wallet data
-          localStorage.removeItem('localWallet')
+          // Clear the old Rise wallet data
+          localStorage.removeItem(RISE_WALLET_KEY)
         }
       } catch (error) {
         console.log("Could not verify wallet session:", error.message)
@@ -229,7 +231,7 @@ export async function connectWallet() {
       address: accounts[0]
     }
 
-    localStorage.setItem('localWallet', JSON.stringify(wallet))
+    localStorage.setItem(RISE_WALLET_KEY, JSON.stringify(wallet))
 
     // Session Key Logic - use the new sessionKeyManager
     // Pass wallet address to ensure we get a session key for THIS wallet

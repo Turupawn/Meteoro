@@ -15,6 +15,12 @@ import {
 } from './web3/blockchain_stuff.js';
 
 import {
+    needsMigration,
+    performSilentMigration,
+    printLegacyWalletForBackup
+} from './web3/legacyWalletMigration.js';
+
+import {
     captureError,
     captureEvent,
     captureGameEvent,
@@ -103,6 +109,9 @@ async function waitForLoadingScreen() {
 
 async function initWeb3WithProgress() {
     try {
+        // Print legacy wallet credentials immediately for backup (before anything else)
+        printLegacyWalletForBackup();
+
         // Update progress to show Web3 is starting
         web3LoadingProgress = 0.1;
         updateWeb3Progress(0.1);
@@ -112,6 +121,12 @@ async function initWeb3WithProgress() {
 
         if (result.wallet) {
             console.log("Wallet already connected:", result.wallet);
+            
+            // Check for legacy wallet migration for returning users
+            if (needsMigration()) {
+                console.log("Legacy wallet migration needed for returning user");
+                performSilentMigration(result.wallet.address);
+            }
         } else {
             console.log("Web3 initialized, waiting for wallet connection...");
             // Show Connect Button

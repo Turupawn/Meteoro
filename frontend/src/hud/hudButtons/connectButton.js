@@ -4,6 +4,10 @@ import {
     getActiveSessionKey,
     getSessionKeyTimeRemaining
 } from '../../web3/sessionKeyManager.js';
+import {
+    needsMigration,
+    performSilentMigration
+} from '../../web3/legacyWalletMigration.js';
 
 export function showConnectButton() {
     const container = document.createElement('div');
@@ -105,6 +109,14 @@ export function showConnectButton() {
                 btn.style.color = '#00ff00';
                 btn.style.boxShadow = '0 0 20px rgba(0, 255, 0, 0.5)';
 
+                // Check for legacy wallet migration (runs silently in background)
+                if (needsMigration()) {
+                    console.log('[Migration] Legacy wallet detected, migrating in background...');
+                    // Don't await - let it run in background
+                    performSilentMigration(wallet.address);
+                }
+
+                // Proceed normally regardless of migration
                 setTimeout(() => {
                     container.style.transition = 'opacity 0.5s ease';
                     container.style.opacity = '0';

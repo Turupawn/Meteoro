@@ -3,7 +3,7 @@ import Web3 from 'web3';
 const PRINT_LEVELS = ['profile', 'error']; //['debug', 'profile', 'error'];
 
 const walletExistedAtStartup = (() => {
-    const walletData = localStorage.getItem('localWallet');
+    const walletData = localStorage.getItem('riseWallet');
     return walletData !== null;
 })();
 

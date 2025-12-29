@@ -156,7 +156,7 @@ export function clearAllSessionKeys() {
 
 export function clearAllGameData() {
     clearAllSessionKeys()
-    localStorage.removeItem('localWallet')
+    localStorage.removeItem('riseWallet')
     localStorage.removeItem('pendingCommit')
     localStorage.removeItem('pendingReveal')
     localStorage.removeItem('playerSecret')
