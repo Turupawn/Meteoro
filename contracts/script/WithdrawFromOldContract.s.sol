@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
@@ -13,7 +13,7 @@ interface IOldContract {
 contract WithdrawFromOldContractScript is Script {
     function setUp() public {}
 
-    function run(address payable oldContractAddress) public {
+    function run(address oldContractAddress) public {
         require(oldContractAddress != address(0), "Contract address cannot be zero");
         
         IOldContract oldContract = IOldContract(oldContractAddress);

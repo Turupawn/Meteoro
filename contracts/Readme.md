@@ -1,13 +1,39 @@
-## Deploy both game and token
+## Deploy Game and Token (Both Together)
 
 ```bash
-source .env && forge script TwoPartyWarGameScript --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
+source .env && forge script DeployScript --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
 ```
 
-## Deploy only game
+Deploys both GachaToken and TwoPartyWarGame. **Recommended for first deployment.**
+
+**Important:** 
+- Save the **PROXY address** from the output - this is the address users will interact with and grant EIP-7702 permissions to
+- **Deposit ETH to the PROXY address**, not the implementation address
+- The proxy address never changes, even after upgrades
+- All state and ETH balance is stored in the proxy contract
+
+## Deploy Game Only (With Existing Token)
 
 ```bash
-source .env && forge script DeployWithExistingTokenScript --sig "run(address)" 0x1234567890123456789012345678901234567890 --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
+source .env && forge script DeployGameScript --sig "run(address)" 0xGACHA_TOKEN_ADDRESS --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
+```
+
+Use this if you already have a GachaToken deployed and want to deploy a new game contract. Replace `0xGACHA_TOKEN_ADDRESS` with your existing token address.
+
+**Note:** GachaToken is not upgradeable (standard for ERC20 tokens). If you need a new token, deploy a new one and use `setGachaToken()` on the game contract to update it.
+
+## Upgrade Contract
+
+```bash
+source .env && forge script UpgradeScript --sig "run(address)" 0xPROXY_ADDRESS --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
+```
+
+Replace `0xPROXY_ADDRESS` with your actual proxy address. The proxy address remains the same after upgrades, so users don't need to grant permissions again.
+
+## Update Bet Amounts and Multipliers
+
+```bash
+source .env && forge script UpdateBetAmountsScript --sig "run(address)" 0xPROXY_ADDRESS --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
 ```
 
 ## Update ABIs
@@ -16,26 +42,23 @@ source .env && forge script DeployWithExistingTokenScript --sig "run(address)" 0
 forge inspect src/TwoPartyWarGame.sol:TwoPartyWarGame abi --json --via-ir > ../frontend/public/json_abi/MyContract.json
 ```
 
-## Verify Token
+## Verify Implementation
 
 ```bash
-forge verify-contract --rpc-url https://testnet.riselabs.xyz --verifier blockscout --verifier-url https://explorer.testnet.riselabs.xyz/api/ 0x1234567890123456789012345678901234567890 src/GachaToken.sol:GachaToken
+forge verify-contract --rpc-url https://testnet.riselabs.xyz --verifier blockscout --verifier-url https://explorer.testnet.riselabs.xyz/api/ 0xIMPLEMENTATION_ADDRESS src/TwoPartyWarGame.sol:TwoPartyWarGame
 ```
 
-## Verify Game
+## Deposit ETH to Contract
 
-```bash
-forge verify-contract --rpc-url https://testnet.riselabs.xyz --verifier blockscout --verifier-url https://explorer.testnet.riselabs.xyz/api/ 0x1234567890123456789012345678901234567890 src/TwoPartyWarGame.sol:TwoPartyWarGame
-```
+You can deposit ETH to the proxy contract in two ways:
 
-## Update Bet Amounts and Multipliers
+1. **Direct transfer** - Send ETH directly to the proxy address
+2. **Using depositFunds()** - Call `depositFunds()` on the proxy (owner only)
 
-```bash
-source .env && forge script UpdateBetAmountsScript --sig "run(address)" 0x1234567890123456789012345678901234567890 --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
-```
+**Always use the PROXY address, never the implementation address!**
 
 ## Withdraw ETH from Old Contract
 
 ```bash
-source .env && forge script WithdrawFromOldContractScript --sig "run(address)" 0x1234567890123456789012345678901234567890 --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
+source .env && forge script WithdrawFromOldContractScript --sig "run(address)" 0xOLD_CONTRACT_ADDRESS --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
 ```

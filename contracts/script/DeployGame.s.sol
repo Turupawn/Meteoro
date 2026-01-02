@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {GachaToken} from "../src/GachaToken.sol";
 import {TwoPartyWarGame} from "../src/TwoPartyWarGame.sol";
 
-contract DeployWithExistingTokenScript is Script {
+contract DeployGameScript is Script {
+    TwoPartyWarGame public implementation;
+    ERC1967Proxy public proxy;
     TwoPartyWarGame public game;
-    GachaToken public gachaToken;
 
     // Rise VRF Coordinator address
     address constant VRF_COORDINATOR = 0x9d57aB4517ba97349551C876a01a7580B1338909;
@@ -17,16 +19,32 @@ contract DeployWithExistingTokenScript is Script {
     uint256 constant INITIAL_LIQUIDITY = 0.05 ether;
 
     function setUp() public {}
-    
+
     function run(address gachaTokenAddress) public {
         require(gachaTokenAddress != address(0), "GachaToken address cannot be zero");
         
         vm.startBroadcast();
 
-        gachaToken = GachaToken(gachaTokenAddress);
-        
-        game = new TwoPartyWarGame(VRF_COORDINATOR, address(gachaToken));
+        GachaToken gachaToken = GachaToken(gachaTokenAddress);
 
+        // Deploy implementation contract
+        implementation = new TwoPartyWarGame();
+
+        // Encode the initialize function call
+        bytes memory initData = abi.encodeWithSelector(
+            TwoPartyWarGame.initialize.selector,
+            VRF_COORDINATOR,
+            address(gachaToken),
+            msg.sender // owner
+        );
+
+        // Deploy proxy with implementation and initialization data
+        proxy = new ERC1967Proxy(address(implementation), initData);
+
+        // Cast proxy to the game interface for easier interaction
+        game = TwoPartyWarGame(payable(address(proxy)));
+
+        // Configure bet amounts
         uint[] memory betAmounts = new uint[](3);
         betAmounts[0] = 0.001 ether;
         betAmounts[1] = 0.005 ether;
@@ -46,8 +64,14 @@ contract DeployWithExistingTokenScript is Script {
         vm.stopBroadcast();
 
         console.log("Using existing GachaToken at:", address(gachaToken));
-        console.log("TwoPartyWarGame deployed at:", address(game));
+        console.log("Implementation deployed at:", address(implementation));
+        console.log("Proxy deployed at:", address(proxy));
+        console.log("TwoPartyWarGame (proxy) address:", address(game));
         console.log("VRF Coordinator:", VRF_COORDINATOR);
         console.log("Initial liquidity sent:", INITIAL_LIQUIDITY);
+        console.log("\n=== IMPORTANT ===");
+        console.log("Use the PROXY address for all interactions:", address(proxy));
+        console.log("The implementation address is:", address(implementation));
     }
 }
+

@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {GachaToken} from "../src/GachaToken.sol";
 import {TwoPartyWarGame} from "../src/TwoPartyWarGame.sol";
 
-contract TwoPartyWarGameScript is Script {
+contract DeployUpgradableScript is Script {
     GachaToken public gachaToken;
+    TwoPartyWarGame public implementation;
+    ERC1967Proxy public proxy;
     TwoPartyWarGame public game;
 
     // Rise VRF Coordinator address
@@ -21,9 +24,27 @@ contract TwoPartyWarGameScript is Script {
     function run() public {
         vm.startBroadcast();
 
+        // Deploy GachaToken
         gachaToken = new GachaToken("GachaToken", "GACHA");
-        game = new TwoPartyWarGame(VRF_COORDINATOR, address(gachaToken));
 
+        // Deploy implementation contract
+        implementation = new TwoPartyWarGame();
+
+        // Encode the initialize function call
+        bytes memory initData = abi.encodeWithSelector(
+            TwoPartyWarGame.initialize.selector,
+            VRF_COORDINATOR,
+            address(gachaToken),
+            msg.sender // owner
+        );
+
+        // Deploy proxy with implementation and initialization data
+        proxy = new ERC1967Proxy(address(implementation), initData);
+
+        // Cast proxy to the game interface for easier interaction
+        game = TwoPartyWarGame(payable(address(proxy)));
+
+        // Configure bet amounts
         uint[] memory betAmounts = new uint[](3);
         betAmounts[0] = 0.001 ether;
         betAmounts[1] = 0.005 ether;
@@ -43,8 +64,14 @@ contract TwoPartyWarGameScript is Script {
         vm.stopBroadcast();
 
         console.log("GachaToken deployed at:", address(gachaToken));
-        console.log("TwoPartyWarGame deployed at:", address(game));
+        console.log("Implementation deployed at:", address(implementation));
+        console.log("Proxy deployed at:", address(proxy));
+        console.log("TwoPartyWarGame (proxy) address:", address(game));
         console.log("VRF Coordinator:", VRF_COORDINATOR);
         console.log("Initial liquidity sent:", INITIAL_LIQUIDITY);
+        console.log("\n=== IMPORTANT ===");
+        console.log("Use the PROXY address for all interactions:", address(proxy));
+        console.log("The implementation address is:", address(implementation));
     }
 }
+

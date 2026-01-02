@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {GachaToken} from "./GachaToken.sol";
 
 interface IVRFCoordinator {
@@ -16,7 +18,48 @@ interface IVRFConsumer {
     ) external;
 }
 
-contract TwoPartyWarGame is Ownable, Pausable, IVRFConsumer {
+contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, IVRFConsumer {
+    // Custom Ownable implementation for upgradeable contracts
+    address private _owner;
+
+    error OwnableUnauthorizedAccount(address account);
+    error OwnableInvalidOwner(address owner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    modifier onlyOwner() {
+        _checkOwner();
+        _;
+    }
+
+    function owner() public view virtual returns (address) {
+        return _owner;
+    }
+
+    function _checkOwner() internal view virtual {
+        if (owner() != _msgSender()) {
+            revert OwnableUnauthorizedAccount(_msgSender());
+        }
+    }
+
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        if (newOwner == address(0)) {
+            revert OwnableInvalidOwner(address(0));
+        }
+        _transferOwnership(newOwner);
+    }
+
+    function _transferOwnership(address newOwner) internal virtual {
+        address oldOwner = _owner;
+        _owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+
+    function __Ownable_init(address initialOwner) internal onlyInitializing {
+        if (initialOwner == address(0)) {
+            revert OwnableInvalidOwner(address(0));
+        }
+        _transferOwnership(initialOwner);
+    }
     enum State { NotStarted, Pending, Completed }
 
     struct Game {
@@ -46,7 +89,7 @@ contract TwoPartyWarGame is Ownable, Pausable, IVRFConsumer {
     uint256 public nextGameId;
     uint256 public requestCount;
     
-    uint256 public tieRewardMultiplier = 10 ether;
+    uint256 public tieRewardMultiplier;
     mapping(uint256 betAmount => uint256 multiplier) public betAmountMultipliers;
 
     event GameRequested(address indexed player, uint256 indexed gameId, uint256 indexed requestId, uint256 betAmount);
@@ -64,12 +107,23 @@ contract TwoPartyWarGame is Ownable, Pausable, IVRFConsumer {
     event TieRewardMultiplierUpdated(uint256 newMultiplier);
     event BetAmountMultiplierUpdated(uint256 betAmount, uint256 multiplier);
 
-    constructor(address _coordinator, address _gachaToken) Ownable(msg.sender) {
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _coordinator, address _gachaToken, address initialOwner) public initializer {
+        __Ownable_init(initialOwner);
+        // Pausable doesn't need initialization (paused defaults to false)
+        // UUPSUpgradeable doesn't need initialization
+        
         coordinator = IVRFCoordinator(_coordinator);
         gachaToken = GachaToken(_gachaToken);
         nextGameId = 1;
         requestCount = 0;
+        tieRewardMultiplier = 10 ether;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     receive() external payable {}
 
@@ -328,3 +382,4 @@ contract TwoPartyWarGame is Ownable, Pausable, IVRFConsumer {
         _unpause();
     }
 }
+
