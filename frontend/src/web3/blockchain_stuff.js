@@ -300,16 +300,59 @@ async function sendSessionTransaction({ to, value, data }) {
     return response
   }
 
-  provider.request({
-    method: 'wallet_getCallsStatus',
-    params: [callId]
-  }).catch(() => {})
-
-  return callId
+  // Wait for the actual transaction to be submitted and get real tx hash
+  const txHash = await waitForTransactionStatus(provider, callId)
+  
+  return txHash
 }
 
-// NOTE: getTransactionReceiptSafe was removed - it used slow eth_getTransactionReceipt
-// For Rise Chain, we now use wallet_getCallsStatus in sendSessionTransaction which is instant
+async function waitForTransactionStatus(provider, callId, maxAttempts = 30) {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const status = await provider.request({
+        method: 'wallet_getCallsStatus',
+        params: [callId]
+      })
+      
+      // Check if we have a status
+      if (status) {
+        // Check for receipts array (contains actual tx hashes)
+        if (status.receipts && status.receipts.length > 0) {
+          const receipt = status.receipts[0]
+          if (receipt.transactionHash) {
+            return receipt.transactionHash
+          }
+        }
+        
+        // Check status field
+        if (status.status === 'CONFIRMED' || status.status === 'confirmed') {
+          // Try to get tx hash from various places
+          if (status.transactionHash) return status.transactionHash
+          if (status.hash) return status.hash
+          if (status.receipts?.[0]?.transactionHash) return status.receipts[0].transactionHash
+          // If confirmed but no hash, return callId as fallback
+          return callId
+        }
+        
+        // Check for failure
+        if (status.status === 'FAILED' || status.status === 'failed' || status.status === 'REVERTED') {
+          const errorMsg = status.error || status.reason || 'Transaction failed'
+          throw new Error(`Transaction failed: ${errorMsg}`)
+        }
+      }
+    } catch (error) {
+      // Silently retry on status check errors
+      if (error.message?.includes('Transaction failed')) {
+        throw error
+      }
+    }
+    
+    // Wait before next attempt
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }
+  
+  return callId
+}
 
 export async function checkInitialGameState() {
   const startTime = Date.now()
@@ -347,13 +390,17 @@ export async function checkInitialGameState() {
     console.log("Element 8 (betAmounts):", gameStateTemp[8])
     console.log("Element 9 (betAmountMultipliers):", gameStateTemp[9])
 
-    // Access the array elements by index according to the ABI
+    // Access the array elements by index according to the new ABI
+    // getInitialFrontendGameState returns:
+    // [0] playerEthBalance, [1] playerGachaTokenBalance, [2] gameState, [3] gameId,
+    // [4] playerCard, [5] houseCard, [6] recentHistory, [7] tieRewardMultiplierValue,
+    // [8] betAmounts, [9] betAmountMultipliersArray
     const playerEthBalance = gameStateTemp[0]
     const playerGachaTokenBalance = gameStateTemp[1]
     const currentGameState = gameStateTemp[2]
-    const playerCommit = gameStateTemp[3]
-    const houseRandomness = gameStateTemp[4]
-    const gameId = gameStateTemp[5]
+    const gameId = gameStateTemp[3]
+    const playerCard = gameStateTemp[4]
+    const houseCard = gameStateTemp[5]
     const recentHistory = gameStateTemp[6]
     const tieRewardMultiplierValue = gameStateTemp[7]
     const betAmounts = gameStateTemp[8]
@@ -385,15 +432,13 @@ export async function checkInitialGameState() {
       throw new Error("No bet amounts configured in contract - owner needs to set bet amounts")
     }
 
-    // Selected bet amount is now handled in gameState.updateBetConfiguration()
-
-    const gameState = {
+    const gameStateData = {
       playerETHBalance: playerEthBalance,
       playerGachaTokenBalance: playerGachaTokenBalance,
       gameState: BigInt(currentGameState),
-      playerCommit: playerCommit,
-      houseRandomness: houseRandomness,
       gameId: gameId,
+      playerCard: playerCard,
+      houseCard: houseCard,
       recentHistory: recentHistory,
       tieRewardMultiplier: tieRewardMultiplierValue,
       betAmounts: betAmounts,
@@ -405,7 +450,7 @@ export async function checkInitialGameState() {
     printLog(['profile'], "Time taken:", Date.now() - startTime, "ms")
     printLog(['profile'], "=============================")
 
-    return gameState
+    return gameStateData
   } catch (error) {
     printLog(['profile'], "=== INITIAL GAME STATE LOAD ===")
     printLog(['profile'], "Game state load failed")
@@ -437,12 +482,15 @@ export async function checkGameState() {
       args: [wallet.address]
     })
 
+    // getFrontendGameState returns:
+    // [0] playerEthBalance, [1] playerGachaTokenBalance, [2] gameState,
+    // [3] gameId, [4] playerCard, [5] houseCard
     const playerEthBalance = gameStateTemp[0]
     const playerGachaTokenBalance = gameStateTemp[1]
     const currentGameState = gameStateTemp[2]
-    const playerCommit = gameStateTemp[3]
-    const houseRandomness = gameStateTemp[4]
-    const gameId = gameStateTemp[5]
+    const gameId = gameStateTemp[3]
+    const playerCard = gameStateTemp[4]
+    const houseCard = gameStateTemp[5]
 
     // Update centralized game state
     updateBalances(playerEthBalance, playerGachaTokenBalance)
@@ -451,9 +499,9 @@ export async function checkGameState() {
       playerETHBalance: playerEthBalance,
       playerGachaTokenBalance: playerGachaTokenBalance,
       gameState: BigInt(currentGameState),
-      playerCommit: playerCommit,
-      houseRandomness: houseRandomness,
-      gameId: gameId
+      gameId: gameId,
+      playerCard: playerCard,
+      houseCard: houseCard
     }
 
     return gameStateData
@@ -469,12 +517,12 @@ export async function checkGameState() {
   }
 }
 
-export async function commit(commitHash) {
+export async function rollDice() {
   const wallet = getLocalWallet()
   if (!wallet) {
     const error = new Error("No local wallet found!")
     showErrorModal(error.message)
-    captureBlockchainError(error, 'commit', {
+    captureBlockchainError(error, 'rollDice', {
       error_type: 'wallet_not_found'
     })
     throw error
@@ -483,43 +531,33 @@ export async function commit(commitHash) {
   if (!gameState.getSelectedBetAmount()) {
     await initializeBetAmount()
   }
+  
+  const betAmount = gameState.getSelectedBetAmount()
 
   try {
-    printLog(['debug'], "Sending commit transaction via WebSocket...")
     const startTime = Date.now()
 
-    // Send transaction using the Rise Wallet client
-    // Note: Rise Wallet handles signing and sending. We don't need manual signing + sendRawTransactionSync for standard txs unless using shreds specifically.
-    // However, the original code used sendRawTransactionSync. 
-    // Is sendRawTransactionSync required for shreds low latency?
-    // Rise Wallet docs say "Use Rise Wallet's EIP-1193 provider with Viem's custom transport".
-    // Let's try standard walletClient.sendTransaction which Rise Wallet intercepts.
+    const txData = encodeFunctionData({
+      abi: CONTRACT_ABI,
+      functionName: 'rollDice',
+      args: []
+    })
 
-    // Use session key transaction
+    // Send transaction using session key
     const hash = await sendSessionTransaction({
       to: MY_CONTRACT_ADDRESS,
-      value: gameState.getSelectedBetAmount(),
-      data: encodeFunctionData({
-        abi: CONTRACT_ABI,
-        functionName: 'commit',
-        args: [commitHash]
-      })
+      value: betAmount,
+      data: txData
     })
 
-    printLog(['debug'], "Commit transaction sent, hash:", hash)
-
-    // On Rise Chain (10ms blocks), transaction is confirmed immediately
-    // sendSessionTransaction already uses wallet_getCallsStatus to get real hash
-    const confirmTime = Date.now() - startTime
-    printLog(['debug'], "Commit Transaction:", {
-      transactionHash: hash,
-      confirmationTime: confirmTime + "ms"
-    })
+    // Profile transaction confirmation time
+    console.log(`Transaction confirmed in ${Date.now() - startTime}ms`)
 
     return { transactionHash: hash, status: 'success' }
   } catch (error) {
-    showErrorModal("Failed to commit: " + error.message)
-    captureBlockchainError(error, 'commit', {
+    console.error("❌ rollDice error:", error)
+    showErrorModal("Failed to roll dice: " + error.message)
+    captureBlockchainError(error, 'rollDice', {
       error_type: 'transaction_failed',
       transaction_data: {
         to: MY_CONTRACT_ADDRESS,
@@ -559,17 +597,6 @@ export async function withdrawFunds(destinationAddress) {
     // Get Gacha token balance
     const gachaTokenBalance = gameState.getGachaTokenBalance()
 
-    // Rise Wallet is gasless, so we can skip strict balance checks for gas.
-    // We only check if user has enough balance to send the VALUE they want to send (if any).
-    // The original code was calculating gas cost. We will assume gas is covered.
-
-    // const valueToSend = currentBalance; // Moved to later usage
-
-    // If we are just sending tokens, we don't need ETH.
-    // If we are sending ETH, we should check if we have enough ETH.
-    // The original logic was trying to empty the wallet.
-    // For Rise Wallet, let's keep it simple: just try to send.
-
     const receipts = []
 
     // First, transfer Gacha tokens if user has any
@@ -587,29 +614,14 @@ export async function withdrawFunds(destinationAddress) {
         gas: BigInt(GAS_LIMIT)
       })
 
-      // We wait for receipt here to match the 'receipt' structure expectations if possible, 
-      // or just return hash if the upstream code handles it. 
-      // The original code waited for sendRawTransactionSync which returns a receipt-like object immediately? 
-      // Actually sendRawTransactionSync usually returns a receipt in shreds context?
-      // Let's assume we need to return a receipt or hash. The caller expects receipts[0].
-      // We'll push the hash.
-
       printLog(['debug'], "Gacha token transfer transaction sent:", tokenHash)
       receipts.push(tokenHash)
-
-      // Note: original code used tokenReceipt.transactionHash. 
-      // If we need to wait, we should: await wsClient.waitForTransactionReceipt({ hash: tokenHash })
 
       printLog(['debug'], "Gacha token transfer transaction sent (Legacy Log):", tokenHash)
     }
 
     // Then transfer ETH
-    // Original logic reserved gas. We will just send what is available locally or a slightly smaller amount if we suspect gas usage.
-    // But since it's gasless, maybe we can send it all?
-    // Let's send currentBalance minus a tiny dust to be safe, or just currentBalance.
-    // Let's try sending almost all, leaving a tiny bit just in case.
-
-    const valueToSend = currentBalance; // Logic simplified for gasless assumption
+    const valueToSend = currentBalance;
 
     if (valueToSend > 0n) {
       printLog(['debug'], "Transferring ETH:", valueToSend.toString(), "to", destinationAddress)
@@ -634,89 +646,6 @@ export async function withdrawFunds(destinationAddress) {
   }
 }
 
-export async function forfeit() {
-  const wallet = getLocalWallet()
-  if (!wallet) {
-    throw new Error("No local wallet found!")
-  }
-
-  try {
-    printLog(['debug'], "Sending forfeit transaction via WebSocket...")
-    const startTime = Date.now()
-
-    // Prepare transaction request
-    const hash = await sendSessionTransaction({
-      to: MY_CONTRACT_ADDRESS,
-      value: 0n,
-      data: encodeFunctionData({
-        abi: CONTRACT_ABI,
-        functionName: 'forfeit',
-        args: []
-      })
-    })
-
-    // On Rise Chain (10ms blocks), transaction is confirmed immediately
-    // sendSessionTransaction already uses wallet_getCallsStatus to get real hash
-    const confirmTime = Date.now() - startTime
-    printLog(['debug'], "Forfeit Transaction:", {
-      transactionHash: hash,
-      confirmationTime: confirmTime + "ms"
-    })
-
-    return { transactionHash: hash, status: 'success' }
-  } catch (error) {
-    showErrorModal("Failed to forfeit: " + error.message)
-    captureBlockchainError(error, 'forfeit', {
-      error_type: 'transaction_failed'
-    })
-    throw error
-  }
-}
-
-export async function performReveal(secret) {
-  try {
-    printLog(['debug'], "=== PERFORM REVEAL START ===")
-
-    const wallet = getLocalWallet()
-    if (!wallet) {
-      throw new Error("No local wallet found!")
-    }
-
-    printLog(['debug'], "Sending reveal transaction via WebSocket...")
-    const startTime = Date.now()
-
-    // Prepare transaction request
-    const hash = await sendSessionTransaction({
-      to: MY_CONTRACT_ADDRESS,
-      value: 0n,
-      data: encodeFunctionData({
-        abi: CONTRACT_ABI,
-        functionName: 'reveal',
-        args: [secret]
-      })
-    })
-
-    // On Rise Chain (10ms blocks), transaction is confirmed immediately
-    // sendSessionTransaction already uses wallet_getCallsStatus to get real hash
-    const confirmTime = Date.now() - startTime
-    printLog(['debug'], "Reveal Transaction:", {
-      transactionHash: hash,
-      confirmationTime: confirmTime + "ms"
-    })
-
-    printLog(['debug'], "=== PERFORM REVEAL END ===")
-    return { transactionHash: hash, status: 'success' }
-  } catch (error) {
-    printLog(['error'], "Error in reveal:", error)
-    showErrorModal("Failed to reveal: " + error.message)
-    captureBlockchainError(error, 'performReveal', {
-      error_type: 'reveal_transaction_failed',
-      secret_provided: !!secret
-    })
-    throw error
-  }
-}
-
 // Real-time event monitoring functions
 export async function startEventMonitoring() {
   try {
@@ -727,15 +656,16 @@ export async function startEventMonitoring() {
       throw new Error("No local wallet found!")
     }
 
+    // Watch for GameCompleted events
     const unwatch = wsClient.watchContractEvent({
       address: MY_CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
-      eventName: 'GameStateChanged',
+      eventName: 'GameCompleted',
       args: {
         player: wallet.address
       },
       onLogs: async (logs) => {
-        printLog(['debug'], "🔔 GameStateChanged event received! Logs:", logs?.length || 0)
+        printLog(['debug'], "🔔 GameCompleted event received! Logs:", logs?.length || 0)
         try {
           const freshState = await checkGameState()
           printLog(['debug'], "🔔 Fresh game state after event:", freshState?.gameState?.toString())

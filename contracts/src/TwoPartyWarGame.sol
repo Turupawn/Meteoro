@@ -5,233 +5,197 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {GachaToken} from "./GachaToken.sol";
 
-contract TwoPartyWarGame is Ownable, Pausable {
-    enum State { NotStarted, Committed, HashPosted, Revealed, Forfeited }
+interface IVRFCoordinator {
+    function requestRandomNumbers(uint32 numNumbers, uint256 seed) external returns (uint256);
+}
+
+interface IVRFConsumer {
+    function rawFulfillRandomNumbers(
+        uint256 requestId,
+        uint256[] memory randomNumbers
+    ) external;
+}
+
+contract TwoPartyWarGame is Ownable, Pausable, IVRFConsumer {
+    enum State { NotStarted, Pending, Completed }
 
     struct Game {
         State gameState;
-
         address playerAddress;
-        bytes32 playerCommit;
-        uint commitTimestamp;
-        uint betAmount;
-
-        bytes32 houseRandomness;
-        uint houseRandomnessTimestamp;
-
-        bytes32 playerSecret;
-        uint playerCard;
-        uint houseCard;
-        uint revealTimestamp;
+        uint256 betAmount;
+        uint256 requestTimestamp;
+        uint256 playerCard;
+        uint256 houseCard;
+        uint256 completedTimestamp;
+        bool playerWon;
     }
 
-    mapping(uint gameId => Game) public games;
-    mapping(address player => uint[] gameIds) playerGames;
+    IVRFCoordinator public coordinator;
+    GachaToken public gachaToken;
+
+    mapping(uint256 gameId => Game) public games;
+    mapping(address player => uint256[] gameIds) playerGames;
+    mapping(uint256 requestId => uint256 gameId) public requestToGame;
+    mapping(address player => bool) public hasPendingGame;
     
     // Whitelisted bet amounts
-    mapping(uint betAmount => bool) public whitelistedBetAmounts;
-    uint[] public betAmountsArray;
+    mapping(uint256 betAmount => bool) public whitelistedBetAmounts;
+    uint256[] public betAmountsArray;
 
-    uint public constant MAX_RETURN_HISTORY = 10;
-    uint public constant MAX_PENDING_GAMES = 20;
+    uint256 public constant MAX_RETURN_HISTORY = 10;
+    uint256 public nextGameId;
+    uint256 public requestCount;
     
-    address public immutable HOUSE;
-    uint public nextGameId;
-    // Packed storage: upper 128 bits = lastRandomnessPostedGameId, lower 128 bits = pendingGameCount
-    uint private packedGameState;
-    
-    GachaToken public gachaToken;
-    uint public tieRewardMultiplier = 10 ether; // Base multiplier per card value
-    mapping(uint betAmount => uint multiplier) public betAmountMultipliers; // Bet amount to reward multiplier
+    uint256 public tieRewardMultiplier = 10 ether;
+    mapping(uint256 betAmount => uint256 multiplier) public betAmountMultipliers;
 
-    event GameForfeited(address indexed player, address house);
-    event GameCreated(address indexed player, bytes32 commitHash, uint gameId, uint betAmount);
-    event TieRewardMinted(address indexed player, uint amount, uint gameId);
-    event BetAmountsUpdated(uint[] newBetAmounts);
-    event TieRewardMultiplierUpdated(uint newMultiplier);
-    event BetAmountMultiplierUpdated(uint betAmount, uint multiplier);
-    event GameStateChanged(uint indexed gameId, State newState, address indexed player);
-    event HouseRandomnessPosted(uint indexed gameId, bytes32 randomness, uint timestamp);
-    event GameRevealed(uint indexed gameId, address indexed player, uint playerCard, uint houseCard, address winner);
-    event GameWon(address indexed winner, uint indexed gameId, uint amount);
-    event GameTied(uint indexed gameId, address indexed player, uint playerCard, uint houseCard, uint tieReward);
-    event BalanceUpdated(address indexed player, uint ethBalance, uint gachaTokenBalance);
+    event GameRequested(address indexed player, uint256 indexed gameId, uint256 indexed requestId, uint256 betAmount);
+    event GameCompleted(
+        address indexed player,
+        uint256 indexed gameId,
+        uint256 playerCard,
+        uint256 houseCard,
+        address winner,
+        uint256 payout
+    );
+    event GameTied(uint256 indexed gameId, address indexed player, uint256 playerCard, uint256 houseCard, uint256 tieReward);
+    event TieRewardMinted(address indexed player, uint256 amount, uint256 gameId);
+    event BetAmountsUpdated(uint256[] newBetAmounts);
+    event TieRewardMultiplierUpdated(uint256 newMultiplier);
+    event BetAmountMultiplierUpdated(uint256 betAmount, uint256 multiplier);
 
-    constructor(address _house, address _gachaToken) Ownable(msg.sender) {
-        HOUSE = _house;
+    constructor(address _coordinator, address _gachaToken) Ownable(msg.sender) {
+        coordinator = IVRFCoordinator(_coordinator);
         gachaToken = GachaToken(_gachaToken);
         nextGameId = 1;
+        requestCount = 0;
     }
-    // Public functions
-    function commit(bytes32 _commitHash) external payable whenNotPaused {
-        require(whitelistedBetAmounts[msg.value], "Bet amount not whitelisted");
-        require(pendingGameCount() < MAX_PENDING_GAMES, "Too many pending games");
-        Game memory playerGame = games[getCurrentGameId(msg.sender)];
-        require(playerGame.gameState == State.NotStarted ||
-                    playerGame.gameState == State.Revealed ||
-                    playerGame.gameState == State.Forfeited,
-                "Player already committed");
 
-        Game memory newGame = Game({
-            gameState: State.Committed,
+    receive() external payable {}
+
+    function rollDice() external payable whenNotPaused returns (uint256 gameId) {
+        require(whitelistedBetAmounts[msg.value], "Bet amount not whitelisted");
+        require(!hasPendingGame[msg.sender], "Already has a pending game");
+        require(address(this).balance >= msg.value, "Insufficient contract balance for payout");
+
+        hasPendingGame[msg.sender] = true;
+
+        gameId = nextGameId++;
+        uint256 seed = requestCount++;
+        uint256 requestId = coordinator.requestRandomNumbers(1, seed);
+
+        games[gameId] = Game({
+            gameState: State.Pending,
             playerAddress: msg.sender,
-            playerCommit: _commitHash,
-            commitTimestamp: block.timestamp,
             betAmount: msg.value,
-            
-            houseRandomness: bytes32(0),
-            houseRandomnessTimestamp: 0,
-            playerSecret: bytes32(0),
+            requestTimestamp: block.timestamp,
             playerCard: 0,
             houseCard: 0,
-            revealTimestamp: 0
+            completedTimestamp: 0,
+            playerWon: false
         });
 
-        _incrementPendingGameCount();
-        games[nextGameId] = newGame;
-        playerGames[msg.sender].push(nextGameId);
-        emit GameCreated(msg.sender, _commitHash, nextGameId, msg.value);
-        emit GameStateChanged(nextGameId, State.Committed, msg.sender);
-        nextGameId++;
+        playerGames[msg.sender].push(gameId);
+        requestToGame[requestId] = gameId;
+
+        emit GameRequested(msg.sender, gameId, requestId, msg.value);
+        return gameId;
     }
 
-    function multiPostRandomness(bytes32[] memory randomness) external payable whenNotPaused {
-        require(msg.sender == HOUSE, "Not house");
-        require(randomness.length > 0, "Should not be 0");
-        require(randomness.length <= pendingGameCount(), "Too many randomness values");
-        
-        uint totalExpectedValue = 0;
-        for (uint i = 0; i < randomness.length; i++) {
-            uint gameId = lastRandomnessPostedGameId() + i + 1;
-            Game storage playerGame = games[gameId];
-            if(playerGame.gameState != State.Forfeited) {
-                require(playerGame.gameState == State.Committed, "Game has to be commited");
-                totalExpectedValue += playerGame.betAmount;
-                playerGame.gameState = State.HashPosted;
-                playerGame.houseRandomness = randomness[i];
-                playerGame.houseRandomnessTimestamp = block.timestamp;
-                emit HouseRandomnessPosted(gameId, randomness[i], block.timestamp);
-                emit GameStateChanged(gameId, State.HashPosted, playerGame.playerAddress);
-            }
-        }
-        require(msg.value == totalExpectedValue, "Incorrect total bet amount");
-        
-        _decrementPendingGameCount(randomness.length);
-        _incrementLastRandomnessPostedGameId(randomness.length);
-    }
+    function rawFulfillRandomNumbers(
+        uint256 requestId,
+        uint256[] memory randomNumbers
+    ) external override {
+        require(msg.sender == address(coordinator), "Only coordinator can fulfill");
+        require(randomNumbers.length > 0, "No random numbers provided");
 
-    function reveal(bytes32 _secret) external whenNotPaused {
-        Game storage playerGame = games[getCurrentGameId(msg.sender)];
-        require(playerGame.gameState == State.HashPosted, "Game not ready for reveal");
-        require(keccak256(abi.encode(_secret)) == playerGame.playerCommit, "Player secret invalid");
-        
-        (uint playerCard, uint houseCard) = calculateGameCards(_secret, playerGame.houseRandomness);
+        uint256 gameId = requestToGame[requestId];
+        require(gameId != 0, "Unknown request ID");
+
+        Game storage game = games[gameId];
+        require(game.gameState == State.Pending, "Game not pending");
+
+        address player = game.playerAddress;
+        uint256 betAmount = game.betAmount;
+
+        // Calculate cards from random number using keccak256 for better distribution
+        uint256 randomNumber = randomNumbers[0];
+        bytes32 playerHash = keccak256(abi.encodePacked(randomNumber, "player"));
+        bytes32 houseHash = keccak256(abi.encodePacked(randomNumber, "house"));
+        uint256 playerCard = (uint256(playerHash) % 13) + 2;
+        uint256 houseCard = (uint256(houseHash) % 13) + 2;
+
+        game.playerCard = playerCard;
+        game.houseCard = houseCard;
+        game.completedTimestamp = block.timestamp;
+        game.gameState = State.Completed;
+
+        hasPendingGame[player] = false;
 
         address winner;
-        bool isTie = false;
-        
+        uint256 payout = 0;
+
         if (playerCard > houseCard) {
-            winner = msg.sender;
+            // Player wins - gets 2x bet
+            winner = player;
+            payout = betAmount * 2;
+            game.playerWon = true;
+            _transferEth(payable(player), payout);
         } else if (houseCard > playerCard) {
-            winner = HOUSE;
+            // House wins - bet stays in contract
+            winner = address(this);
+            game.playerWon = false;
         } else {
-            isTie = true;
+            // Tie - return bet to player and mint gacha tokens
             winner = address(0);
-        }
-
-        playerGame.gameState = State.Revealed;
-        playerGame.playerSecret = _secret;
-        playerGame.playerCard = playerCard;
-        playerGame.houseCard = houseCard;
-        playerGame.revealTimestamp = block.timestamp;
-
-        uint totalStake = playerGame.betAmount * 2;
-        uint currentGameId = getCurrentGameId(msg.sender);
-        
-        emit GameRevealed(currentGameId, msg.sender, playerCard, houseCard, winner);
-        emit GameStateChanged(currentGameId, State.Revealed, msg.sender);
-        
-        if (isTie) {
-            uint betMultiplier = betAmountMultipliers[playerGame.betAmount];
+            game.playerWon = false;
+            _transferEth(payable(player), betAmount);
+            
+            uint256 betMultiplier = betAmountMultipliers[betAmount];
             if (betMultiplier == 0) {
-                betMultiplier = 1; // Default 1x if no multiplier set
+                betMultiplier = 1;
             }
-            uint tieReward = playerCard * tieRewardMultiplier * betMultiplier;
-            gachaToken.mint(msg.sender, tieReward);
-            emit TieRewardMinted(msg.sender, tieReward, currentGameId);
-            emit GameTied(currentGameId, msg.sender, playerCard, houseCard, tieReward);
-            transferEth(payable(HOUSE), totalStake);
-        } else {
-            emit GameWon(winner, currentGameId, totalStake);
-            transferEth(payable(winner), totalStake);
+            uint256 tieReward = playerCard * tieRewardMultiplier * betMultiplier;
+            gachaToken.mint(player, tieReward);
+            emit TieRewardMinted(player, tieReward, gameId);
+            emit GameTied(gameId, player, playerCard, houseCard, tieReward);
         }
+
+        emit GameCompleted(player, gameId, playerCard, houseCard, winner, payout);
+        delete requestToGame[requestId];
     }
 
-    function forfeit() external whenNotPaused {
-        Game storage playerGame = games[getCurrentGameId(msg.sender)];
-        require(playerGame.gameState == State.HashPosted ||
-                playerGame.gameState == State.Committed
-                , "Game not in correct state to forfeit"
-        );
-        playerGame.gameState = State.Forfeited;
-        transferEth(payable(HOUSE), playerGame.betAmount);
-        emit GameForfeited(msg.sender, HOUSE);
-        emit GameStateChanged(getCurrentGameId(msg.sender), State.Forfeited, msg.sender);
-    }
-
-    // Helpers
-    function transferEth(address to, uint amount) internal {
-        (bool sent,) = payable(to).call{value: amount}("");
+    function _transferEth(address payable to, uint256 amount) internal {
+        (bool sent,) = to.call{value: amount}("");
         require(sent, "Failed ETH transfer");
-    }
-
-    function calculateGameCards(bytes32 secret, bytes32 houseRandomness) public pure returns (uint, uint) {
-        uint xorResult = uint(secret) ^ uint(houseRandomness);
-        uint playerCard = ((xorResult >> 128) % 13) + 2;
-        uint houseCard = ((xorResult & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) % 13) + 2;
-        return (playerCard, houseCard);
     }
 
     // View functions
     function getInitialFrontendGameState(address player) external view returns (
-        uint playerEthBalance,
-        uint playerGachaTokenBalance,
+        uint256 playerEthBalance,
+        uint256 playerGachaTokenBalance,
         State gameState,
-        bytes32 playerCommit,
-        bytes32 houseRandomness,
-        uint gameId,
+        uint256 gameId,
+        uint256 playerCard,
+        uint256 houseCard,
         Game[] memory recentHistory,
-        uint tieRewardMultiplierValue,
-        uint[] memory betAmounts,
-        uint[] memory betAmountMultipliersArray
+        uint256 tieRewardMultiplierValue,
+        uint256[] memory betAmounts,
+        uint256[] memory betAmountMultipliersArray
     ) {
-        uint currentGameId = getCurrentGameId(player);
+        uint256 currentGameId = getCurrentGameId(player);
         Game storage playerGame = games[currentGameId];
 
-        uint historyLength = playerGames[player].length;
-        uint returnLength = historyLength > MAX_RETURN_HISTORY ? MAX_RETURN_HISTORY : historyLength;
-        recentHistory = new Game[](returnLength);
-
-        for (uint i = 0; i < returnLength; i++) {
-            uint gameIdToAdd = playerGames[player][historyLength - returnLength + i];
-            recentHistory[i] = games[gameIdToAdd];
-        }
-
-        betAmounts = betAmountsArray;
-        betAmountMultipliersArray = new uint[](betAmountsArray.length);
-        
-        for (uint i = 0; i < betAmountsArray.length; i++) {
-            uint multiplier = betAmountMultipliers[betAmountsArray[i]];
-            betAmountMultipliersArray[i] = multiplier == 0 ? 1 : multiplier;
-        }
+        recentHistory = _getRecentHistory(player);
+        (betAmounts, betAmountMultipliersArray) = _getBetConfig();
 
         return (
             player.balance,
             gachaToken.balanceOf(player),
             playerGame.gameState,
-            playerGame.playerCommit,
-            playerGame.houseRandomness,
             currentGameId,
+            playerGame.playerCard,
+            playerGame.houseCard,
             recentHistory,
             tieRewardMultiplier,
             betAmounts,
@@ -239,99 +203,104 @@ contract TwoPartyWarGame is Ownable, Pausable {
         );
     }
 
+    function _getRecentHistory(address player) internal view returns (Game[] memory recentHistory) {
+        uint256 historyLength = playerGames[player].length;
+        uint256 returnLength = historyLength > MAX_RETURN_HISTORY ? MAX_RETURN_HISTORY : historyLength;
+        recentHistory = new Game[](returnLength);
+
+        for (uint256 i = 0; i < returnLength; i++) {
+            uint256 gameIdToAdd = playerGames[player][historyLength - returnLength + i];
+            recentHistory[i] = games[gameIdToAdd];
+        }
+    }
+
+    function _getBetConfig() internal view returns (uint256[] memory betAmounts, uint256[] memory betAmountMultipliersArray) {
+        betAmounts = betAmountsArray;
+        betAmountMultipliersArray = new uint256[](betAmountsArray.length);
+        
+        for (uint256 i = 0; i < betAmountsArray.length; i++) {
+            uint256 multiplier = betAmountMultipliers[betAmountsArray[i]];
+            betAmountMultipliersArray[i] = multiplier == 0 ? 1 : multiplier;
+        }
+    }
+
     function getFrontendGameState(address player) external view returns (
-        uint playerEthBalance,
-        uint playerGachaTokenBalance,
+        uint256 playerEthBalance,
+        uint256 playerGachaTokenBalance,
         State gameState,
-        bytes32 playerCommit,
-        bytes32 houseRandomness,
-        uint gameId
+        uint256 gameId,
+        uint256 playerCard,
+        uint256 houseCard
     ) {
-        uint currentGameId = getCurrentGameId(player);
+        uint256 currentGameId = getCurrentGameId(player);
         Game storage playerGame = games[currentGameId];
         return (
             player.balance,
             gachaToken.balanceOf(player),
             playerGame.gameState,
-            playerGame.playerCommit,
-            playerGame.houseRandomness,
-            currentGameId
+            currentGameId,
+            playerGame.playerCard,
+            playerGame.houseCard
         );
     }
 
-    function getBackendGameState() external view returns (uint, uint, uint[] memory) {
-        uint currentPendingCount = pendingGameCount();
-        uint[] memory pendingBetAmounts = new uint[](currentPendingCount);
-        uint pendingIndex = 0;
-        
-        for (uint i = lastRandomnessPostedGameId() + 1; i <= nextGameId && pendingIndex < currentPendingCount; i++) {
-            Game storage game = games[i];
-            if (game.gameState == State.Committed) {
-                pendingBetAmounts[pendingIndex] = game.betAmount;
-                pendingIndex++;
-            }
-        }
-        
-        return (
-            lastRandomnessPostedGameId(),
-            currentPendingCount,
-            pendingBetAmounts
-        );
-    }
-
-    function getGames(uint offset, uint amount, bool ascendant) external view returns (Game[] memory) {
-        uint endIndex = offset + amount;
+    function getGames(uint256 offset, uint256 amount, bool ascendant) external view returns (Game[] memory) {
+        uint256 endIndex = offset + amount;
         if (endIndex > nextGameId) {
             endIndex = nextGameId;
         }
 
-        uint actualAmount = endIndex - offset;
+        uint256 actualAmount = endIndex - offset;
         Game[] memory result = new Game[](actualAmount);
 
-        for (uint i = 0; i < actualAmount; i++) {
-            uint gameId;
+        for (uint256 i = 0; i < actualAmount; i++) {
+            uint256 id;
             if (ascendant) {
-                gameId = offset + i + 1; // +1 because game IDs start from 1
+                id = offset + i + 1;
             } else {
-                gameId = nextGameId - offset - i;
+                id = nextGameId - offset - i;
             }
-            result[i] = games[gameId];
+            result[i] = games[id];
         }
         
         return result;
     }
 
-    function getCurrentGameId(address player) public view returns(uint) {
-        uint gameAmount = playerGames[player].length;
+    function getCurrentGameId(address player) public view returns(uint256) {
+        uint256 gameAmount = playerGames[player].length;
         if (gameAmount == 0)
             return 0;
         return playerGames[player][gameAmount-1];
     }
 
-    function getBetAmountsArray() external view returns (uint[] memory) {
+    function getBetAmountsArray() external view returns (uint256[] memory) {
         return betAmountsArray;
     }
 
+    function getContractBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+
     // Owner functions
-    function setBetAmounts(uint[] memory _betAmounts) external onlyOwner {
-        for (uint i = 0; i < betAmountsArray.length; i++) {
+    function setBetAmounts(uint256[] memory _betAmounts) external onlyOwner {
+        for (uint256 i = 0; i < betAmountsArray.length; i++) {
             whitelistedBetAmounts[betAmountsArray[i]] = false;
         }
         
         betAmountsArray = _betAmounts;
-        for (uint i = 0; i < _betAmounts.length; i++) {
+        for (uint256 i = 0; i < _betAmounts.length; i++) {
             whitelistedBetAmounts[_betAmounts[i]] = true;
         }
         
         emit BetAmountsUpdated(_betAmounts);
     }
 
-    function setTieRewardMultiplier(uint _newMultiplier) external onlyOwner {
+    function setTieRewardMultiplier(uint256 _newMultiplier) external onlyOwner {
         tieRewardMultiplier = _newMultiplier;
         emit TieRewardMultiplierUpdated(_newMultiplier);
     }
 
-    function setBetAmountMultiplier(uint _betAmount, uint _multiplier) external onlyOwner {
+    function setBetAmountMultiplier(uint256 _betAmount, uint256 _multiplier) external onlyOwner {
         betAmountMultipliers[_betAmount] = _multiplier;
         emit BetAmountMultiplierUpdated(_betAmount, _multiplier);
     }
@@ -340,10 +309,16 @@ contract TwoPartyWarGame is Ownable, Pausable {
         gachaToken = GachaToken(_gachaToken);
     }
 
-    function withdrawStuckFunds() external onlyOwner {
-        require(address(this).balance > 0, "No funds to withdraw");
-        transferEth(payable(owner()), address(this).balance);
+    function setCoordinator(address _coordinator) external onlyOwner {
+        coordinator = IVRFCoordinator(_coordinator);
     }
+
+    function withdrawFunds(uint256 amount) external onlyOwner {
+        require(amount <= address(this).balance, "Insufficient balance");
+        _transferEth(payable(owner()), amount);
+    }
+
+    function depositFunds() external payable onlyOwner {}
 
     function pause() external onlyOwner {
         _pause();
@@ -352,39 +327,4 @@ contract TwoPartyWarGame is Ownable, Pausable {
     function unpause() external onlyOwner {
         _unpause();
     }
-
-    // Bit manipulation functions
-    function lastRandomnessPostedGameId() public view returns (uint) {
-        return packedGameState >> 128;
-    }
-
-    function pendingGameCount() public view returns (uint) {
-        return packedGameState & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-    }
-
-    function _setLastRandomnessPostedGameId(uint _value) private {
-        uint currentPendingCount = pendingGameCount();
-        packedGameState = (_value << 128) | currentPendingCount;
-    }
-
-    function _setPendingGameCount(uint _value) private {
-        uint currentLastPosted = lastRandomnessPostedGameId();
-        packedGameState = (currentLastPosted << 128) | _value;
-    }
-
-    function _incrementLastRandomnessPostedGameId(uint _increment) private {
-        uint currentValue = lastRandomnessPostedGameId();
-        _setLastRandomnessPostedGameId(currentValue + _increment);
-    }
-
-    function _incrementPendingGameCount() private {
-        uint currentValue = pendingGameCount();
-        _setPendingGameCount(currentValue + 1);
-    }
-
-    function _decrementPendingGameCount(uint _decrement) private {
-        uint currentValue = pendingGameCount();
-        _setPendingGameCount(currentValue - _decrement);
-    }
-    // End of bit manipulation functions
 }

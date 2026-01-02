@@ -3,7 +3,7 @@
     "type": "constructor",
     "inputs": [
       {
-        "name": "_house",
+        "name": "_coordinator",
         "type": "address",
         "internalType": "address"
       },
@@ -16,30 +16,8 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "function",
-    "name": "HOUSE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "MAX_PENDING_GAMES",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
+    "type": "receive",
+    "stateMutability": "payable"
   },
   {
     "type": "function",
@@ -94,52 +72,23 @@
   },
   {
     "type": "function",
-    "name": "calculateGameCards",
-    "inputs": [
-      {
-        "name": "secret",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "houseRandomness",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
+    "name": "coordinator",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "address",
+        "internalType": "contract IVRFCoordinator"
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "commit",
-    "inputs": [
-      {
-        "name": "_commitHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "forfeit",
+    "name": "depositFunds",
     "inputs": [],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "payable"
   },
   {
     "type": "function",
@@ -176,34 +125,14 @@
         "internalType": "address"
       },
       {
-        "name": "playerCommit",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "commitTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "betAmount",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "houseRandomness",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "houseRandomnessTimestamp",
+        "name": "requestTimestamp",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "playerSecret",
-        "type": "bytes32",
-        "internalType": "bytes32"
       },
       {
         "name": "playerCard",
@@ -216,32 +145,14 @@
         "internalType": "uint256"
       },
       {
-        "name": "revealTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getBackendGameState",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
+        "name": "completedTimestamp",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
+        "name": "playerWon",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -255,6 +166,19 @@
         "name": "",
         "type": "uint256[]",
         "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getContractBalance",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -305,17 +229,17 @@
         "internalType": "enum TwoPartyWarGame.State"
       },
       {
-        "name": "playerCommit",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "houseRandomness",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
         "name": "gameId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "playerCard",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "houseCard",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -359,34 +283,14 @@
             "internalType": "address"
           },
           {
-            "name": "playerCommit",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "commitTimestamp",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "betAmount",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "houseRandomness",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "houseRandomnessTimestamp",
+            "name": "requestTimestamp",
             "type": "uint256",
             "internalType": "uint256"
-          },
-          {
-            "name": "playerSecret",
-            "type": "bytes32",
-            "internalType": "bytes32"
           },
           {
             "name": "playerCard",
@@ -399,9 +303,14 @@
             "internalType": "uint256"
           },
           {
-            "name": "revealTimestamp",
+            "name": "completedTimestamp",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "playerWon",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       }
@@ -435,17 +344,17 @@
         "internalType": "enum TwoPartyWarGame.State"
       },
       {
-        "name": "playerCommit",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "houseRandomness",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
         "name": "gameId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "playerCard",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "houseCard",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -465,34 +374,14 @@
             "internalType": "address"
           },
           {
-            "name": "playerCommit",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "commitTimestamp",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "betAmount",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "houseRandomness",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "houseRandomnessTimestamp",
+            "name": "requestTimestamp",
             "type": "uint256",
             "internalType": "uint256"
-          },
-          {
-            "name": "playerSecret",
-            "type": "bytes32",
-            "internalType": "bytes32"
           },
           {
             "name": "playerCard",
@@ -505,9 +394,14 @@
             "internalType": "uint256"
           },
           {
-            "name": "revealTimestamp",
+            "name": "completedTimestamp",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "playerWon",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       },
@@ -531,29 +425,22 @@
   },
   {
     "type": "function",
-    "name": "lastRandomnessPostedGameId",
-    "inputs": [],
+    "name": "hasPendingGame",
+    "inputs": [
+      {
+        "name": "player",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "multiPostRandomness",
-    "inputs": [
-      {
-        "name": "randomness",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "payable"
   },
   {
     "type": "function",
@@ -603,7 +490,32 @@
   },
   {
     "type": "function",
-    "name": "pendingGameCount",
+    "name": "rawFulfillRandomNumbers",
+    "inputs": [
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "randomNumbers",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "renounceOwnership",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "requestCount",
     "inputs": [],
     "outputs": [
       {
@@ -616,23 +528,35 @@
   },
   {
     "type": "function",
-    "name": "renounceOwnership",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "name": "requestToGame",
+    "inputs": [
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "gameId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "reveal",
-    "inputs": [
+    "name": "rollDice",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "_secret",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "gameId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "payable"
   },
   {
     "type": "function",
@@ -660,6 +584,19 @@
         "name": "_betAmounts",
         "type": "uint256[]",
         "internalType": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setCoordinator",
+    "inputs": [
+      {
+        "name": "_coordinator",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -745,35 +682,16 @@
   },
   {
     "type": "function",
-    "name": "withdrawStuckFunds",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "BalanceUpdated",
+    "name": "withdrawFunds",
     "inputs": [
       {
-        "name": "player",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "ethBalance",
+        "name": "amount",
         "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "gachaTokenBalance",
-        "type": "uint256",
-        "indexed": false,
         "internalType": "uint256"
       }
     ],
-    "anonymous": false
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "event",
@@ -809,7 +727,7 @@
   },
   {
     "type": "event",
-    "name": "GameCreated",
+    "name": "GameCompleted",
     "inputs": [
       {
         "name": "player",
@@ -817,61 +735,11 @@
         "indexed": true,
         "internalType": "address"
       },
-      {
-        "name": "commitHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "gameId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "betAmount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "GameForfeited",
-    "inputs": [
-      {
-        "name": "player",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "house",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "GameRevealed",
-    "inputs": [
       {
         "name": "gameId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
-      },
-      {
-        "name": "player",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
       },
       {
         "name": "playerCard",
@@ -890,14 +758,26 @@
         "type": "address",
         "indexed": false,
         "internalType": "address"
+      },
+      {
+        "name": "payout",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "GameStateChanged",
+    "name": "GameRequested",
     "inputs": [
+      {
+        "name": "player",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
       {
         "name": "gameId",
         "type": "uint256",
@@ -905,16 +785,16 @@
         "internalType": "uint256"
       },
       {
-        "name": "newState",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "enum TwoPartyWarGame.State"
+        "name": "requestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
       },
       {
-        "name": "player",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        "name": "betAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -949,56 +829,6 @@
       },
       {
         "name": "tieReward",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "GameWon",
-    "inputs": [
-      {
-        "name": "winner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "gameId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "HouseRandomnessPosted",
-    "inputs": [
-      {
-        "name": "gameId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "randomness",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "timestamp",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

@@ -10,7 +10,7 @@ contract UpdateBetAmountsScript is Script {
  
     function setUp() public {}
     
-    function run(address gameAddress) public {
+    function run(address payable gameAddress) public {
         require(gameAddress != address(0), "Game address cannot be zero");
         
         vm.startBroadcast();
