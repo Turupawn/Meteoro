@@ -49,7 +49,14 @@ export class LoadingScreen extends Phaser.Scene {
         this.createLoadingDetails();
         
         this.uiReady = true;
-        
+
+        // Hide the HTML preloader now that Phaser is ready
+        const preloader = document.getElementById('preloader');
+        if (preloader) {
+            preloader.classList.add('hidden');
+            setTimeout(() => preloader.remove(), 300);
+        }
+
         setLoadingScreenReady();
         
         this.startAdditionalMonitoring();
