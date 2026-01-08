@@ -2,7 +2,8 @@ import { applyPerspectiveToQuadImageToRight, isLandscape, getCardDisplay } from 
 
 export class GameHistory {
     recentHistory = [];
-    
+    pendingRender = null;
+
     constructor(scene) {
         this.scene = scene;
         this.createGameHistory();
@@ -22,7 +23,7 @@ export class GameHistory {
 
     createGameHistoryTexture() {
         this.renderTexture = this.scene.add.renderTexture(0, 0, 300, 400);
-        
+
         const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
             font: 'bold 28px Orbitron',
             fill: '#E0F6FF',
@@ -38,7 +39,7 @@ export class GameHistory {
             }
         });
         titleText.setVisible(false);
-        
+
         this.renderTexture.draw(titleText, 10, 10);
         titleText.destroy();
 
@@ -56,16 +57,16 @@ export class GameHistory {
         this.renderTexture.saveTexture('gameHistoryTexture');
 
         // Only create quadImage in landscape mode
-        if(isLandscape()) {
+        if (isLandscape()) {
             this.quadImage = this.scene.add.rexQuadImage({
-                x: 236+50,
+                x: 236 + 50,
                 y: 300,
                 texture: 'gameHistoryTexture',
                 ninePointMode: true
-            
+
             });
 
-            this.quadImage.setScale(16,16);
+            this.quadImage.setScale(16, 16);
             this.quadImage.setAlpha(0.85);
 
             let perspectiveX = this.quadImage.topLeft.x + 1200;
@@ -80,11 +81,19 @@ export class GameHistory {
     }
 
     updateGameHistory(playerAddress = null) {
-        this.scene.time.delayedCall(250, () => {
+        // Cancel any pending render to avoid race conditions
+        if (this.pendingRender) {
+            this.pendingRender.destroy();
+            this.pendingRender = null;
+        }
+        
+        this.pendingRender = this.scene.time.delayedCall(250, () => {
+            this.pendingRender = null;
+            
             if (!this.renderTexture) {
                 return;
             }
-            
+
             // Don't update game history in portrait mode
             if (!isLandscape()) {
                 return;
@@ -92,7 +101,7 @@ export class GameHistory {
 
             this.renderTexture.clear();
 
-            if(isLandscape()) {
+            if (isLandscape()) {
                 const titleText = this.scene.add.text(0, 0, 'GAME HISTORY', {
                     font: 'bold 24px Orbitron',
                     fill: '#E0F6FF',
@@ -111,7 +120,7 @@ export class GameHistory {
                 this.renderTexture.draw(titleText, 10, 10);
                 titleText.destroy();
             }
-            
+
             let yOffset = 40;
             this.recentHistory.forEach((game, index) => {
                 let isWin = false;
@@ -141,9 +150,9 @@ export class GameHistory {
                         isWin = playerCard > houseCard;
                     }
                 }
-                
+
                 const score = `${getCardDisplay(game.playerCard)}-${getCardDisplay(game.houseCard)}`;
-                
+
                 // Set color based on game state
                 let textColor;
                 if (isPending || isTie) {
@@ -161,7 +170,7 @@ export class GameHistory {
                 gameText.setVisible(false);
                 this.renderTexture.draw(gameText, 10, yOffset);
                 gameText.destroy();
-                
+
                 yOffset += 25;
             });
 
@@ -173,7 +182,21 @@ export class GameHistory {
     }
 
     initializeHistory(recentHistory) {
-        this.recentHistory = recentHistory;
+        // Filter out any games with state 0 (NotStarted) or with card values of 0
+        // These are incomplete games that shouldn't be in history
+        const validGames = recentHistory ? recentHistory.filter(g => {
+            const hasValidCards = g.playerCard && g.houseCard && 
+                                  BigInt(g.playerCard) > 0n && BigInt(g.houseCard) > 0n;
+            const isCompleted = g.gameState === 2 || g.gameState === 2n;
+            return hasValidCards && isCompleted;
+        }) : [];
+        
+        this.recentHistory = [...validGames].reverse();
+        
+        // Update display with the initialized history
+        if (isLandscape()) {
+            this.updateGameHistory(this.recentHistory);
+        }
     }
 
     addPendingGameToHistory() {
@@ -181,60 +204,70 @@ export class GameHistory {
         if (!isLandscape()) {
             return;
         }
+
+        // Check if there's ANY pending game in history (not just the most recent)
+        const hasPendingGame = this.recentHistory.some(
+            game => game && game.playerCard === "?" && game.houseCard === "?"
+        );
         
-        // Check if there's already a pending game (most recent game with ?-?)
-        if (this.recentHistory.length > 0) {
-            const mostRecentGame = this.recentHistory[0];
-            if (mostRecentGame && mostRecentGame.playerCard === "?" && mostRecentGame.houseCard === "?") {
-                // Already have a pending game, don't add another one
-                return;
-            }
+        if (hasPendingGame) {
+            return;
         }
-        
+
         const newGame = {
-            gameState: 1, // Committed state
-            playerAddress: "0x0", // Will be updated when we have access to wallet
-            playerCommit: "0x0",
-            commitTimestamp: Math.floor(Date.now() / 1000),
-            betAmount: "0", // Will be updated when we have access to bet amount
-            houseRandomness: "0x0",
-            houseRandomnessTimestamp: 0,
-            playerSecret: "0x0",
-            playerCard: "?", // Placeholder
-            houseCard: "?", // Placeholder
-            revealTimestamp: 0
+            gameState: 1, // Pending state
+            playerCard: "?", // Placeholder until VRF completes
+            houseCard: "?", // Placeholder until VRF completes
+            timestamp: Math.floor(Date.now() / 1000)
         };
-        
+
         // Add to the beginning of the array (most recent first)
         this.recentHistory.unshift(newGame);
-        
+
         // Keep only the first 10 games
         if (this.recentHistory.length > 10) {
             this.recentHistory = this.recentHistory.slice(0, 10);
         }
-        
+
         // Update the display
         this.updateGameHistory(this.recentHistory);
     }
-    
+
     updateLastGameInHistory(playerCard, houseCard) {
         // Don't update history in portrait mode
         if (!isLandscape()) {
             return;
         }
-        
+
         if (!this.recentHistory || this.recentHistory.length === 0) {
             return;
         }
 
-        // Update the first (most recent) game with the actual results
-        const lastGame = this.recentHistory[0];
-        if (lastGame && lastGame.playerCard === "?" && lastGame.houseCard === "?") {
-            lastGame.playerCard = getCardDisplay(playerCard);
-            lastGame.houseCard = getCardDisplay(houseCard);
-            lastGame.revealTimestamp = Math.floor(Date.now() / 1000);
-            
+        // Find the first pending game (should be most recent, but search to be safe)
+        const pendingGameIndex = this.recentHistory.findIndex(
+            game => game && game.playerCard === "?" && game.houseCard === "?"
+        );
+        
+        if (pendingGameIndex !== -1) {
+            const pendingGame = this.recentHistory[pendingGameIndex];
+            pendingGame.playerCard = getCardDisplay(playerCard);
+            pendingGame.houseCard = getCardDisplay(houseCard);
+            pendingGame.gameState = 2; // Completed
+
             // Update the display
+            this.updateGameHistory(this.recentHistory);
+        }
+    }
+    
+    // Remove any stale pending games (called when we know there shouldn't be any)
+    clearPendingGames() {
+        if (!this.recentHistory) return;
+        
+        this.recentHistory = this.recentHistory.filter(
+            game => !(game && game.playerCard === "?" && game.houseCard === "?")
+        );
+        
+        if (isLandscape()) {
             this.updateGameHistory(this.recentHistory);
         }
     }

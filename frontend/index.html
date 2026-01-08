@@ -1,20 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <title>Meteoro.xyz</title>
-  
+
   <!-- Google Fonts - Orbitron -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
-  
+
   <style>
     body {
       margin: 0;
       padding: 0;
       overflow: hidden;
     }
+
     .container {
       width: 100vw;
       height: 100vh;
@@ -22,12 +24,40 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container"></div>
   <!-- Main content expanded to fill most of the screen -->
   <div style="display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw;">
     <!-- Card Display Section - much larger -->
   </div>
+  <script>
+    // WebAuthn Polyfill for Rise Wallet SDK
+    // Fixes "publicKey.pubKeyCredParams is missing" error by injecting default algorithms
+    if (navigator.credentials && navigator.credentials.create) {
+      const originalCreate = navigator.credentials.create;
+      navigator.credentials.create = async function (options) {
+        if (options && options.publicKey) {
+          if (!options.publicKey.pubKeyCredParams) {
+            options.publicKey.pubKeyCredParams = [];
+          }
+          const params = options.publicKey.pubKeyCredParams;
+          // Ensure ES256 (-7) is present
+          if (!params.some(p => p.alg === -7)) {
+            console.log("[Polyfill] Injecting ES256 for WebAuthn");
+            params.push({ alg: -7, type: "public-key" });
+          }
+          // Ensure RS256 (-257) is present
+          if (!params.some(p => p.alg === -257)) {
+            console.log("[Polyfill] Injecting RS256 for WebAuthn");
+            params.push({ alg: -257, type: "public-key" });
+          }
+        }
+        return originalCreate.call(navigator.credentials, options);
+      };
+    }
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>

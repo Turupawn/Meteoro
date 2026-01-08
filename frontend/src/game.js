@@ -16,9 +16,8 @@ import { BetMenu } from './menus/betMenu.js';
 import { InsufficientBalanceMenu } from './menus/insufficientBalanceMenu.js';
 import { setErrorModal, ErrorModal } from './menus/errorModal.js';
 import { PleaseWaitScreen } from './menus/pleaseWaitScreen.js';
-import { WalletWarningScreen } from './menus/walletWarningScreen.js';
 import { setGameScene, updateGameDisplay } from './main.js';
-import { printLog, isLandscape, shouldShowWalletWarning } from './utils/utils.js';
+import { printLog, isLandscape } from './utils/utils.js';
 import { getMinimumPlayableBalance, getPlayerETHBalance, getPlayerGachaTokenBalanceFormatted } from './web3/blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
@@ -67,14 +66,10 @@ class GameScene extends Phaser.Scene {
         this.insufficientBalanceMenu = new InsufficientBalanceMenu(this);
         this.errorModal = new ErrorModal(this);
         this.pleaseWaitScreen = new PleaseWaitScreen(this);
-        this.walletWarningScreen = new WalletWarningScreen(this);
 
         setErrorModal(this.errorModal);
         setGameScene(this);
 
-        if (shouldShowWalletWarning()) {
-            this.walletWarningScreen.show();
-        }
         this.time.delayedCall(100, () => {
             updateGameDisplay();
         });
@@ -93,13 +88,13 @@ class GameScene extends Phaser.Scene {
         this.currentBalance = currentBalance;
         this.ethBalanceText.updateBalance(currentBalance);
         this.gachaTokenBalanceText.updateBalance(currentGachaBalance);
-        this.cardDisplay.updateCurrentGameDisplay();
+        // Note: Card display is updated via updateCardDisplay() when a game completes
         
         this.portraitDisplay.updatePortrait();
         
-        if (isLandscape()) {
-            this.gameHistory.updateGameHistory();
-        } else {
+        // Note: Game history is updated when data changes (addPendingGame, updateLastGame)
+        // Not on every frame - this was causing the debounce to never complete
+        if (!isLandscape()) {
             // In portrait mode, ensure game history is completely hidden
             if (this.gameHistory.quadImage) {
                 this.gameHistory.quadImage.setVisible(false);
@@ -130,10 +125,6 @@ class GameScene extends Phaser.Scene {
 
     checkInsufficientBalance(balance) {
         try {
-            if (shouldShowWalletWarning()) {
-                return;
-            }
-
             const hasInsufficientBalance = BigInt(balance) < BigInt(getMinimumPlayableBalance());
             
             if (hasInsufficientBalance && this.cardDisplay && 

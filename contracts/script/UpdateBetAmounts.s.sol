@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {TwoPartyWarGame} from "../src/TwoPartyWarGame.sol";
 
 contract UpdateBetAmountsScript is Script {
-    TwoPartyWarGame public game;
- 
     function setUp() public {}
     
     function run(address gameAddress) public {
@@ -15,7 +13,7 @@ contract UpdateBetAmountsScript is Script {
         
         vm.startBroadcast();
 
-        game = TwoPartyWarGame(gameAddress);
+        TwoPartyWarGame game = TwoPartyWarGame(payable(gameAddress));
         
         // Hardcoded bet amounts
         uint[] memory betAmounts = new uint[](3);

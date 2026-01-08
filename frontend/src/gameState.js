@@ -3,10 +3,11 @@ class GameState {
     this.playerETHBalance = 0n
     this.playerGachaTokenBalance = 0n
     
-    this.gameState = 0n // 0: NotStarted, 1: Committed, 2: HashPosted, 3: Revealed, 4: Forfeited
-    this.playerCommit = '0x0000000000000000000000000000000000000000000000000000000000000000'
-    this.houseRandomness = '0x0000000000000000000000000000000000000000000000000000000000000000'
+    // VRF game states: 0: NotStarted, 1: Pending, 2: Completed
+    this.gameState = 0n
     this.gameId = 0n
+    this.playerCard = 0n
+    this.houseCard = 0n
     this.recentHistory = []
     
     this.betAmounts = []
@@ -41,9 +42,9 @@ class GameState {
 
   updateGameState(newGameState) {
     this.gameState = newGameState.gameState
-    this.playerCommit = newGameState.playerCommit
-    this.houseRandomness = newGameState.houseRandomness
     this.gameId = newGameState.gameId
+    this.playerCard = newGameState.playerCard || 0n
+    this.houseCard = newGameState.houseCard || 0n
     this.recentHistory = newGameState.recentHistory || []
     this.notifyListeners('gameStateUpdate', newGameState)
   }
@@ -51,9 +52,9 @@ class GameState {
   getGameState() {
     return {
       gameState: this.gameState,
-      playerCommit: this.playerCommit,
-      houseRandomness: this.houseRandomness,
       gameId: this.gameId,
+      playerCard: this.playerCard,
+      houseCard: this.houseCard,
       recentHistory: this.recentHistory
     }
   }
@@ -149,15 +150,20 @@ class GameState {
     return this.playerETHBalance < this.getMinimumPlayableBalance()
   }
 
+  // Check if game is pending (waiting for VRF)
+  isGamePending() {
+    return this.gameState === 1n
+  }
+
   // Debug method
   getState() {
     return {
       playerETHBalance: this.playerETHBalance.toString(),
       playerGachaTokenBalance: this.playerGachaTokenBalance.toString(),
       gameState: this.gameState.toString(),
-      playerCommit: this.playerCommit,
-      houseRandomness: this.houseRandomness,
       gameId: this.gameId.toString(),
+      playerCard: this.playerCard.toString(),
+      houseCard: this.houseCard.toString(),
       recentHistory: this.recentHistory,
       betAmounts: this.betAmounts.map(b => b.toString()),
       betAmountMultipliers: this.betAmountMultipliers.map(b => b.toString()),
@@ -186,3 +192,4 @@ export const updateBetConfiguration = (betAmounts, betAmountMultipliers, tieRewa
   gameState.updateBetConfiguration(betAmounts, betAmountMultipliers, tieRewardMultiplier)
 export const addGameStateListener = (event, callback) => gameState.addListener(event, callback)
 export const removeGameStateListener = (event, callback) => gameState.removeListener(event, callback)
+export const isGamePending = () => gameState.isGamePending()
