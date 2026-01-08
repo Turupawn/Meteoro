@@ -1,5 +1,5 @@
 import { playGame } from '../../main.js';
-import { isLandscape, shouldShowWalletWarning } from '../../utils/utils.js';
+import { isLandscape } from '../../utils/utils.js';
 import { getPlayerETHBalance, getLocalWallet, getMinimumPlayableBalance } from '../../web3/blockchain_stuff.js';
 
 export class PlayButton {
