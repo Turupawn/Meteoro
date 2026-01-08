@@ -93,13 +93,13 @@ class GameScene extends Phaser.Scene {
         this.currentBalance = currentBalance;
         this.ethBalanceText.updateBalance(currentBalance);
         this.gachaTokenBalanceText.updateBalance(currentGachaBalance);
-        this.cardDisplay.updateCurrentGameDisplay();
+        // Note: Card display is updated via updateCardDisplay() when a game completes
         
         this.portraitDisplay.updatePortrait();
         
-        if (isLandscape()) {
-            this.gameHistory.updateGameHistory();
-        } else {
+        // Note: Game history is updated when data changes (addPendingGame, updateLastGame)
+        // Not on every frame - this was causing the debounce to never complete
+        if (!isLandscape()) {
             // In portrait mode, ensure game history is completely hidden
             if (this.gameHistory.quadImage) {
                 this.gameHistory.quadImage.setVisible(false);

@@ -1,4 +1,4 @@
-import { forfeit, withdrawFunds, getLocalWallet, formatBalance, getPlayerGachaTokenBalance } from '../web3/blockchain_stuff.js';
+import { withdrawFunds, getLocalWallet, formatBalance, getPlayerGachaTokenBalance } from '../web3/blockchain_stuff.js';
 import { isLandscape, ETH_BALANCE_DECIMALS, GACHA_BALANCE_DECIMALS } from '../utils/utils.js';
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuInput } from './menuElements/menuInput.js';
@@ -141,21 +141,10 @@ export class MainMenu {
             () => this.showWithdrawSubmenu()
         );
 
-        const forfeitY = startY + buttonSpacing * 2;
-        this.forfeitButton = new MenuButton(
-            this.scene,
-            this.scene.centerX, 
-            forfeitY, 
-            "CLEANUP", 
-            buttonFontSize,
-            () => this.showForfeitSubmenu()
-        );
-
-        const disconnectY = startY + buttonSpacing * 3;
         this.disconnectButton = new MenuButton(
             this.scene,
             this.scene.centerX, 
-            disconnectY, 
+            startY + buttonSpacing * 2, 
             "DISCONNECT", 
             buttonFontSize,
             () => this.showDisconnectSubmenu()
@@ -164,7 +153,6 @@ export class MainMenu {
         this.menuButtons = [
             this.depositButton, 
             this.withdrawButton, 
-            this.forfeitButton,
             this.disconnectButton
         ];
     }
@@ -434,80 +422,6 @@ export class MainMenu {
         ];
     }
 
-    showForfeitSubmenu() {
-        this.currentSubmenu = 'cleanup';
-        
-        this.clearMainMenu();
-        
-        const isLandscapeMode = isLandscape();
-        this.submenuWidth = isLandscapeMode
-            ? Math.min(1100, this.scene.screenWidth * 0.96)
-            : Math.min(900, this.scene.screenWidth * 0.98);
-        this.submenuHeight = isLandscapeMode
-            ? Math.min(700, this.scene.screenHeight * 0.85)
-            : Math.min(600, this.scene.screenHeight * 0.8);
-        
-        this.submenuContainer = this.scene.add.rectangle(
-            this.scene.centerX, 
-            this.scene.centerY, 
-            this.submenuWidth, 
-            this.submenuHeight, 
-            0x000000, 
-            0.95
-        );
-        this.submenuContainer.setStrokeStyle(2, 0x00FFFF);
-        this.submenuContainer.setDepth(253);
-
-        this.createSubmenuXButton(this.submenuWidth, this.submenuHeight);
-
-        const titleFontSize = isLandscapeMode
-            ? Math.max(22, this.scene.screenWidth / 50)
-            : Math.max(32, this.scene.screenWidth / 25);
-        
-        const titleY = this.scene.centerY - this.submenuHeight/2 + 30;
-        const warningY = this.scene.centerY - (isLandscapeMode ? 120 : 80);
-        const confirmButtonY = this.scene.centerY + (isLandscapeMode ? 120 : 80);
-        
-        this.submenuTitle = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            titleY, 
-            "CLEANUP", 
-            titleFontSize,
-            { depth: 254 }
-        );
-
-        this.warningText = new MenuText(
-            this.scene,
-            this.scene.centerX, 
-            warningY,
-            "This will forfeit your current game\nand clear cache. This will not\naffect your balance.", 
-            titleFontSize - 4,
-            {
-                depth: 254,
-                wordWrap: { width: this.submenuWidth - 100 },
-                align: 'center'
-            }
-        );
-        
-        this.confirmButton = new MenuButton(
-            this.scene,
-            this.scene.centerX,
-            confirmButtonY,
-            "CONFIRM CLEANUP", 
-            titleFontSize,
-            () => this.executeForfeit()
-        );
-        
-        this.submenuElements = [
-            this.submenuContainer,
-            this.submenuTitle,
-            this.warningText,
-            this.confirmButton,
-            this.submenuXButton
-        ];
-    }
-
     showDisconnectSubmenu() {
         this.currentSubmenu = 'disconnect';
         
@@ -585,7 +499,7 @@ export class MainMenu {
     executeDisconnect() {
         console.log('🔌 Disconnecting wallet...');
         
-        // Clear all game data (session keys, wallet, pending commits, etc.)
+        // Clear all game data (session keys, wallet, etc.)
         clearAllGameData();
         
         // Close the menu
@@ -645,28 +559,6 @@ export class MainMenu {
         } else {
             console.log('Invalid address format');
         }
-    }
-
-    async executeForfeit() {
-        if (this.scene.pleaseWaitScreen) {
-            this.scene.pleaseWaitScreen.show();
-        }
-        
-        try {
-            this.clearAllCache();
-            await forfeit();
-            this.closeMenu();
-        } catch (error) {
-            console.error("Error executing forfeit:", error);
-        } finally {
-            window.location.reload();
-        }
-    }
-
-    clearAllCache() {
-        localStorage.removeItem('playerSecret');
-        localStorage.removeItem('pendingCommit');
-        localStorage.removeItem('pendingReveal');
     }
 
     closeMenu() {

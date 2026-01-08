@@ -21,6 +21,9 @@ export class CardDisplay {
         this.gameCount = 0;
         this.playerIndicator = null;
         this.houseIndicator = null;
+        this.isAnimating = false; // Track if card animation is in progress
+        this.pendingTieSequence = null; // Track pending tie sequence delayed call
+        this.pendingWinAnimation = null; // Track pending win animation delayed call
     }
 
     createCardDisplay() {
@@ -45,6 +48,9 @@ export class CardDisplay {
 
     updateCurrentGameDisplay(playerCard = null, houseCard = null) {
         if (playerCard !== null && houseCard !== null) {
+            // Mark animation as in progress
+            this.isAnimating = true;
+            
             // Store the card values for later use
             this.currentPlayerCard = playerCard;
             this.currentHouseCard = houseCard;
@@ -64,7 +70,10 @@ export class CardDisplay {
             if (playerCard === houseCard) {
                 this.currentGameText.setText(`You earned GACHA!`);
                 if (this.scene.tieSequence) {
-                    this.scene.time.delayedCall(2000, () => {
+                    // Store reference so we can cancel it if user starts a new game
+                    // Note: If user starts new game, clearCardSprites() will destroy this delayed call
+                    this.pendingTieSequence = this.scene.time.delayedCall(500, () => {
+                        this.pendingTieSequence = null;
                         this.scene.tieSequence.startTieSequence(playerCard, houseCard);
                     });
                 } else {
@@ -85,7 +94,9 @@ export class CardDisplay {
                 }
 
                 if (playerCard > houseCard) {
-                    this.scene.time.delayedCall(1000, () => {
+                    // Store reference so we can cancel it if user starts a new game
+                    this.pendingWinAnimation = this.scene.time.delayedCall(1000, () => {
+                        this.pendingWinAnimation = null;
                         // Add null check before triggering animation
                         if (this.houseCardSprite && this.houseCardSprite.active) {
                             this.triggerWinParticleAnimation();
@@ -392,7 +403,18 @@ export class CardDisplay {
         
         // Update game history after the delay when both card numbers are fully visible
         this.scene.time.delayedCall(100, () => {
-            this.scene.gameHistory.updateLastGameInHistory(this.currentPlayerCard, this.currentHouseCard);
+            // Only update history if we still have card values (not already handled by playGame)
+            if (this.currentPlayerCard !== null && this.currentHouseCard !== null) {
+                this.scene.gameHistory.updateLastGameInHistory(this.currentPlayerCard, this.currentHouseCard);
+                
+                // Clear card values to prevent duplicate updates
+                this.currentPlayerCard = null;
+                this.currentHouseCard = null;
+            }
+            
+            // Mark animation as complete
+            this.isAnimating = false;
+            
             window.dispatchEvent(new CustomEvent('cardsDisplayed'));
         });
     }
@@ -657,6 +679,19 @@ export class CardDisplay {
     }
 
     clearCardSprites() {
+        // Reset animation state
+        this.isAnimating = false;
+        
+        // Cancel any pending delayed calls (tie sequence, win animation)
+        if (this.pendingTieSequence) {
+            this.pendingTieSequence.destroy();
+            this.pendingTieSequence = null;
+        }
+        if (this.pendingWinAnimation) {
+            this.pendingWinAnimation.destroy();
+            this.pendingWinAnimation = null;
+        }
+        
         // Stop any running tweens on the sprites before destroying them
         if (this.playerCardSprite) {
             this.scene.tweens.killTweensOf(this.playerCardSprite);

@@ -157,9 +157,6 @@ export function clearAllSessionKeys() {
 export function clearAllGameData() {
     clearAllSessionKeys()
     localStorage.removeItem('riseWallet')
-    localStorage.removeItem('pendingCommit')
-    localStorage.removeItem('pendingReveal')
-    localStorage.removeItem('playerSecret')
     localStorage.removeItem('selectedBetAmount')
     
     return 'Game data cleared. Refresh to reconnect.'

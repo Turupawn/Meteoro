@@ -1,14 +1,12 @@
 import { loadPhaser } from './game.js';
 import posthog from 'posthog-js';
-import { generateRandomBytes32, calculateCards, printLog } from './utils/utils.js';
-import { keccak256 } from 'viem';
+import { printLog } from './utils/utils.js';
 import {
     initWeb3,
     getLocalWallet,
     checkGameState,
     checkInitialGameState,
-    commit,
-    performReveal,
+    rollDice,
     startEventMonitoring,
     stopEventMonitoring,
     warmupSdkAndCrypto
@@ -41,19 +39,11 @@ var game
 var gameScene = null; // Reference to the main game scene
 
 const MIN_BALANCE = "0.00001";
-const GAME_LOOP_INTERVAL = 50;
-let commitStartTime = null;
+const GAME_LOOP_INTERVAL = 100;
+let gameStartTime = null;
 
 let gameState = null;
-let shouldProcessCommit = false;
-
-let precomputedSecret = null;
-let precomputedHash = null;
-
-function precomputeNextCommit() {
-    precomputedSecret = generateRandomBytes32();
-    precomputedHash = keccak256(precomputedSecret);
-}
+let shouldProcessGame = false;
 
 // Loading coordination
 let web3LoadingProgress = 0;
@@ -67,6 +57,7 @@ let loadingScreenReady = false;
 // Add transaction state tracking
 let isTransactionInProgress = false;
 let lastTransactionHash = null;
+let lastDisplayedGameId = null; // Track last displayed game to avoid duplicates
 
 let initialRecentHistory = [];
 async function loadDapp() {
@@ -221,28 +212,12 @@ async function loadGameData() {
         const gameStateForLog = convertBigIntToString(gameState);
         console.log("Initial game state from getInitialFrontendGameState:", JSON.stringify(gameStateForLog, null, 2));
 
-        const pendingReveal = getPendingReveal();
-        if (pendingReveal) {
-            console.log("Pending reveal found:", JSON.stringify(pendingReveal, null, 2));
-            try {
-                console.log("Attempting to reveal pending secret...");
-                await performReveal(pendingReveal.secret);
-                console.log("Reveal completed successfully");
-            } catch (error) {
-                console.log("Reveal failed:", error.message);
-                captureError(error, { function: 'loadGameData attempt to reveal pending secret' });
-            }
-        } else {
-            console.log("No pending reveal found");
-        }
-
         await new Promise(resolve => setTimeout(resolve, 150));
         gameDataLoadingProgress = 1;
         isGameDataReady = true;
         updateGameDataProgress(1);
         console.log("Starting game loop...")
         await warmupSdkAndCrypto();
-        precomputeNextCommit();
         startGameLoop();
     } catch (error) {
         console.error("Error loading game data:", error);
@@ -276,20 +251,6 @@ window.addEventListener('beforeunload', () => {
     stopEventMonitoring()
 })
 
-function getStoredSecret() {
-    const secretData = localStorage.getItem('playerSecret');
-    return secretData ? JSON.parse(secretData) : null;
-}
-
-function clearStoredSecret() {
-    printLog(['debug'], "=== CLEAR SECRET ===");
-    printLog(['debug'], "Secret before clearing:", getStoredSecret());
-    printLog(['debug'], "===================");
-    localStorage.removeItem('playerSecret');
-    clearStoredCommit()
-    clearPendingReveal()
-}
-
 async function gameLoop() {
     const wallet = getLocalWallet();
     if (!wallet) {
@@ -308,149 +269,33 @@ async function gameLoop() {
 
         const centralizedGameState = getGameState()
 
-        const pendingCommit = getStoredCommit();
-        const pendingReveal = getPendingReveal();
-        printLog(['debug'], "Pending commit:", pendingCommit);
-        printLog(['debug'], "Pending reveal:", pendingReveal);
-
-        if (centralizedGameState && centralizedGameState.gameState === 2n /* HashPosted */ && pendingCommit) {
-            const result = calculateCards(pendingCommit.secret, centralizedGameState.houseRandomness);
-
-            if (commitStartTime) {
-                const endTime = Date.now();
-                const totalTime = endTime - commitStartTime;
-                printLog(['profile'], "=== PERFORMANCE METRICS ===");
-                printLog(['profile'], "Total time from commit to result:", totalTime, "ms");
-                printLog(['profile'], "Start time:", new Date(commitStartTime).toISOString());
-                printLog(['profile'], "End time:", new Date(endTime).toISOString());
-                printLog(['profile'], "=========================");
-                commitStartTime = null;
-
-                // Track game completion performance
-                captureGameEvent('game_completed', {
-                    game_id: centralizedGameState.gameId?.toString(),
-                    player_card: result.playerCard,
-                    house_card: result.houseCard,
-                    total_time_ms: totalTime,
-                    player_balance: centralizedGameState.playerETHBalance?.toString()
-                });
-            }
-
-            clearStoredCommit();
-            storePendingReveal(pendingCommit.secret);
-            // Use the game scene reference instead of hardcoded index
-            if (gameScene) {
-                gameScene.updateCardDisplay(result.playerCard, result.houseCard);
-            }
-
-
-            printLog(['debug'], "Conditions met for reveal, attempting...");
-
-            // Mark transaction as in progress
-            isTransactionInProgress = true;
-            try {
-                await performReveal(pendingCommit.secret);
-                printLog(['debug'], "Reveal transaction completed successfully");
-
-                captureGameEvent('reveal_transaction_success', {
-                    game_id: centralizedGameState.gameId?.toString(),
-                    player_card: result.playerCard,
-                    house_card: result.houseCard
-                });
-
-                gameScene.playButton.unlockButton()
-
-            } catch (error) {
-                printLog(['error'], "Reveal failed:", error);
-
-                captureGameEvent('reveal_transaction_failed', {
-                    game_id: centralizedGameState.gameId?.toString(),
-                    error: error.message
-                });
-
-                if (error.message && error.message.includes('already known')) {
-                    printLog(['debug'], "Transaction already known, clearing pending reveal");
-                    clearPendingReveal();
-                }
-            } finally {
-                isTransactionInProgress = false;
-            }
-        }
-
-        // Handle case where game is already revealed (state 3n) and there's a pending reveal
-        if (centralizedGameState && centralizedGameState.gameState === 3n && pendingReveal) {
-            printLog(['debug'], "Game already revealed, clearing pending reveal");
-            clearPendingReveal();
-
-            // Calculate and display the result
-            if (centralizedGameState.playerCard && centralizedGameState.houseCard) {
-                const playerCard = parseInt(centralizedGameState.playerCard);
-                const houseCard = parseInt(centralizedGameState.houseCard);
-                if (!isNaN(playerCard) && !isNaN(houseCard)) {
-                    if (gameScene) {
-                        gameScene.updateCardDisplay(playerCard, houseCard);
-                    }
-                }
-            }
-        }
-
-        // Handle new game requests
+        // Handle game request - VRF flow is much simpler
+        // State 0: NotStarted, State 1: Pending, State 2: Completed
         if (
             centralizedGameState && (
                 centralizedGameState.gameState === 0n /* NotStarted */ ||
-                centralizedGameState.gameState === 3n /* Revealed */ ||
-                centralizedGameState.gameState === 4n /* Forfeited */)
-            && shouldProcessCommit) {
+                centralizedGameState.gameState === 2n /* Completed */)
+            && shouldProcessGame) {
 
-            shouldProcessCommit = false;
-            const storedCommit = getStoredCommit();
-
-            if (storedCommit) {
-                printLog(['debug'], "Found pending commit from previous game:", storedCommit);
-                printLog(['debug'], "Clearing stale commit and proceeding...");
-                clearStoredCommit();
-                captureGameEvent('game_start_blocked_pending_commit', {
-                    game_id: centralizedGameState.gameId?.toString()
-                });
-            }
+            shouldProcessGame = false;
 
             if (!gameState) {
                 printLog(['error'], "Global game state not initialized");
-                shouldProcessCommit = false;
+                shouldProcessGame = false;
                 captureGameEvent('game_start_failed_uninitialized_state');
 
             } else if (BigInt(getPlayerETHBalance()) < BigInt(getMinimumPlayableBalance())) {
                 printLog(['debug'], "Insufficient balance detected, UI will handle display");
-                shouldProcessCommit = false;
+                shouldProcessGame = false;
                 captureGameEvent('game_start_blocked_insufficient_balance', {
                     player_balance: getPlayerETHBalance(),
                     minimum_balance: getMinimumPlayableBalance()
                 });
 
-            } else if (centralizedGameState.gameState === 0n /* NotStarted */ ||
-                centralizedGameState.gameState === 3n /* Revealed */ ||
-                centralizedGameState.gameState === 4n /* Forfeited */) {
-                printLog(['debug'], "=== STARTING COMMIT PROCESS ===");
+            } else {
+                printLog(['debug'], "=== STARTING ROLL DICE ===");
 
-                let secret, commitHash;
-                if (precomputedSecret && precomputedHash) {
-                    secret = precomputedSecret;
-                    commitHash = precomputedHash;
-                    precomputedSecret = null; // Clear after use
-                    precomputedHash = null;
-                    printLog(['debug'], "Using pre-computed commit (faster)");
-                } else {
-                    secret = generateRandomBytes32();
-                    commitHash = keccak256(secret);
-                    printLog(['debug'], "Computing commit on-the-fly");
-                }
-
-                storeCommit(secret);
-                commitStartTime = Date.now();
-                printLog(['profile'], "=== COMMIT REQUESTED ===");
-                printLog(['profile'], "Start time:", new Date(commitStartTime).toISOString());
-
-                printLog(['debug'], "Processing commit request...");
+                gameStartTime = Date.now();
 
                 // Track game start attempt
                 captureGameEvent('game_start_attempted', {
@@ -462,52 +307,93 @@ async function gameLoop() {
                 // Mark transaction as in progress
                 isTransactionInProgress = true;
                 try {
-                    await commit(commitHash);
-                    shouldProcessCommit = false;
+                    await rollDice();
+                    shouldProcessGame = false;
                     updateGameDisplay();
-                    printLog(['debug'], "Commit transaction completed successfully");
+                    printLog(['debug'], "rollDice transaction completed successfully");
 
-                    precomputeNextCommit();
-
-                    // Track successful commit
-                    captureGameEvent('commit_transaction_success', {
+                    // Track successful roll
+                    captureGameEvent('rollDice_transaction_success', {
                         game_id: centralizedGameState.gameId?.toString(),
                         player_balance: centralizedGameState.playerETHBalance?.toString()
                     });
 
-                    printLog(['debug'], "Starting polling for HashPosted state...");
-                    pollForHashPosted();
+                    // WebSocket event listener will handle game completion
 
                 } catch (error) {
-                    printLog(['error'], "Commit failed:", error);
-                    shouldProcessCommit = false;
+                    printLog(['error'], "rollDice failed:", error);
+                    shouldProcessGame = false;
                     
                     // Unlock the play button on error so user can try again
                     if (gameScene && gameScene.playButton) {
                         gameScene.playButton.unlockButton();
                     }
 
-                    // Track commit failure
-                    captureGameEvent('commit_transaction_failed', {
+                    // Track rollDice failure
+                    captureGameEvent('rollDice_transaction_failed', {
                         game_id: centralizedGameState.gameId?.toString(),
                         error: error.message
                     });
-
-                    // If it's an "already known" error, clear the stored commit
-                    if (error.message && error.message.includes('already known')) {
-                        printLog(['debug'], "Transaction already known, clearing stored commit");
-                        clearStoredCommit();
-                    }
                 } finally {
                     isTransactionInProgress = false;
                 }
             }
         }
+
+        // Handle completed game display
+        if (centralizedGameState && centralizedGameState.gameState === 2n /* Completed */) {
+            // If we have card values and haven't displayed them yet
+            if (centralizedGameState.playerCard && centralizedGameState.houseCard && 
+                centralizedGameState.playerCard > 0n && centralizedGameState.houseCard > 0n) {
+                
+                // Get current gameId (convert to string for comparison)
+                const currentGameId = centralizedGameState.gameId?.toString();
+                
+                // Only display if this is a NEW game (different from last displayed)
+                // AND we have a pending game start AND no animation is running
+                const isNewGame = currentGameId && currentGameId !== lastDisplayedGameId;
+                const isAnimationInProgress = gameScene?.cardDisplay?.isAnimating || 
+                                              gameScene?.tieSequence?.isActive ||
+                                              gameScene?.tieSequence?.bigWinAnimation?.isActive;
+                
+                if (gameStartTime && !isAnimationInProgress && isNewGame) {
+                    const endTime = Date.now();
+                    const totalTime = endTime - gameStartTime;
+                    printLog(['profile'], "=== PERFORMANCE METRICS ===");
+                    printLog(['profile'], "Total time from roll to result:", totalTime, "ms");
+                    printLog(['profile'], "Game ID:", currentGameId);
+                    printLog(['profile'], "Start time:", new Date(gameStartTime).toISOString());
+                    printLog(['profile'], "End time:", new Date(endTime).toISOString());
+                    printLog(['profile'], "=========================");
+                    gameStartTime = null;
+                    lastDisplayedGameId = currentGameId; // Mark this game as displayed
+
+                    // Track game completion performance
+                    captureGameEvent('game_completed', {
+                        game_id: currentGameId,
+                        player_card: Number(centralizedGameState.playerCard),
+                        house_card: Number(centralizedGameState.houseCard),
+                        total_time_ms: totalTime,
+                        player_balance: centralizedGameState.playerETHBalance?.toString()
+                    });
+
+                    // Display the cards
+                    if (gameScene) {
+                        gameScene.updateCardDisplay(
+                            Number(centralizedGameState.playerCard), 
+                            Number(centralizedGameState.houseCard)
+                        );
+                        gameScene.playButton.unlockButton();
+                    }
+                }
+            }
+        }
+
         updateGameDisplay();
         printLog(['debug'], "=== GAME LOOP END ===");
     } catch (error) {
         printLog(['error'], "Error in game loop:", error);
-        shouldProcessCommit = false;
+        shouldProcessGame = false;
         isTransactionInProgress = false;
 
         // Track game loop error
@@ -539,134 +425,59 @@ function startGameLoop() {
     setInterval(gameLoop, GAME_LOOP_INTERVAL);
 }
 
-/**
- * Poll for game state to change to HashPosted (state 2)
- * This is a fallback mechanism in case WebSocket events don't fire
- */
-async function pollForHashPosted() {
-    const POLL_INTERVAL = 100; // ms
-    const MAX_POLL_TIME = 30000; // 30 seconds max
-    const startTime = Date.now();
-    
-    printLog(['debug'], "=== POLL FOR HASHPOSTED START ===");
-    
-    const poll = async () => {
-        try {
-            const elapsed = Date.now() - startTime;
-            if (elapsed > MAX_POLL_TIME) {
-                printLog(['error'], "Polling timeout - game state did not change to HashPosted");
-                captureGameEvent('hashposted_poll_timeout', {
-                    elapsed_ms: elapsed
-                });
-                return;
-            }
-            
-            // Fetch fresh game state from blockchain
-            const freshState = await checkGameState();
-            if (!freshState) {
-                printLog(['debug'], "Poll: No game state returned, retrying...");
-                setTimeout(poll, POLL_INTERVAL);
-                return;
-            }
-            
-            printLog(['debug'], `Poll: Current game state = ${freshState.gameState}`);
-            
-            // Check if state changed to HashPosted (2) or beyond
-            if (freshState.gameState >= 2n) {
-                printLog(['debug'], `Poll: State changed to ${freshState.gameState}, updating game state`);
-                printLog(['profile'], "=== HASHPOSTED DETECTED ===");
-                printLog(['profile'], "Time from commit to HashPosted:", Date.now() - startTime, "ms");
-                printLog(['profile'], "===========================");
-                
-                // Update the centralized game state
-                updateGameState(freshState);
-                
-                captureGameEvent('hashposted_detected', {
-                    elapsed_ms: elapsed,
-                    game_state: freshState.gameState.toString()
-                });
-                
-                return; // Stop polling
-            }
-            
-            // State not yet HashPosted, continue polling
-            setTimeout(poll, POLL_INTERVAL);
-        } catch (error) {
-            printLog(['error'], "Poll error:", error);
-            // Continue polling even on error
-            setTimeout(poll, POLL_INTERVAL);
-        }
-    };
-    
-    // Start polling
-    poll();
-}
-
-function storeCommit(secret) {
-    printLog(['debug'], "=== STORE COMMIT ===");
-    printLog(['debug'], "Previous commit:", getStoredCommit());
-    printLog(['debug'], "New commit:", secret);
-    // Note: commitment hash will be calculated in the commit function
-    localStorage.setItem('pendingCommit', JSON.stringify({
-        secret: secret,
-        timestamp: Date.now()
-    }));
-    printLog(['debug'], "Stored commit:", getStoredCommit());
-    printLog(['debug'], "===================");
-}
-
-function getStoredCommit() {
-    const commitData = localStorage.getItem('pendingCommit');
-    return commitData ? JSON.parse(commitData) : null;
-}
-
-function clearStoredCommit() {
-    printLog(['debug'], "=== CLEAR COMMIT ===");
-    printLog(['debug'], "Commit before clearing:", getStoredCommit());
-    printLog(['debug'], "===================");
-    localStorage.removeItem('pendingCommit');
-}
-
-function storePendingReveal(secret) {
-    printLog(['debug'], "=== STORE PENDING REVEAL ===");
-    printLog(['debug'], "Previous pending reveal:", getPendingReveal());
-    printLog(['debug'], "New pending reveal:", secret);
-    localStorage.setItem('pendingReveal', JSON.stringify({
-        secret: secret,
-        timestamp: Date.now()
-    }));
-    printLog(['debug'], "Stored pending reveal:", getPendingReveal());
-    printLog(['debug'], "===================");
-}
-
-function getPendingReveal() {
-    const revealData = localStorage.getItem('pendingReveal');
-    return revealData ? JSON.parse(revealData) : null;
-}
-
-function clearPendingReveal() {
-    printLog(['debug'], "=== CLEAR PENDING REVEAL ===");
-    printLog(['debug'], "Pending reveal before clearing:", getPendingReveal());
-    printLog(['debug'], "===================");
-    localStorage.removeItem('pendingReveal');
-}
-
-export async function commitGame() {
-    gameScene.cardDisplay.clearCardSprites();
-    shouldProcessCommit = true;
-
-    if (gameScene.cardDisplay.currentPlayerCard !== null && gameScene.cardDisplay.currentHouseCard !== null) {
-        gameScene.gameHistory.updateLastGameInHistory(gameScene.cardDisplay.currentPlayerCard, gameScene.cardDisplay.currentHouseCard);
+export async function playGame() {
+    // Prevent multiple rapid clicks
+    if (isTransactionInProgress || shouldProcessGame) {
+        printLog(['debug'], "Play blocked - transaction in progress or game pending");
+        return;
     }
 
-    gameScene.gameHistory.addPendingGameToHistory();
+    // Force close any active tie sequence or big win animation
+    if (gameScene) {
+        if (gameScene.tieSequence?.bigWinAnimation?.isActive) {
+            printLog(['debug'], "Force closing big win animation for new game");
+            gameScene.tieSequence.bigWinAnimation.closeBigWinAnimation();
+        }
+        if (gameScene.tieSequence?.isActive) {
+            printLog(['debug'], "Force closing tie sequence for new game");
+            gameScene.tieSequence.closeTieSequence();
+        }
+    }
+
+    // If card animation is in progress, complete the history update first
+    if (gameScene && gameScene.cardDisplay) {
+        // If there are pending card values that haven't been recorded yet, record them now
+        // Use proper check for both null and undefined
+        const hasPlayerCard = gameScene.cardDisplay.currentPlayerCard != null;
+        const hasHouseCard = gameScene.cardDisplay.currentHouseCard != null;
+        
+        if (hasPlayerCard && hasHouseCard) {
+            printLog(['debug'], "Completing pending history update before new game:", 
+                gameScene.cardDisplay.currentPlayerCard, gameScene.cardDisplay.currentHouseCard);
+            gameScene.gameHistory.updateLastGameInHistory(
+                gameScene.cardDisplay.currentPlayerCard,
+                gameScene.cardDisplay.currentHouseCard
+            );
+        }
+        
+        // Now clear sprites and reset state
+        gameScene.cardDisplay.clearCardSprites();
+        gameScene.cardDisplay.currentPlayerCard = null;
+        gameScene.cardDisplay.currentHouseCard = null;
+    }
+    
+    shouldProcessGame = true;
+
+    // Add pending game entry to history
+    if (gameScene && gameScene.gameHistory) {
+        gameScene.gameHistory.addPendingGameToHistory();
+    }
 
     setTimeout(() => {
         updateGameDisplay();
     }, 100);
 
-    captureGameEvent('commit_game_called', {
+    captureGameEvent('play_game_called', {
         timestamp: Date.now()
     });
 }
-

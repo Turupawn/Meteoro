@@ -8,15 +8,7 @@ export function getFunctionSelector(signature) {
 export const GAME_CALLS = [
     {
         to: CONTRACT_ADDRESS,
-        signature: getFunctionSelector('commit(bytes32)')
-    },
-    {
-        to: CONTRACT_ADDRESS,
-        signature: getFunctionSelector('reveal(bytes32)')
-    },
-    {
-        to: CONTRACT_ADDRESS,
-        signature: getFunctionSelector('forfeit()')
+        signature: getFunctionSelector('rollDice()')
     }
 ]
 
