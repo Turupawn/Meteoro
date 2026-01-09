@@ -23,7 +23,7 @@ import {
   getSessionKeyTimeRemaining
 } from './sessionKeyManager.js'
 
-const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract.json"
+const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract_v2.json"
 
 let CONTRACT_ABI = null
 
