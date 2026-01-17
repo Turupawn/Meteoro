@@ -323,7 +323,7 @@ async function gameLoop() {
                 } catch (error) {
                     printLog(['error'], "rollDice failed:", error);
                     shouldProcessGame = false;
-                    
+
                     // Unlock the play button on error so user can try again
                     if (gameScene && gameScene.playButton) {
                         gameScene.playButton.unlockButton();
@@ -450,22 +450,22 @@ export async function playGame() {
         // Use proper check for both null and undefined
         const hasPlayerCard = gameScene.cardDisplay.currentPlayerCard != null;
         const hasHouseCard = gameScene.cardDisplay.currentHouseCard != null;
-        
+
         if (hasPlayerCard && hasHouseCard) {
-            printLog(['debug'], "Completing pending history update before new game:", 
+            printLog(['debug'], "Completing pending history update before new game:",
                 gameScene.cardDisplay.currentPlayerCard, gameScene.cardDisplay.currentHouseCard);
             gameScene.gameHistory.updateLastGameInHistory(
                 gameScene.cardDisplay.currentPlayerCard,
                 gameScene.cardDisplay.currentHouseCard
             );
         }
-        
+
         // Now clear sprites and reset state
         gameScene.cardDisplay.clearCardSprites();
         gameScene.cardDisplay.currentPlayerCard = null;
         gameScene.cardDisplay.currentHouseCard = null;
     }
-    
+
     shouldProcessGame = true;
 
     // Add pending game entry to history
