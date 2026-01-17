@@ -177,7 +177,7 @@ export async function warmupSdkAndCrypto() {
     const provider = riseWalletInstance.provider
     const dummyParams = [{
       calls: [{
-        to: wallet.address, // Send to self (won't execute)
+        to: wallet.address,
         value: '0x0',
         data: '0x'
       }],
@@ -260,7 +260,20 @@ export async function connectWallet() {
   }
 }
 
-async function sendSessionTransaction({ to, value, data }) {
+// =============================================================================
+// DUPLICATE NONCE RETRY WORKAROUND
+// Rise Wallet relay sometimes returns stale nonces causing "duplicate call" errors.
+// Set ENABLE_DUPLICATE_RETRY to false to disable the retry mechanism.
+// TODO: Remove this workaround once Rise Wallet fixes their relay nonce management.
+// =============================================================================
+const ENABLE_DUPLICATE_RETRY = true
+const MAX_DUPLICATE_RETRIES = 4
+const RETRY_DELAY_MS = 500
+
+// Track seen nonces to detect duplicates (only used when retry is enabled)
+const seenNonces = new Map()
+
+async function sendSessionTransaction({ to, value, data }, retryCount = 0) {
   if (!riseWalletInstance) throw new Error("Rise Wallet not initialized")
 
   const provider = riseWalletInstance.provider
@@ -268,28 +281,58 @@ async function sendSessionTransaction({ to, value, data }) {
   if (!wallet) throw new Error("No wallet connected")
 
   let sessionKey = getActiveSessionKey(wallet.address)
-
   if (!sessionKey || !isSessionKeyValid(sessionKey, wallet.address)) {
     sessionKey = await createNewSessionKey(provider, wallet.address)
   }
 
   const hexValue = value ? `0x${BigInt(value).toString(16)}` : '0x0'
 
+  const prepareParams = [{
+    calls: [{ to, value: hexValue, data }],
+    key: { type: 'p256', publicKey: sessionKey.publicKey }
+  }]
+
   const prepared = await provider.request({
     method: 'wallet_prepareCalls',
-    params: [{
-      calls: [{ to, value: hexValue, data }],
-      key: { type: 'p256', publicKey: sessionKey.publicKey }
-    }]
+    params: prepareParams
   })
+
+  const nonce = prepared.context?.quote?.quotes?.[0]?.intent?.nonce
+
+  // Duplicate nonce detection and retry (workaround for Rise Wallet relay bug)
+  if (ENABLE_DUPLICATE_RETRY && nonce && seenNonces.has(nonce)) {
+    if (retryCount < MAX_DUPLICATE_RETRIES) {
+      console.log(`Duplicate nonce detected, retry ${retryCount + 1}/${MAX_DUPLICATE_RETRIES}...`)
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS))
+      return sendSessionTransaction({ to, value, data }, retryCount + 1)
+    }
+  }
+
+  if (ENABLE_DUPLICATE_RETRY && nonce) {
+    seenNonces.set(nonce, Date.now())
+  }
 
   const { digest, ...requestParams } = prepared
   const signature = signWithSessionKey(digest, sessionKey)
 
-  const response = await provider.request({
-    method: 'wallet_sendPreparedCalls',
-    params: [{ ...requestParams, signature }]
-  })
+  const sendParams = [{ ...requestParams, signature }]
+
+  let response
+  try {
+    response = await provider.request({
+      method: 'wallet_sendPreparedCalls',
+      params: sendParams
+    })
+  } catch (sendError) {
+    // Retry on duplicate call error (workaround for Rise Wallet relay bug)
+    if (ENABLE_DUPLICATE_RETRY && sendError.message?.includes('duplicate') && retryCount < MAX_DUPLICATE_RETRIES) {
+      console.log(`Duplicate call error, retry ${retryCount + 1}/${MAX_DUPLICATE_RETRIES}...`)
+      if (nonce) seenNonces.delete(nonce)
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS))
+      return sendSessionTransaction({ to, value, data }, retryCount + 1)
+    }
+    throw sendError
+  }
 
   let callId
   if (Array.isArray(response) && response.length > 0 && response[0].id) {
@@ -300,9 +343,16 @@ async function sendSessionTransaction({ to, value, data }) {
     return response
   }
 
-  // Wait for the actual transaction to be submitted and get real tx hash
   const txHash = await waitForTransactionStatus(provider, callId)
-  
+
+  // Clean up old nonce entries
+  if (ENABLE_DUPLICATE_RETRY) {
+    const now = Date.now()
+    for (const [n, timestamp] of seenNonces) {
+      if (now - timestamp > 60000) seenNonces.delete(n)
+    }
+  }
+
   return txHash
 }
 
@@ -531,31 +581,25 @@ export async function rollDice() {
   if (!gameState.getSelectedBetAmount()) {
     await initializeBetAmount()
   }
-  
+
   const betAmount = gameState.getSelectedBetAmount()
 
   try {
-    const startTime = Date.now()
-
     const txData = encodeFunctionData({
       abi: CONTRACT_ABI,
       functionName: 'rollDice',
       args: []
     })
 
-    // Send transaction using session key
     const hash = await sendSessionTransaction({
       to: MY_CONTRACT_ADDRESS,
       value: betAmount,
       data: txData
     })
 
-    // Profile transaction confirmation time
-    console.log(`Transaction confirmed in ${Date.now() - startTime}ms`)
-
     return { transactionHash: hash, status: 'success' }
   } catch (error) {
-    console.error("❌ rollDice error:", error)
+    printLog(['error'], "rollDice error:", error)
     showErrorModal("Failed to roll dice: " + error.message)
     captureBlockchainError(error, 'rollDice', {
       error_type: 'transaction_failed',

@@ -200,10 +200,8 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
             winner = address(this);
             game.playerWon = false;
         } else {
-            // Tie - return bet to player and mint gacha tokens
             winner = address(0);
             game.playerWon = false;
-            _transferEth(payable(player), betAmount);
             
             uint256 betMultiplier = betAmountMultipliers[betAmount];
             if (betMultiplier == 0) {
