@@ -54,7 +54,7 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         emit OwnershipTransferred(oldOwner, newOwner);
     }
 
-    function __Ownable_init(address initialOwner) internal onlyInitializing {
+    function _ownableInit(address initialOwner) internal onlyInitializing {
         if (initialOwner == address(0)) {
             revert OwnableInvalidOwner(address(0));
         }
@@ -112,7 +112,7 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
     }
 
     function initialize(address _coordinator, address _gachaToken, address initialOwner) public initializer {
-        __Ownable_init(initialOwner);
+        _ownableInit(initialOwner);
         // Pausable doesn't need initialization (paused defaults to false)
         // UUPSUpgradeable doesn't need initialization
         
