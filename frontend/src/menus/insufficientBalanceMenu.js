@@ -1,4 +1,4 @@
-import { getLocalWallet, getPlayerETHBalance, getMinimumPlayableBalance } from '../web3/blockchain_stuff.js';
+import { getLocalWallet, getPlayerEthBalance, getMinimumPlayableBalance } from '../web3/blockchain_stuff.js';
 import { isLandscape } from '../utils/utils.js';
 import { MenuText } from './menuElements/menuText.js';
 import { MenuInput } from './menuElements/menuInput.js';
@@ -332,7 +332,7 @@ export class InsufficientBalanceMenu {
             const wallet = getLocalWallet();
             if (!wallet) return;
 
-            if (BigInt(getPlayerETHBalance()) >= BigInt(getMinimumPlayableBalance())) {
+            if (BigInt(getPlayerEthBalance()) >= BigInt(getMinimumPlayableBalance())) {
                 // User now has sufficient balance, hide the screen
                 this.hide();
             }

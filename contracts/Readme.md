@@ -39,7 +39,8 @@ source .env && forge script UpdateBetAmountsScript --sig "run(address)" 0xPROXY_
 ## Update ABIs
 
 ```bash
-forge inspect src/TwoPartyWarGame.sol:TwoPartyWarGame abi --json --via-ir > ../frontend/public/json_abi/MyContract.json
+forge inspect src/TwoPartyWarGame.sol:TwoPartyWarGame abi --json --via-ir > ../frontend/public/json_abi/TwoPartyWarGame.json
+forge inspect src/MockUSDC.sol:MockUSDC abi --json > ../frontend/public/json_abi/USDC.json
 ```
 
 ## Verify Implementation

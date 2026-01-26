@@ -1,7 +1,8 @@
 class GameState {
   constructor() {
-    this.playerETHBalance = 0n
+    this.playerEthBalance = 0n
     this.playerGachaTokenBalance = 0n
+    this.playerUsdcBalance = 0n
     
     // VRF game states: 0: NotStarted, 1: Pending, 2: Completed
     this.gameState = 0n
@@ -22,18 +23,23 @@ class GameState {
     }
   }
 
-  updateBalances(ethBalance, gachaBalance) {
-    this.playerETHBalance = ethBalance
+  updateBalances(ethBalance, gachaBalance, usdcBalance) {
+    this.playerEthBalance = ethBalance
     this.playerGachaTokenBalance = gachaBalance
-    this.notifyListeners('balanceUpdate', { ethBalance, gachaBalance })
+    this.playerUsdcBalance = usdcBalance
+    this.notifyListeners('balanceUpdate', { ethBalance, gachaBalance, usdcBalance })
   }
 
-  getETHBalance() {
-    return this.playerETHBalance
+  getEthBalance() {
+    return this.playerEthBalance
   }
 
   getGachaTokenBalance() {
     return this.playerGachaTokenBalance
+  }
+
+  getUsdcBalance() {
+    return this.playerUsdcBalance
   }
 
   getGachaTokenBalanceFormatted() {
@@ -110,8 +116,11 @@ class GameState {
     if (!selectedBetAmount || selectedBetAmount === 0n) {
       return 0n
     }
-    const gasFeeBufferWei = BigInt(5*1e12) // 0.000005 ETH in wei
-    return selectedBetAmount + gasFeeBufferWei
+    return selectedBetAmount
+  }
+
+  getMinimumEthForGas() {
+    return BigInt(5*1e12) // 0.000005 ETH for gas
   }
 
   // Event listener management
@@ -147,7 +156,11 @@ class GameState {
   }
 
   hasInsufficientBalance() {
-    return this.playerETHBalance < this.getMinimumPlayableBalance()
+    return this.playerUsdcBalance < this.getMinimumPlayableBalance()
+  }
+
+  hasInsufficientEthForGas() {
+    return this.playerEthBalance < this.getMinimumEthForGas()
   }
 
   // Check if game is pending (waiting for VRF)
@@ -158,8 +171,9 @@ class GameState {
   // Debug method
   getState() {
     return {
-      playerETHBalance: this.playerETHBalance.toString(),
+      playerEthBalance: this.playerEthBalance.toString(),
       playerGachaTokenBalance: this.playerGachaTokenBalance.toString(),
+      playerUsdcBalance: this.playerUsdcBalance.toString(),
       gameState: this.gameState.toString(),
       gameId: this.gameId.toString(),
       playerCard: this.playerCard.toString(),
@@ -177,8 +191,9 @@ const gameState = new GameState()
 
 export default gameState
 
-export const getPlayerETHBalance = () => gameState.getETHBalance()
+export const getPlayerEthBalance = () => gameState.getEthBalance()
 export const getPlayerGachaTokenBalance = () => gameState.getGachaTokenBalance()
+export const getPlayerUsdcBalance = () => gameState.getUsdcBalance()
 export const getPlayerGachaTokenBalanceFormatted = () => gameState.getGachaTokenBalanceFormatted()
 export const getBetAmountsArray = () => gameState.getBetAmounts()
 export const getBetAmountMultiplier = (betAmount) => gameState.getBetAmountMultiplier(betAmount)
@@ -187,8 +202,8 @@ export const setSelectedBetAmount = (betAmount) => gameState.setSelectedBetAmoun
 export const getMinimumPlayableBalance = () => gameState.getMinimumPlayableBalance()
 export const getGameState = () => gameState.getGameState()
 export const updateGameState = (newGameState) => gameState.updateGameState(newGameState)
-export const updateBalances = (ethBalance, gachaBalance) => gameState.updateBalances(ethBalance, gachaBalance)
-export const updateBetConfiguration = (betAmounts, betAmountMultipliers, tieRewardMultiplier) => 
+export const updateBalances = (ethBalance, gachaBalance, usdcBalance) => gameState.updateBalances(ethBalance, gachaBalance, usdcBalance)
+export const updateBetConfiguration = (betAmounts, betAmountMultipliers, tieRewardMultiplier) =>
   gameState.updateBetConfiguration(betAmounts, betAmountMultipliers, tieRewardMultiplier)
 export const addGameStateListener = (event, callback) => gameState.addListener(event, callback)
 export const removeGameStateListener = (event, callback) => gameState.removeListener(event, callback)

@@ -5,6 +5,7 @@ const PRINT_LEVELS = ['profile', 'error']; //['debug', 'profile', 'error'];
 export const BET_AMOUNT_DECIMALS = 4;
 export const ETH_BALANCE_DECIMALS = 6;
 export const GACHA_BALANCE_DECIMALS = 0;
+export const USDC_BALANCE_DECIMALS = 2;
 
 export function generateRandomBytes32() {
     return Web3.utils.randomHex(32);

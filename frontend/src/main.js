@@ -27,7 +27,7 @@ import {
 
 import {
     getMinimumPlayableBalance,
-    getPlayerETHBalance,
+    getPlayerEthBalance,
     getGameState,
     updateGameState,
     updateBalances
@@ -284,11 +284,11 @@ async function gameLoop() {
                 shouldProcessGame = false;
                 captureGameEvent('game_start_failed_uninitialized_state');
 
-            } else if (BigInt(getPlayerETHBalance()) < BigInt(getMinimumPlayableBalance())) {
+            } else if (BigInt(getPlayerEthBalance()) < BigInt(getMinimumPlayableBalance())) {
                 printLog(['debug'], "Insufficient balance detected, UI will handle display");
                 shouldProcessGame = false;
                 captureGameEvent('game_start_blocked_insufficient_balance', {
-                    player_balance: getPlayerETHBalance(),
+                    player_balance: getPlayerEthBalance(),
                     minimum_balance: getMinimumPlayableBalance()
                 });
 

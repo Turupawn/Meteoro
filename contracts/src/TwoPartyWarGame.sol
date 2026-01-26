@@ -230,8 +230,6 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
 
     // View functions
     function getInitialFrontendGameState(address player) external view returns (
-        uint256 playerUsdcBalance,
-        uint256 playerGachaTokenBalance,
         State gameState,
         uint256 gameId,
         uint256 playerCard,
@@ -240,7 +238,12 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         uint256 tieRewardMultiplierValue,
         uint256[] memory betAmounts,
         uint256[] memory betAmountMultipliersArray,
-        uint8 tokenDecimalsValue
+        uint256 playerEthBalance,
+        uint256 playerGachaTokenBalance,
+        uint256 playerUsdcBalance,
+        address gachaTokenAddress,
+        address usdcTokenAddress,
+        uint8 usdcDecimals
     ) {
         uint256 currentGameId = getCurrentGameId(player);
         Game storage playerGame = games[currentGameId];
@@ -249,8 +252,6 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         (betAmounts, betAmountMultipliersArray) = _getBetConfig();
 
         return (
-            usdcToken.balanceOf(player),
-            gachaToken.balanceOf(player),
             playerGame.gameState,
             currentGameId,
             playerGame.playerCard,
@@ -259,6 +260,11 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
             tieRewardMultiplier,
             betAmounts,
             betAmountMultipliersArray,
+            player.balance,
+            gachaToken.balanceOf(player),
+            usdcToken.balanceOf(player),
+            address(gachaToken),
+            address(usdcToken),
             tokenDecimals
         );
     }
@@ -285,22 +291,24 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
     }
 
     function getFrontendGameState(address player) external view returns (
-        uint256 playerUsdcBalance,
-        uint256 playerGachaTokenBalance,
         State gameState,
         uint256 gameId,
         uint256 playerCard,
-        uint256 houseCard
+        uint256 houseCard,
+        uint256 playerEthBalance,
+        uint256 playerGachaTokenBalance,
+        uint256 playerUsdcBalance
     ) {
         uint256 currentGameId = getCurrentGameId(player);
         Game storage playerGame = games[currentGameId];
         return (
-            usdcToken.balanceOf(player),
-            gachaToken.balanceOf(player),
             playerGame.gameState,
             currentGameId,
             playerGame.playerCard,
-            playerGame.houseCard
+            playerGame.houseCard,
+            player.balance,
+            gachaToken.balanceOf(player),
+            usdcToken.balanceOf(player)
         );
     }
 
@@ -339,14 +347,6 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
 
     function getContractBalance() external view returns (uint256) {
         return usdcToken.balanceOf(address(this));
-    }
-
-    function getUsdcAddress() external view returns (address) {
-        return address(usdcToken);
-    }
-
-    function getTokenDecimals() external view returns (uint8) {
-        return tokenDecimals;
     }
 
     // Owner functions

@@ -1,6 +1,6 @@
 import { playGame } from '../../main.js';
 import { isLandscape } from '../../utils/utils.js';
-import { getPlayerETHBalance, getLocalWallet, getMinimumPlayableBalance } from '../../web3/blockchain_stuff.js';
+import { getPlayerEthBalance, getLocalWallet, getMinimumPlayableBalance } from '../../web3/blockchain_stuff.js';
 
 export class PlayButton {
     constructor(scene) {
@@ -69,7 +69,7 @@ export class PlayButton {
         this.button.setSize(hitAreaWidth, hitAreaHeight);
 
         const clickHandler = async () => {
-            const hasInsufficientBalance = await this.checkInsufficientBalance();
+            const hasInsufficientBalance = this.checkInsufficientBalance();
             if (hasInsufficientBalance) {                
                 if (this.scene.insufficientBalanceMenu) {
                     this.scene.insufficientBalanceMenu.show(true);
@@ -101,12 +101,12 @@ export class PlayButton {
         this.button.on('pointerdown', clickHandler);
     }
 
-    async checkInsufficientBalance() {
+    checkInsufficientBalance() {
         try {
             const wallet = getLocalWallet();
             if (!wallet) return false;
 
-            const balance = await getPlayerETHBalance();
+            const balance = getPlayerEthBalance();
             const minBalanceWei = getMinimumPlayableBalance();
             
             return BigInt(balance) < BigInt(minBalanceWei);

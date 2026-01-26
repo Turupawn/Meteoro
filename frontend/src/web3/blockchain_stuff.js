@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, webSocket, formatEther, encodeFunctionData, custom, createClient } from 'viem'
+import { createPublicClient, createWalletClient, webSocket, formatEther, formatUnits, encodeFunctionData, custom, createClient } from 'viem'
 import { riseTestnet } from 'viem/chains'
 import { shredActions, sendRawTransactionSync, watchShreds } from 'shreds/viem'
 import { RiseWallet } from 'rise-wallet'
@@ -23,9 +23,13 @@ import {
   getSessionKeyTimeRemaining
 } from './sessionKeyManager.js'
 
-const MY_CONTRACT_ABI_PATH = "/json_abi/MyContract_v2.json"
+const TWO_PARTY_WAR_GAME_ABI_PATH = "/json_abi/TwoPartyWarGame_v3.json"
+const USDC_ABI_PATH = "/json_abi/USDC.json"
 
-let CONTRACT_ABI = null
+let twoPartyWarGameAbi = null
+let usdcAbi = null
+let usdcAddress = null
+let gachaTokenAddress = null
 
 const ERC20_ABI = [
   {
@@ -63,22 +67,53 @@ let riseWalletInstance // Store instance to access provider
 let eventUnwatch = null
 let balancePoll = null
 let gachaTokenBalanceUnwatch = null
+let usdcBalanceUnwatch = null
 
 export function formatBalance(weiBalance, shownDecimals = 6) {
   const balanceInEth = formatEther(weiBalance)
   return Number(balanceInEth).toFixed(shownDecimals)
 }
 
-async function loadContractABI() {
-  if (CONTRACT_ABI) return CONTRACT_ABI
+export function formatTokenBalance(balance, decimals, shownDecimals = 2) {
+  const formatted = formatUnits(balance, decimals)
+  return Number(formatted).toFixed(shownDecimals)
+}
+
+export async function getUsdcBalance(address) {
+  await loadUsdcAbi()
+  const balance = await wsClient.readContract({
+    address: usdcAddress,
+    abi: usdcAbi,
+    functionName: 'balanceOf',
+    args: [address]
+  })
+  return balance
+}
+
+async function loadTwoPartyWarGameAbi() {
+  if (twoPartyWarGameAbi) return twoPartyWarGameAbi
 
   try {
-    const response = await fetch(MY_CONTRACT_ABI_PATH)
-    CONTRACT_ABI = await response.json()
-    printLog(['debug'], "Contract ABI loaded successfully")
-    return CONTRACT_ABI
+    const response = await fetch(TWO_PARTY_WAR_GAME_ABI_PATH)
+    twoPartyWarGameAbi = await response.json()
+    printLog(['debug'], "TwoPartyWarGame ABI loaded successfully")
+    return twoPartyWarGameAbi
   } catch (error) {
-    console.error("Failed to load contract ABI:", error)
+    console.error("Failed to load TwoPartyWarGame ABI:", error)
+    throw error
+  }
+}
+
+async function loadUsdcAbi() {
+  if (usdcAbi) return usdcAbi
+
+  try {
+    const response = await fetch(USDC_ABI_PATH)
+    usdcAbi = await response.json()
+    printLog(['debug'], "USDC ABI loaded successfully")
+    return usdcAbi
+  } catch (error) {
+    console.error("Failed to load USDC ABI:", error)
     throw error
   }
 }
@@ -99,7 +134,7 @@ export async function initWeb3() {
     printLog(['debug'], "WSS_URL:", WSS_URL)
     printLog(['debug'], "CONTRACT_ADDRESS:", MY_CONTRACT_ADDRESS)
 
-    await loadContractABI()
+    await loadTwoPartyWarGameAbi()
 
     const rw = RiseWallet.create();
     riseWalletInstance = rw;
@@ -415,7 +450,7 @@ export async function checkInitialGameState() {
     console.log("=== INITIAL STATE CHECK (WebSocket) ===")
     console.log("Contract address:", MY_CONTRACT_ADDRESS)
     console.log("Wallet address:", wallet.address)
-    console.log("Contract ABI loaded:", !!CONTRACT_ABI)
+    console.log("Contract ABI loaded:", !!twoPartyWarGameAbi)
     printLog(['debug'], "Using WebSocket for initial state check")
 
     let gameStateTemp
@@ -424,7 +459,7 @@ export async function checkInitialGameState() {
       // Use WebSocket client for initial state check
       gameStateTemp = await wsClient.readContract({
         address: MY_CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
+        abi: twoPartyWarGameAbi,
         functionName: 'getInitialFrontendGameState',
         args: [wallet.address]
       })
@@ -442,19 +477,24 @@ export async function checkInitialGameState() {
 
     // Access the array elements by index according to the new ABI
     // getInitialFrontendGameState returns:
-    // [0] playerEthBalance, [1] playerGachaTokenBalance, [2] gameState, [3] gameId,
-    // [4] playerCard, [5] houseCard, [6] recentHistory, [7] tieRewardMultiplierValue,
-    // [8] betAmounts, [9] betAmountMultipliersArray
-    const playerEthBalance = gameStateTemp[0]
-    const playerGachaTokenBalance = gameStateTemp[1]
-    const currentGameState = gameStateTemp[2]
-    const gameId = gameStateTemp[3]
-    const playerCard = gameStateTemp[4]
-    const houseCard = gameStateTemp[5]
-    const recentHistory = gameStateTemp[6]
-    const tieRewardMultiplierValue = gameStateTemp[7]
-    const betAmounts = gameStateTemp[8]
-    const betAmountMultipliersArray = gameStateTemp[9]
+    // [0] gameState, [1] gameId, [2] playerCard, [3] houseCard,
+    // [4] recentHistory, [5] tieRewardMultiplierValue, [6] betAmounts, [7] betAmountMultipliersArray,
+    // [8] playerEthBalance, [9] playerGachaTokenBalance, [10] playerUsdcBalance,
+    // [11] gachaTokenAddress, [12] usdcTokenAddress, [13] usdcDecimals
+    const currentGameState = gameStateTemp[0]
+    const gameId = gameStateTemp[1]
+    const playerCard = gameStateTemp[2]
+    const houseCard = gameStateTemp[3]
+    const recentHistory = gameStateTemp[4]
+    const tieRewardMultiplierValue = gameStateTemp[5]
+    const betAmounts = gameStateTemp[6]
+    const betAmountMultipliersArray = gameStateTemp[7]
+    const playerEthBalance = gameStateTemp[8]
+    const playerGachaTokenBalance = gameStateTemp[9]
+    const playerUsdcBalance = gameStateTemp[10]
+    gachaTokenAddress = gameStateTemp[11]
+    usdcAddress = gameStateTemp[12]
+    const usdcDecimals = gameStateTemp[13]
 
     console.log("Bet amounts:", betAmounts)
     console.log("Bet amounts type:", typeof betAmounts)
@@ -473,7 +513,7 @@ export async function checkInitialGameState() {
     printLog(['debug'], "=========================")
 
     // Update centralized game state
-    updateBalances(playerEthBalance, playerGachaTokenBalance)
+    updateBalances(playerEthBalance, playerGachaTokenBalance, playerUsdcBalance)
     updateBetConfiguration(betAmounts, betAmountMultipliersArray, tieRewardMultiplierValue)
 
     if (!betAmounts || betAmounts.length === 0) {
@@ -483,8 +523,9 @@ export async function checkInitialGameState() {
     }
 
     const gameStateData = {
-      playerETHBalance: playerEthBalance,
+      playerEthBalance: playerEthBalance,
       playerGachaTokenBalance: playerGachaTokenBalance,
+      playerUsdcBalance: playerUsdcBalance,
       gameState: BigInt(currentGameState),
       gameId: gameId,
       playerCard: playerCard,
@@ -492,7 +533,10 @@ export async function checkInitialGameState() {
       recentHistory: recentHistory,
       tieRewardMultiplier: tieRewardMultiplierValue,
       betAmounts: betAmounts,
-      betAmountMultipliers: betAmountMultipliersArray
+      betAmountMultipliers: betAmountMultipliersArray,
+      gachaTokenAddress: gachaTokenAddress,
+      usdcAddress: usdcAddress,
+      usdcDecimals: usdcDecimals
     }
 
     printLog(['profile'], "=== INITIAL GAME STATE LOAD ===")
@@ -527,27 +571,29 @@ export async function checkGameState() {
 
     let gameStateTemp = await wsClient.readContract({
       address: MY_CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
+      abi: twoPartyWarGameAbi,
       functionName: 'getFrontendGameState',
       args: [wallet.address]
     })
 
     // getFrontendGameState returns:
-    // [0] playerEthBalance, [1] playerGachaTokenBalance, [2] gameState,
-    // [3] gameId, [4] playerCard, [5] houseCard
-    const playerEthBalance = gameStateTemp[0]
-    const playerGachaTokenBalance = gameStateTemp[1]
-    const currentGameState = gameStateTemp[2]
-    const gameId = gameStateTemp[3]
-    const playerCard = gameStateTemp[4]
-    const houseCard = gameStateTemp[5]
+    // [0] gameState, [1] gameId, [2] playerCard, [3] houseCard,
+    // [4] playerEthBalance, [5] playerGachaTokenBalance, [6] playerUsdcBalance
+    const currentGameState = gameStateTemp[0]
+    const gameId = gameStateTemp[1]
+    const playerCard = gameStateTemp[2]
+    const houseCard = gameStateTemp[3]
+    const playerEthBalance = gameStateTemp[4]
+    const playerGachaTokenBalance = gameStateTemp[5]
+    const playerUsdcBalance = gameStateTemp[6]
 
     // Update centralized game state
-    updateBalances(playerEthBalance, playerGachaTokenBalance)
+    updateBalances(playerEthBalance, playerGachaTokenBalance, playerUsdcBalance)
 
     const gameStateData = {
-      playerETHBalance: playerEthBalance,
+      playerEthBalance: playerEthBalance,
       playerGachaTokenBalance: playerGachaTokenBalance,
+      playerUsdcBalance: playerUsdcBalance,
       gameState: BigInt(currentGameState),
       gameId: gameId,
       playerCard: playerCard,
@@ -586,7 +632,7 @@ export async function rollDice() {
 
   try {
     const txData = encodeFunctionData({
-      abi: CONTRACT_ABI,
+      abi: twoPartyWarGameAbi,
       functionName: 'rollDice',
       args: []
     })
@@ -626,16 +672,9 @@ export async function withdrawFunds(destinationAddress) {
 
     printLog(['debug'], "Withdrawing funds via WebSocket to:", destinationAddress)
 
-    // Fetch current balance, gas price, and GachaToken address
-    const [currentBalance, gasPrice, gachaTokenAddress] = await Promise.all([
+    const [currentBalance, gasPrice] = await Promise.all([
       wsClient.getBalance({ address: wallet.address }),
-      wsClient.getGasPrice(),
-      wsClient.readContract({
-        address: MY_CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: 'gachaToken',
-        args: []
-      })
+      wsClient.getGasPrice()
     ])
 
     // Get Gacha token balance
@@ -703,7 +742,7 @@ export async function startEventMonitoring() {
     // Watch for GameCompleted events
     const unwatch = wsClient.watchContractEvent({
       address: MY_CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
+      abi: twoPartyWarGameAbi,
       eventName: 'GameCompleted',
       args: {
         player: wallet.address
@@ -730,10 +769,12 @@ export async function startEventMonitoring() {
     balancePoll = setInterval(async () => {
       const ethBalance = await wsClient.getBalance({ address: wallet.address })
       const currentGacha = gameState.getGachaTokenBalance()
-      updateBalances(ethBalance, currentGacha)
+      const currentUsdc = gameState.getUsdcBalance()
+      updateBalances(ethBalance, currentGacha, currentUsdc)
     }, BALANCE_POLL_INTERVAL)
 
     await startGachaTokenBalanceMonitoring()
+    await startUsdcBalanceMonitoring()
 
     return eventUnwatch
   } catch (error) {
@@ -751,14 +792,6 @@ async function startGachaTokenBalanceMonitoring() {
       throw new Error("No local wallet found!")
     }
 
-    // Get GachaToken contract address
-    const gachaTokenAddress = await wsClient.readContract({
-      address: MY_CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: 'gachaToken',
-      args: []
-    })
-
     printLog(['debug'], "Starting Gacha token balance monitoring via shreds for:", gachaTokenAddress)
 
     // Get initial token balance
@@ -770,8 +803,9 @@ async function startGachaTokenBalanceMonitoring() {
     })
 
     // Update initial balance in game state
-    const currentEthBalance = gameState.getETHBalance()
-    updateBalances(currentEthBalance, initialBalance)
+    const currentEthBalance = gameState.getEthBalance()
+    const currentUsdc = gameState.getUsdcBalance()
+    updateBalances(currentEthBalance, initialBalance, currentUsdc)
     printLog(['debug'], "Initial Gacha token balance:", initialBalance.toString())
 
     // Watch for Transfer events on the Gacha token contract
@@ -833,15 +867,88 @@ async function updateGachaTokenBalance(gachaTokenAddress, walletAddress) {
       args: [walletAddress]
     })
 
-    const currentEthBalance = gameState.getETHBalance()
+    const currentEthBalance = gameState.getEthBalance()
     const oldGachaBalance = gameState.getGachaTokenBalance()
+    const currentUsdc = gameState.getUsdcBalance()
 
     if (newBalance !== oldGachaBalance) {
       printLog(['debug'], `Gacha token balance updated: ${oldGachaBalance.toString()} -> ${newBalance.toString()}`)
-      updateBalances(currentEthBalance, newBalance)
+      updateBalances(currentEthBalance, newBalance, currentUsdc)
     }
   } catch (error) {
     printLog(['error'], "Error updating Gacha token balance:", error)
+  }
+}
+
+// Separate monitoring for USDC balance
+async function startUsdcBalanceMonitoring() {
+  try {
+    const wallet = getLocalWallet()
+    if (!wallet) {
+      throw new Error("No local wallet found!")
+    }
+
+    printLog(['debug'], "Starting USDC balance monitoring for:", usdcAddress)
+
+    // Watch for Transfer events on the USDC token contract (sent from wallet)
+    const transferUnwatch = wsClient.watchContractEvent({
+      address: usdcAddress,
+      abi: ERC20_ABI,
+      eventName: 'Transfer',
+      args: {
+        from: wallet.address
+      },
+      onLogs: async (logs) => {
+        printLog(['debug'], "USDC Transfer event detected (sent), updating balance...")
+        await updateUsdcBalance(wallet.address)
+      },
+    })
+
+    // Watch for transfers TO the wallet
+    const receiveUnwatch = wsClient.watchContractEvent({
+      address: usdcAddress,
+      abi: ERC20_ABI,
+      eventName: 'Transfer',
+      args: {
+        to: wallet.address
+      },
+      onLogs: async (logs) => {
+        printLog(['debug'], "USDC Transfer event detected (received), updating balance...")
+        await updateUsdcBalance(wallet.address)
+      },
+    })
+
+    usdcBalanceUnwatch = () => {
+      transferUnwatch()
+      receiveUnwatch()
+    }
+
+    printLog(['debug'], "USDC balance monitoring started successfully")
+  } catch (error) {
+    printLog(['error'], "Error starting USDC balance monitoring:", error)
+  }
+}
+
+// Helper function to update USDC balance
+async function updateUsdcBalance(walletAddress) {
+  try {
+    const newBalance = await wsClient.readContract({
+      address: usdcAddress,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [walletAddress]
+    })
+
+    const currentEthBalance = gameState.getEthBalance()
+    const currentGacha = gameState.getGachaTokenBalance()
+    const oldUsdcBalance = gameState.getUsdcBalance()
+
+    if (newBalance !== oldUsdcBalance) {
+      printLog(['debug'], `USDC balance updated: ${oldUsdcBalance?.toString()} -> ${newBalance.toString()}`)
+      updateBalances(currentEthBalance, currentGacha, newBalance)
+    }
+  } catch (error) {
+    printLog(['error'], "Error updating USDC balance:", error)
   }
 }
 
@@ -860,6 +967,11 @@ export function stopEventMonitoring() {
     gachaTokenBalanceUnwatch = null
     printLog(['debug'], "Gacha token balance monitoring stopped")
   }
+  if (usdcBalanceUnwatch) {
+    usdcBalanceUnwatch()
+    usdcBalanceUnwatch = null
+    printLog(['debug'], "USDC balance monitoring stopped")
+  }
 }
 
 async function initializeBetAmount() {
@@ -874,7 +986,8 @@ async function initializeBetAmount() {
 export {
   setSelectedBetAmount,
   getMinimumPlayableBalance,
-  getPlayerETHBalance,
+  getPlayerEthBalance,
   getPlayerGachaTokenBalance,
-  getPlayerGachaTokenBalanceFormatted
+  getPlayerGachaTokenBalanceFormatted,
+  getPlayerUsdcBalance
 } from '../gameState.js'
