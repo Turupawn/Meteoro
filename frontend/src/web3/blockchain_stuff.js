@@ -1011,7 +1011,7 @@ export async function checkInitialGameState() {
 
     // Update centralized game state
     updateBalances(playerEthBalance, playerGachaTokenBalance, playerUsdcBalance)
-    updateBetConfiguration(betAmounts, betAmountMultipliersArray, tieRewardMultiplierValue)
+    updateBetConfiguration(betAmounts, betAmountMultipliersArray, tieRewardMultiplierValue, usdcDecimals)
 
     if (!betAmounts || betAmounts.length === 0) {
       printLog(['error'], "Contract is accessible but has no bet amounts configured")
@@ -1472,13 +1472,14 @@ export async function startEventMonitoring() {
       throw new Error("No local wallet found!")
     }
 
-    // Watch for GameCompleted events
-    // Note: Don't filter by player address - Rise Wallet's on-chain smart account address
-    // doesn't match wallet.address, so filtering would miss our own events
+    // Watch for GameCompleted events filtered by player address
     const unwatch = wsClient.watchContractEvent({
       address: MY_CONTRACT_ADDRESS,
       abi: twoPartyWarGameAbi,
       eventName: 'GameCompleted',
+      args: {
+        player: wallet.address
+      },
       onLogs: async (logs) => {
         console.log("🔔 GameCompleted event received! Logs:", logs)
         printLog(['debug'], "🔔 GameCompleted event received! Logs:", logs?.length || 0)

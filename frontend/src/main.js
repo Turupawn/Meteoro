@@ -29,6 +29,8 @@ import {
     getMinimumPlayableBalance,
     getPlayerEthBalance,
     getPlayerUsdcBalance,
+    getMinimumEthForGas,
+    hasInsufficientEthForGas,
     getGameState,
     updateGameState,
     updateBalances
@@ -59,7 +61,6 @@ let loadingScreenReady = false;
 let isTransactionInProgress = false;
 let lastTransactionHash = null;
 let lastDisplayedGameId = null; // Track last displayed game to avoid duplicates
-let preRollGameId = null; // gameId before rolling, used to detect new results
 
 let initialRecentHistory = [];
 async function loadDapp() {
@@ -313,6 +314,14 @@ async function gameLoop() {
                     minimum_balance: getMinimumPlayableBalance().toString()
                 });
 
+            } else if (hasInsufficientEthForGas()) {
+                printLog(['debug'], "Insufficient ETH for gas");
+                shouldProcessGame = false;
+                captureGameEvent('game_start_blocked_insufficient_gas', {
+                    player_eth_balance: getPlayerEthBalance().toString(),
+                    minimum_eth_for_gas: getMinimumEthForGas().toString()
+                });
+
             } else {
                 printLog(['debug'], "=== STARTING ROLL DICE ===");
 
@@ -321,13 +330,12 @@ async function gameLoop() {
                 // Track game start attempt
                 captureGameEvent('game_start_attempted', {
                     game_id: centralizedGameState.gameId?.toString(),
-                    player_balance: centralizedGameState.playerETHBalance?.toString(),
+                    player_balance: centralizedGameState.playerEthBalance?.toString(),
                     game_state: centralizedGameState.gameState?.toString()
                 });
 
                 // Mark transaction as in progress
                 isTransactionInProgress = true;
-                preRollGameId = centralizedGameState.gameId?.toString();
                 try {
                     console.log('🎮 Calling rollDice...');
                     const result = await rollDice();
@@ -340,7 +348,7 @@ async function gameLoop() {
                     // Track successful roll
                     captureGameEvent('rollDice_transaction_success', {
                         game_id: centralizedGameState.gameId?.toString(),
-                        player_balance: centralizedGameState.playerETHBalance?.toString()
+                        player_balance: centralizedGameState.playerEthBalance?.toString()
                     });
 
                     // WebSocket event listener will handle game completion
@@ -399,7 +407,7 @@ async function gameLoop() {
                         player_card: Number(centralizedGameState.playerCard),
                         house_card: Number(centralizedGameState.houseCard),
                         total_time_ms: totalTime,
-                        player_balance: centralizedGameState.playerETHBalance?.toString()
+                        player_balance: centralizedGameState.playerEthBalance?.toString()
                     });
 
                     // Display the cards
@@ -438,7 +446,7 @@ export async function updateGameDisplay() {
         if (!wallet) return;
         // Use the game scene reference instead of hardcoded index
         if (gameScene) {
-            gameScene.updateDisplay(centralizedGameState.playerETHBalance, centralizedGameState.playerGachaTokenBalance, wallet.address, centralizedGameState);
+            gameScene.updateDisplay(centralizedGameState.playerEthBalance, centralizedGameState.playerGachaTokenBalance, wallet.address, centralizedGameState);
         }
     } catch (error) {
         console.error("Error updating game state:", error);

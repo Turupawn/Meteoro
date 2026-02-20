@@ -15,6 +15,7 @@ class GameState {
     this.betAmountMultipliers = []
     this.selectedBetAmount = null
     this.tieRewardMultiplier = 0n
+    this.usdcDecimals = 6
     
     this.listeners = {
       balanceUpdate: [],
@@ -65,10 +66,11 @@ class GameState {
     }
   }
 
-  updateBetConfiguration(betAmounts, betAmountMultipliers, tieRewardMultiplier) {
+  updateBetConfiguration(betAmounts, betAmountMultipliers, tieRewardMultiplier, usdcDecimals) {
     this.betAmounts = betAmounts
     this.betAmountMultipliers = betAmountMultipliers
     this.tieRewardMultiplier = tieRewardMultiplier
+    if (usdcDecimals !== undefined) this.usdcDecimals = usdcDecimals
     
     const storedBetAmount = localStorage.getItem('selectedBetAmount')
     if (storedBetAmount) {
@@ -117,6 +119,14 @@ class GameState {
       return 0n
     }
     return selectedBetAmount
+  }
+
+  getMinimumEthForGas() {
+    return BigInt(5e12) // 0.000005 ETH
+  }
+
+  hasInsufficientEthForGas() {
+    return this.playerEthBalance < this.getMinimumEthForGas()
   }
 
   // Event listener management
@@ -192,11 +202,14 @@ export const getBetAmountMultiplier = (betAmount) => gameState.getBetAmountMulti
 export const getSelectedBetAmount = () => gameState.getSelectedBetAmount()
 export const setSelectedBetAmount = (betAmount) => gameState.setSelectedBetAmount(betAmount)
 export const getMinimumPlayableBalance = () => gameState.getMinimumPlayableBalance()
+export const getMinimumEthForGas = () => gameState.getMinimumEthForGas()
+export const hasInsufficientEthForGas = () => gameState.hasInsufficientEthForGas()
 export const getGameState = () => gameState.getGameState()
 export const updateGameState = (newGameState) => gameState.updateGameState(newGameState)
 export const updateBalances = (ethBalance, gachaBalance, usdcBalance) => gameState.updateBalances(ethBalance, gachaBalance, usdcBalance)
-export const updateBetConfiguration = (betAmounts, betAmountMultipliers, tieRewardMultiplier) =>
-  gameState.updateBetConfiguration(betAmounts, betAmountMultipliers, tieRewardMultiplier)
+export const getUsdcDecimals = () => gameState.usdcDecimals
+export const updateBetConfiguration = (betAmounts, betAmountMultipliers, tieRewardMultiplier, usdcDecimals) =>
+  gameState.updateBetConfiguration(betAmounts, betAmountMultipliers, tieRewardMultiplier, usdcDecimals)
 export const addGameStateListener = (event, callback) => gameState.addListener(event, callback)
 export const removeGameStateListener = (event, callback) => gameState.removeListener(event, callback)
 export const isGamePending = () => gameState.isGamePending()

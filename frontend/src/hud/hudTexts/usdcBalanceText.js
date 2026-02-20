@@ -1,5 +1,6 @@
 import { applyPerspectiveToQuadImageToLeft, isLandscape, USDC_BALANCE_DECIMALS } from '../../utils/utils.js';
 import { formatTokenBalance } from '../../web3/blockchain_stuff.js';
+import { getUsdcDecimals } from '../../gameState.js';
 
 export class UsdcBalanceText {
 
@@ -78,7 +79,7 @@ export class UsdcBalanceText {
             this.renderTexture.clear();
 
             if (balance !== null) {
-                this.usdcBalanceText = `${formatTokenBalance(balance, 6, USDC_BALANCE_DECIMALS)} USDC`;
+                this.usdcBalanceText = `${formatTokenBalance(balance, getUsdcDecimals(), USDC_BALANCE_DECIMALS)} USDC`;
             }
 
             const usdcBalanceText = this.scene.add.text(0, 0, this.usdcBalanceText, {
