@@ -114,7 +114,7 @@ class GameScene extends Phaser.Scene {
             this.betMenuButton.updateDisplay();
         }
         
-        this.checkInsufficientBalance(getPlayerEthBalance());
+        this.checkInsufficientBalance(getPlayerUsdcBalance());
     }
 
     updateCardDisplay(playerCard, houseCard) {

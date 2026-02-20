@@ -28,6 +28,7 @@ import {
 import {
     getMinimumPlayableBalance,
     getPlayerEthBalance,
+    getPlayerUsdcBalance,
     getGameState,
     updateGameState,
     updateBalances
@@ -58,6 +59,7 @@ let loadingScreenReady = false;
 let isTransactionInProgress = false;
 let lastTransactionHash = null;
 let lastDisplayedGameId = null; // Track last displayed game to avoid duplicates
+let preRollGameId = null; // gameId before rolling, used to detect new results
 
 let initialRecentHistory = [];
 async function loadDapp() {
@@ -192,6 +194,17 @@ async function loadGameData() {
             throw new Error("Failed to load initial game state - contract may not be deployed or accessible")
         }
 
+        // Push initial state to centralized store so game loop sees real contract state
+        updateGameState(gameState);
+
+        // If game is already completed, mark it as displayed so we don't re-show old results
+        if (gameState.gameState === 2n && gameState.gameId) {
+            lastDisplayedGameId = gameState.gameId.toString();
+        }
+
+        console.log('Initial contract state: gameState=' + gameState.gameState.toString() +
+            ' gameId=' + gameState.gameId.toString());
+
         initialRecentHistory = gameState.recentHistory || [];
 
         // Convert BigInt values to strings for readable output (recursive)
@@ -269,8 +282,16 @@ async function gameLoop() {
 
         const centralizedGameState = getGameState()
 
-        // Handle game request - VRF flow is much simpler
-        // State 0: NotStarted, State 1: Pending, State 2: Completed
+        // Handle game request - VRF flow
+        // State 0: NotStarted, State 1: Pending (VRF in progress), State 2: Completed
+        if (centralizedGameState && centralizedGameState.gameState === 1n && shouldProcessGame) {
+            // Game is already pending VRF — don't send a new tx, just wait for it
+            shouldProcessGame = false;
+            console.log('Game pending VRF (state=1), waiting for completion...',
+                'gameId:', centralizedGameState.gameId?.toString());
+            gameStartTime = gameStartTime || Date.now();
+        }
+
         if (
             centralizedGameState && (
                 centralizedGameState.gameState === 0n /* NotStarted */ ||
@@ -284,12 +305,12 @@ async function gameLoop() {
                 shouldProcessGame = false;
                 captureGameEvent('game_start_failed_uninitialized_state');
 
-            } else if (BigInt(getPlayerEthBalance()) < BigInt(getMinimumPlayableBalance())) {
-                printLog(['debug'], "Insufficient balance detected, UI will handle display");
+            } else if (BigInt(getPlayerUsdcBalance()) < BigInt(getMinimumPlayableBalance())) {
+                printLog(['debug'], "Insufficient USDC balance detected, UI will handle display");
                 shouldProcessGame = false;
                 captureGameEvent('game_start_blocked_insufficient_balance', {
-                    player_balance: getPlayerEthBalance(),
-                    minimum_balance: getMinimumPlayableBalance()
+                    player_balance: getPlayerUsdcBalance().toString(),
+                    minimum_balance: getMinimumPlayableBalance().toString()
                 });
 
             } else {
@@ -306,10 +327,14 @@ async function gameLoop() {
 
                 // Mark transaction as in progress
                 isTransactionInProgress = true;
+                preRollGameId = centralizedGameState.gameId?.toString();
                 try {
-                    await rollDice();
+                    console.log('🎮 Calling rollDice...');
+                    const result = await rollDice();
+                    console.log('🎮 rollDice returned:', result);
                     shouldProcessGame = false;
                     updateGameDisplay();
+                    console.log('🎮 Game display updated, waiting for state change...');
                     printLog(['debug'], "rollDice transaction completed successfully");
 
                     // Track successful roll

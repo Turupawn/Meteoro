@@ -119,10 +119,6 @@ class GameState {
     return selectedBetAmount
   }
 
-  getMinimumEthForGas() {
-    return BigInt(5*1e12) // 0.000005 ETH for gas
-  }
-
   // Event listener management
   addListener(event, callback) {
     if (this.listeners[event]) {
@@ -157,10 +153,6 @@ class GameState {
 
   hasInsufficientBalance() {
     return this.playerUsdcBalance < this.getMinimumPlayableBalance()
-  }
-
-  hasInsufficientEthForGas() {
-    return this.playerEthBalance < this.getMinimumEthForGas()
   }
 
   // Check if game is pending (waiting for VRF)

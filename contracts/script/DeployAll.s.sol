@@ -16,7 +16,7 @@ contract DeployAllScript is Script {
     TwoPartyWarGame public game;
 
     // Rise VRF Coordinator address
-    address constant VRF_COORDINATOR = 0x9d57aB4517ba97349551C876a01a7580B1338909;
+    address constant VRF_COORDINATOR = 0xc0d49A572cF25aC3e9ae21B939e8B619b39291Ea;
 
     function setUp() public {}
 

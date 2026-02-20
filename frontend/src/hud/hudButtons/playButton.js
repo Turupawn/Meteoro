@@ -1,6 +1,6 @@
 import { playGame } from '../../main.js';
 import { isLandscape } from '../../utils/utils.js';
-import { getPlayerEthBalance, getLocalWallet, getMinimumPlayableBalance } from '../../web3/blockchain_stuff.js';
+import { getPlayerUsdcBalance, getLocalWallet, getMinimumPlayableBalance } from '../../web3/blockchain_stuff.js';
 
 export class PlayButton {
     constructor(scene) {
@@ -106,7 +106,7 @@ export class PlayButton {
             const wallet = getLocalWallet();
             if (!wallet) return false;
 
-            const balance = getPlayerEthBalance();
+            const balance = getPlayerUsdcBalance();
             const minBalanceWei = getMinimumPlayableBalance();
             
             return BigInt(balance) < BigInt(minBalanceWei);
