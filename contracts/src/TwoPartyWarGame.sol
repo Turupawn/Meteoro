@@ -377,6 +377,11 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         gachaToken = GachaToken(_gachaToken);
     }
 
+    function setUsdcToken(address _usdcToken) external onlyOwner {
+        usdcToken = IERC20Metadata(_usdcToken);
+        tokenDecimals = usdcToken.decimals();
+    }
+
     function setCoordinator(address _coordinator) external onlyOwner {
         coordinator = IVRFCoordinator(_coordinator);
     }

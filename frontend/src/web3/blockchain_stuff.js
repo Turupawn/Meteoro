@@ -26,9 +26,8 @@ import {
 } from './sessionKeyManager.js'
 
 import { getFunctionSelector } from './gamePermissions.js'
-
-const TWO_PARTY_WAR_GAME_ABI_PATH = "/json_abi/TwoPartyWarGame_v3.json"
-const USDC_ABI_PATH = "/json_abi/USDC.json"
+import twoPartyWarGameAbiJson from '../abi/TwoPartyWarGame_v3.json'
+import usdcAbiJson from '../abi/USDC.json'
 
 let twoPartyWarGameAbi = null
 let usdcAbi = null
@@ -467,8 +466,7 @@ async function loadTwoPartyWarGameAbi() {
   if (twoPartyWarGameAbi) return twoPartyWarGameAbi
 
   try {
-    const response = await fetch(TWO_PARTY_WAR_GAME_ABI_PATH)
-    twoPartyWarGameAbi = await response.json()
+    twoPartyWarGameAbi = twoPartyWarGameAbiJson
     printLog(['debug'], "TwoPartyWarGame ABI loaded successfully")
     return twoPartyWarGameAbi
   } catch (error) {
@@ -481,8 +479,7 @@ async function loadUsdcAbi() {
   if (usdcAbi) return usdcAbi
 
   try {
-    const response = await fetch(USDC_ABI_PATH)
-    usdcAbi = await response.json()
+    usdcAbi = usdcAbiJson
     printLog(['debug'], "USDC ABI loaded successfully")
     return usdcAbi
   } catch (error) {
