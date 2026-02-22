@@ -1,6 +1,6 @@
-import { getBetAmountsArray, setSelectedBetAmount, getSelectedBetAmount } from '../gameState.js';
-import { formatBalance } from '../web3/blockchain_stuff.js';
-import { isLandscape, BET_AMOUNT_DECIMALS } from '../utils/utils.js';
+import { getBetAmountsArray, setSelectedBetAmount, getSelectedBetAmount, getUsdcDecimals } from '../gameState.js';
+import { formatTokenBalance } from '../web3/blockchain_stuff.js';
+import { isLandscape } from '../utils/utils.js';
 import { MenuButton } from './menuElements/menuButton.js';
 import { MenuText } from './menuElements/menuText.js';
 
@@ -197,7 +197,7 @@ export class BetMenu {
             
             // Create bet amount label below portrait with more spacing
             const labelY = y + portraitSize / 2 + 25;
-            const labelText = `${formatBalance(betAmount, BET_AMOUNT_DECIMALS)} ETH`;
+            const labelText = `$${formatTokenBalance(betAmount, getUsdcDecimals(), 0)} USDC`;
             const label = this.scene.add.text(x, labelY, labelText, {
                 font: `${labelFontSize}px Arial`,
                 fill: isSelected ? "#00FF00" : "#E0F6FF",

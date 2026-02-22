@@ -5,6 +5,8 @@ import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.s
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {GachaToken} from "./GachaToken.sol";
 
 interface IVRFCoordinator {
@@ -19,6 +21,8 @@ interface IVRFConsumer {
 }
 
 contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, IVRFConsumer {
+    using SafeERC20 for IERC20Metadata;
+
     // Custom Ownable implementation for upgradeable contracts
     address private _owner;
 
@@ -54,7 +58,7 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         emit OwnershipTransferred(oldOwner, newOwner);
     }
 
-    function __Ownable_init(address initialOwner) internal onlyInitializing {
+    function _ownableInit(address initialOwner) internal onlyInitializing {
         if (initialOwner == address(0)) {
             revert OwnableInvalidOwner(address(0));
         }
@@ -75,6 +79,8 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
 
     IVRFCoordinator public coordinator;
     GachaToken public gachaToken;
+    IERC20Metadata public usdcToken;
+    uint8 public tokenDecimals;
 
     mapping(uint256 gameId => Game) public games;
     mapping(address player => uint256[] gameIds) playerGames;
@@ -111,13 +117,15 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         _disableInitializers();
     }
 
-    function initialize(address _coordinator, address _gachaToken, address initialOwner) public initializer {
-        __Ownable_init(initialOwner);
+    function initialize(address _coordinator, address _gachaToken, address _usdcToken, address initialOwner) public initializer {
+        _ownableInit(initialOwner);
         // Pausable doesn't need initialization (paused defaults to false)
         // UUPSUpgradeable doesn't need initialization
-        
+
         coordinator = IVRFCoordinator(_coordinator);
         gachaToken = GachaToken(_gachaToken);
+        usdcToken = IERC20Metadata(_usdcToken);
+        tokenDecimals = usdcToken.decimals();
         nextGameId = 1;
         requestCount = 0;
         tieRewardMultiplier = 10 ether;
@@ -125,12 +133,11 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    receive() external payable {}
-
-    function rollDice() external payable whenNotPaused returns (uint256 gameId) {
-        require(whitelistedBetAmounts[msg.value], "Bet amount not whitelisted");
+    function rollDice(uint256 betAmount) external whenNotPaused returns (uint256 gameId) {
+        require(whitelistedBetAmounts[betAmount], "Bet amount not whitelisted");
         require(!hasPendingGame[msg.sender], "Already has a pending game");
-        require(address(this).balance >= msg.value, "Insufficient contract balance for payout");
+
+        usdcToken.safeTransferFrom(msg.sender, address(this), betAmount);
 
         hasPendingGame[msg.sender] = true;
 
@@ -141,7 +148,7 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         games[gameId] = Game({
             gameState: State.Pending,
             playerAddress: msg.sender,
-            betAmount: msg.value,
+            betAmount: betAmount,
             requestTimestamp: block.timestamp,
             playerCard: 0,
             houseCard: 0,
@@ -152,7 +159,7 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         playerGames[msg.sender].push(gameId);
         requestToGame[requestId] = gameId;
 
-        emit GameRequested(msg.sender, gameId, requestId, msg.value);
+        emit GameRequested(msg.sender, gameId, requestId, betAmount);
         return gameId;
     }
 
@@ -194,7 +201,7 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
             winner = player;
             payout = betAmount * 2;
             game.playerWon = true;
-            _transferEth(payable(player), payout);
+            _transferUsdc(player, payout);
         } else if (houseCard > playerCard) {
             // House wins - bet stays in contract
             winner = address(this);
@@ -217,15 +224,12 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         delete requestToGame[requestId];
     }
 
-    function _transferEth(address payable to, uint256 amount) internal {
-        (bool sent,) = to.call{value: amount}("");
-        require(sent, "Failed ETH transfer");
+    function _transferUsdc(address to, uint256 amount) internal {
+        usdcToken.safeTransfer(to, amount);
     }
 
     // View functions
     function getInitialFrontendGameState(address player) external view returns (
-        uint256 playerEthBalance,
-        uint256 playerGachaTokenBalance,
         State gameState,
         uint256 gameId,
         uint256 playerCard,
@@ -233,7 +237,13 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         Game[] memory recentHistory,
         uint256 tieRewardMultiplierValue,
         uint256[] memory betAmounts,
-        uint256[] memory betAmountMultipliersArray
+        uint256[] memory betAmountMultipliersArray,
+        uint256 playerEthBalance,
+        uint256 playerGachaTokenBalance,
+        uint256 playerUsdcBalance,
+        address gachaTokenAddress,
+        address usdcTokenAddress,
+        uint8 usdcDecimals
     ) {
         uint256 currentGameId = getCurrentGameId(player);
         Game storage playerGame = games[currentGameId];
@@ -242,8 +252,6 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         (betAmounts, betAmountMultipliersArray) = _getBetConfig();
 
         return (
-            player.balance,
-            gachaToken.balanceOf(player),
             playerGame.gameState,
             currentGameId,
             playerGame.playerCard,
@@ -251,7 +259,13 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
             recentHistory,
             tieRewardMultiplier,
             betAmounts,
-            betAmountMultipliersArray
+            betAmountMultipliersArray,
+            player.balance,
+            gachaToken.balanceOf(player),
+            usdcToken.balanceOf(player),
+            address(gachaToken),
+            address(usdcToken),
+            tokenDecimals
         );
     }
 
@@ -277,22 +291,24 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
     }
 
     function getFrontendGameState(address player) external view returns (
-        uint256 playerEthBalance,
-        uint256 playerGachaTokenBalance,
         State gameState,
         uint256 gameId,
         uint256 playerCard,
-        uint256 houseCard
+        uint256 houseCard,
+        uint256 playerEthBalance,
+        uint256 playerGachaTokenBalance,
+        uint256 playerUsdcBalance
     ) {
         uint256 currentGameId = getCurrentGameId(player);
         Game storage playerGame = games[currentGameId];
         return (
-            player.balance,
-            gachaToken.balanceOf(player),
             playerGame.gameState,
             currentGameId,
             playerGame.playerCard,
-            playerGame.houseCard
+            playerGame.houseCard,
+            player.balance,
+            gachaToken.balanceOf(player),
+            usdcToken.balanceOf(player)
         );
     }
 
@@ -330,7 +346,7 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
     }
 
     function getContractBalance() external view returns (uint256) {
-        return address(this).balance;
+        return usdcToken.balanceOf(address(this));
     }
 
     // Owner functions
@@ -366,11 +382,13 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
     }
 
     function withdrawFunds(uint256 amount) external onlyOwner {
-        require(amount <= address(this).balance, "Insufficient balance");
-        _transferEth(payable(owner()), amount);
+        require(amount <= usdcToken.balanceOf(address(this)), "Insufficient balance");
+        _transferUsdc(owner(), amount);
     }
 
-    function depositFunds() external payable onlyOwner {}
+    function depositFunds(uint256 amount) external onlyOwner {
+        usdcToken.safeTransferFrom(msg.sender, address(this), amount);
+    }
 
     function pause() external onlyOwner {
         _pause();

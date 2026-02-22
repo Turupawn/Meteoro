@@ -1,10 +1,10 @@
-## Deploy Game and Token (Both Together)
+## Deploy All Contracts (MockUSDC, GachaToken, Game)
 
 ```bash
-source .env && forge script DeployScript --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
+source .env && forge script DeployAllScript --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
 ```
 
-Deploys both GachaToken and TwoPartyWarGame. **Recommended for first deployment.**
+Deploys MockUSDC, GachaToken, and TwoPartyWarGame. **Recommended for first deployment.**
 
 **Important:** 
 - Save the **PROXY address** from the output - this is the address users will interact with and grant EIP-7702 permissions to
@@ -12,13 +12,13 @@ Deploys both GachaToken and TwoPartyWarGame. **Recommended for first deployment.
 - The proxy address never changes, even after upgrades
 - All state and ETH balance is stored in the proxy contract
 
-## Deploy Game Only (With Existing Token)
+## Deploy Game Only (With Existing Tokens)
 
 ```bash
-source .env && forge script DeployGameScript --sig "run(address)" 0xGACHA_TOKEN_ADDRESS --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
+source .env && forge script DeployGameScript --sig "run(address,address)" 0xGACHA_TOKEN_ADDRESS 0xMOCK_USDC_ADDRESS --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --legacy --via-ir
 ```
 
-Use this if you already have a GachaToken deployed and want to deploy a new game contract. Replace `0xGACHA_TOKEN_ADDRESS` with your existing token address.
+Use this if you already have GachaToken and MockUSDC deployed and want to deploy a new game contract. Replace addresses with your existing token addresses.
 
 **Note:** GachaToken is not upgradeable (standard for ERC20 tokens). If you need a new token, deploy a new one and use `setGachaToken()` on the game contract to update it.
 
@@ -39,7 +39,8 @@ source .env && forge script UpdateBetAmountsScript --sig "run(address)" 0xPROXY_
 ## Update ABIs
 
 ```bash
-forge inspect src/TwoPartyWarGame.sol:TwoPartyWarGame abi --json --via-ir > ../frontend/public/json_abi/MyContract.json
+forge inspect src/TwoPartyWarGame.sol:TwoPartyWarGame abi --json --via-ir > ../frontend/public/json_abi/TwoPartyWarGame.json
+forge inspect src/MockUSDC.sol:MockUSDC abi --json > ../frontend/public/json_abi/USDC.json
 ```
 
 ## Verify Implementation

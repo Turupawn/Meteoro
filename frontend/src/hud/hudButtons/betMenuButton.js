@@ -1,6 +1,6 @@
-import { getSelectedBetAmount } from '../../gameState.js';
-import { formatBalance } from '../../web3/blockchain_stuff.js';
-import { isLandscape, BET_AMOUNT_DECIMALS } from '../../utils/utils.js';
+import { getSelectedBetAmount, getUsdcDecimals } from '../../gameState.js';
+import { formatTokenBalance } from '../../web3/blockchain_stuff.js';
+import { isLandscape } from '../../utils/utils.js';
 
 export class BetMenuButton {
     constructor(scene, betMenu) {
@@ -93,14 +93,14 @@ export class BetMenuButton {
         if (!betAmount) {
             return "Loading...";
         }
-        return `BET\n${formatBalance(betAmount, BET_AMOUNT_DECIMALS)} ETH`;
+        return `BET\n$${formatTokenBalance(betAmount, getUsdcDecimals(), 0)} USDC`;
     }
 
     getAmountText(betAmount) {
         if (!betAmount) {
             return "Loading...";
         }
-        return `${formatBalance(betAmount, BET_AMOUNT_DECIMALS)} ETH`;
+        return `$${formatTokenBalance(betAmount, getUsdcDecimals(), 0)} USDC`;
     }
 
     updateDisplay() {

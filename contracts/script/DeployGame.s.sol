@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {GachaToken} from "../src/GachaToken.sol";
 import {TwoPartyWarGame} from "../src/TwoPartyWarGame.sol";
 
@@ -12,66 +13,60 @@ contract DeployGameScript is Script {
     ERC1967Proxy public proxy;
     TwoPartyWarGame public game;
 
-    // Rise VRF Coordinator address
-    address constant VRF_COORDINATOR = 0x9d57aB4517ba97349551C876a01a7580B1338909;
-    
-    // Initial liquidity for betting payouts
-    uint256 constant INITIAL_LIQUIDITY = 0.05 ether;
+    address constant VRF_COORDINATOR = 0xc0d49A572cF25aC3e9ae21B939e8B619b39291Ea;
 
     function setUp() public {}
 
-    function run(address gachaTokenAddress) public {
+    function run(address gachaTokenAddress, address usdcAddress) public {
         require(gachaTokenAddress != address(0), "GachaToken address cannot be zero");
-        
+        require(usdcAddress != address(0), "USDC address cannot be zero");
+
         vm.startBroadcast();
 
         GachaToken gachaToken = GachaToken(gachaTokenAddress);
+        IERC20Metadata usdc = IERC20Metadata(usdcAddress);
 
-        // Deploy implementation contract
+        uint8 decimals = usdc.decimals();
+        uint256 decimalUnits = 10 ** decimals;
+
         implementation = new TwoPartyWarGame();
 
-        // Encode the initialize function call
         bytes memory initData = abi.encodeWithSelector(
             TwoPartyWarGame.initialize.selector,
             VRF_COORDINATOR,
             address(gachaToken),
-            msg.sender // owner
+            usdcAddress,
+            msg.sender
         );
 
-        // Deploy proxy with implementation and initialization data
         proxy = new ERC1967Proxy(address(implementation), initData);
-
-        // Cast proxy to the game interface for easier interaction
         game = TwoPartyWarGame(payable(address(proxy)));
 
-        // Configure bet amounts
         uint[] memory betAmounts = new uint[](3);
-        betAmounts[0] = 0.001 ether;
-        betAmounts[1] = 0.005 ether;
-        betAmounts[2] = 0.01 ether;
+        betAmounts[0] = 1 * decimalUnits;   // $1
+        betAmounts[1] = 5 * decimalUnits;   // $5
+        betAmounts[2] = 10 * decimalUnits;  // $10
         game.setBetAmounts(betAmounts);
 
-        game.setBetAmountMultiplier(0.001 ether, 1);
-        game.setBetAmountMultiplier(0.005 ether, 5);
-        game.setBetAmountMultiplier(0.01 ether, 10);
+        game.setBetAmountMultiplier(1 * decimalUnits, 1);
+        game.setBetAmountMultiplier(5 * decimalUnits, 5);
+        game.setBetAmountMultiplier(10 * decimalUnits, 10);
 
         gachaToken.setMinter(address(game), true);
 
-        // Send initial liquidity to the contract for bet payouts
-        (bool sent,) = address(game).call{value: INITIAL_LIQUIDITY}("");
-        require(sent, "Failed to send initial liquidity");
-
         vm.stopBroadcast();
 
+        console.log("=== Deployed Contracts ===");
+        console.log("Using existing USDC at:", usdcAddress);
         console.log("Using existing GachaToken at:", address(gachaToken));
         console.log("Implementation deployed at:", address(implementation));
         console.log("Proxy deployed at:", address(proxy));
         console.log("TwoPartyWarGame (proxy) address:", address(game));
         console.log("VRF Coordinator:", VRF_COORDINATOR);
-        console.log("Initial liquidity sent:", INITIAL_LIQUIDITY);
+        console.log("Token decimals:", decimals);
         console.log("\n=== IMPORTANT ===");
         console.log("Use the PROXY address for all interactions:", address(proxy));
-        console.log("The implementation address is:", address(implementation));
+        console.log("Remember to deposit USDC liquidity using depositFunds()");
     }
 }
 

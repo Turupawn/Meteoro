@@ -10,6 +10,7 @@ import { PlayButton } from './hud/hudButtons/playButton.js';
 import { SocialLinks } from './hud/hudButtons/socialLinks.js';
 import { ETHBalanceText } from './hud/hudTexts/ethBalanceText.js';
 import { GachaTokenBalanceText } from './hud/hudTexts/gachaTokenBalanceText.js';
+import { UsdcBalanceText } from './hud/hudTexts/usdcBalanceText.js';
 import { GameHistory } from './hud/hudTexts/gameHistory.js';
 import { MainMenu } from './menus/mainMenu.js';
 import { BetMenu } from './menus/betMenu.js';
@@ -18,7 +19,7 @@ import { setErrorModal, ErrorModal } from './menus/errorModal.js';
 import { PleaseWaitScreen } from './menus/pleaseWaitScreen.js';
 import { setGameScene, updateGameDisplay } from './main.js';
 import { printLog, isLandscape } from './utils/utils.js';
-import { getMinimumPlayableBalance, getPlayerETHBalance, getPlayerGachaTokenBalanceFormatted } from './web3/blockchain_stuff.js';
+import { getMinimumPlayableBalance, getPlayerEthBalance, getPlayerGachaTokenBalanceFormatted, getPlayerUsdcBalance } from './web3/blockchain_stuff.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -54,6 +55,7 @@ class GameScene extends Phaser.Scene {
         this.portraitDisplay = new PortraitDisplay(this);
         this.ethBalanceText = new ETHBalanceText(this);
         this.gachaTokenBalanceText = new GachaTokenBalanceText(this);
+        this.usdcBalanceText = new UsdcBalanceText(this);
         this.gameHistory = new GameHistory(this);
         this.playButton = new PlayButton(this);
         this.mainMenu = new MainMenu(this);
@@ -82,12 +84,14 @@ class GameScene extends Phaser.Scene {
 
     updateDisplay(balance = null, gachaTokenBalance = null, gameState = null) {
         // Get balance directly from blockchain functions instead of parameters
-        const currentBalance = balance || getPlayerETHBalance();
+        const currentBalance = balance || getPlayerEthBalance();
         const currentGachaBalance = gachaTokenBalance || getPlayerGachaTokenBalanceFormatted();
-        
+        const currentUsdcBalance = getPlayerUsdcBalance();
+
         this.currentBalance = currentBalance;
         this.ethBalanceText.updateBalance(currentBalance);
         this.gachaTokenBalanceText.updateBalance(currentGachaBalance);
+        this.usdcBalanceText.updateBalance(currentUsdcBalance);
         // Note: Card display is updated via updateCardDisplay() when a game completes
         
         this.portraitDisplay.updatePortrait();
@@ -110,7 +114,7 @@ class GameScene extends Phaser.Scene {
             this.betMenuButton.updateDisplay();
         }
         
-        this.checkInsufficientBalance(getPlayerETHBalance());
+        this.checkInsufficientBalance(getPlayerUsdcBalance());
     }
 
     updateCardDisplay(playerCard, houseCard) {

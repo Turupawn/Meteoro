@@ -5,10 +5,6 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "receive",
-    "stateMutability": "payable"
-  },
-  {
     "type": "function",
     "name": "MAX_RETURN_HISTORY",
     "inputs": [],
@@ -88,9 +84,15 @@
   {
     "type": "function",
     "name": "depositFunds",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -216,16 +218,6 @@
     ],
     "outputs": [
       {
-        "name": "playerEthBalance",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "playerGachaTokenBalance",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "gameState",
         "type": "uint8",
         "internalType": "enum TwoPartyWarGame.State"
@@ -242,6 +234,21 @@
       },
       {
         "name": "houseCard",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "playerEthBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "playerGachaTokenBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "playerUsdcBalance",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -331,16 +338,6 @@
     ],
     "outputs": [
       {
-        "name": "playerEthBalance",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "playerGachaTokenBalance",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "gameState",
         "type": "uint8",
         "internalType": "enum TwoPartyWarGame.State"
@@ -421,6 +418,36 @@
         "name": "betAmountMultipliersArray",
         "type": "uint256[]",
         "internalType": "uint256[]"
+      },
+      {
+        "name": "playerEthBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "playerGachaTokenBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "playerUsdcBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gachaTokenAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "usdcTokenAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "usdcDecimals",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
     "stateMutability": "view"
@@ -455,6 +482,11 @@
       },
       {
         "name": "_gachaToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_usdcToken",
         "type": "address",
         "internalType": "address"
       },
@@ -579,7 +611,13 @@
   {
     "type": "function",
     "name": "rollDice",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "betAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "gameId",
@@ -587,7 +625,7 @@
         "internalType": "uint256"
       }
     ],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -674,6 +712,19 @@
   },
   {
     "type": "function",
+    "name": "tokenDecimals",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "transferOwnership",
     "inputs": [
       {
@@ -709,6 +760,19 @@
     ],
     "outputs": [],
     "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "usdcToken",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20Metadata"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1063,6 +1127,17 @@
     "inputs": [
       {
         "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
+      {
+        "name": "token",
         "type": "address",
         "internalType": "address"
       }
