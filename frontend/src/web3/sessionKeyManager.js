@@ -1,5 +1,5 @@
 import { P256, Signature, PublicKey } from 'ox'
-import { SESSION_KEY_STORAGE_PREFIX, SESSION_KEY_EXPIRY_SECONDS } from './walletConfig.js'
+import { SESSION_KEY_STORAGE_PREFIX, SESSION_KEY_EXPIRY_SECONDS, CONTRACT_ADDRESS } from './walletConfig.js'
 import { GAME_PERMISSIONS } from './gamePermissions.js'
 
 let activeKeyPair = null
@@ -41,10 +41,16 @@ export function getActiveSessionKey(walletAddress = null) {
         return validKey
     }
 
-    if (walletAddress && activeKeyPair) {
-        activeKeyPair = null
+    // Clean up stale/expired/wrong-contract keys
+    const staleKeys = storedKeys.filter(key => !isSessionKeyValid(key, walletAddress))
+    if (staleKeys.length > 0) {
+        console.log(`🔑 Cleaning up ${staleKeys.length} stale session keys`)
+        staleKeys.forEach(key => {
+            localStorage.removeItem(getStorageKey(key.publicKey))
+        })
     }
 
+    activeKeyPair = null
     return null
 }
 
@@ -68,6 +74,18 @@ export function isSessionKeyValid(sessionKey, walletAddress = null) {
         }
     }
 
+    // Check if session key has permissions for the current contract address
+    // If contract was redeployed, old session keys are stale
+    if (CONTRACT_ADDRESS && sessionKey.permissions?.calls) {
+        const hasCurrentContract = sessionKey.permissions.calls.some(
+            call => call.to?.toLowerCase() === CONTRACT_ADDRESS.toLowerCase()
+        )
+        if (!hasCurrentContract) {
+            console.log('🔑 Session key stale: permissions target old contract, not', CONTRACT_ADDRESS)
+            return false
+        }
+    }
+
     return true
 }
 
@@ -75,8 +93,29 @@ export function hasUsableSessionKey(walletAddress = null) {
     return getActiveSessionKey(walletAddress) !== null
 }
 
-export async function createSessionKey(provider, walletAddress) {
+export async function createSessionKey(provider, walletAddress, additionalCalls = []) {
     console.log('🔑 Creating session key...')
+
+    // Merge base permissions with additional calls
+    const permissions = {
+        calls: [...(GAME_PERMISSIONS.calls || []), ...additionalCalls],
+        spend: GAME_PERMISSIONS.spend
+    }
+
+    console.log('🔑 Merged permissions:', JSON.stringify(permissions, null, 2))
+
+    // Validate permissions before sending to Rise Wallet
+    if (!permissions.calls || permissions.calls.length === 0) {
+        console.error('⚠️ permissions.calls is empty - CONTRACT_ADDRESS may be undefined')
+        console.error('⚠️ Check your .env file and restart vite')
+    }
+
+    // Check for undefined values in calls
+    for (const call of permissions.calls || []) {
+        if (!call.to) {
+            throw new Error('Session key creation failed: CONTRACT_ADDRESS is undefined. Check your .env file and restart vite.')
+        }
+    }
 
     const privateKey = P256.randomPrivateKey()
     const publicKey = PublicKey.toHex(P256.getPublicKey({ privateKey }), {
@@ -91,12 +130,14 @@ export async function createSessionKey(provider, walletAddress) {
             publicKey: publicKey
         },
         expiry: expiry,
-        permissions: GAME_PERMISSIONS,
+        permissions: permissions,
         feeToken: {
             token: '0x0000000000000000000000000000000000000000',
             limit: '10000000000000000'
         }
     }]
+
+    console.log('🔑 Permission params:', JSON.stringify(permissionParams, null, 2))
 
     const response = await provider.request({
         method: 'wallet_grantPermissions',
@@ -109,7 +150,7 @@ export async function createSessionKey(provider, walletAddress) {
         expiry: expiry,
         createdAt: Date.now(),
         address: walletAddress,
-        permissions: GAME_PERMISSIONS
+        permissions: permissions
     }
 
     localStorage.setItem(
@@ -165,6 +206,27 @@ export function clearAllGameData() {
 if (typeof window !== 'undefined') {
     window.clearGameData = clearAllGameData
     window.clearSessionKeys = clearAllSessionKeys
+    window.listSessionKeys = () => {
+        const keys = getStoredSessionKeys()
+        console.log(`📋 Found ${keys.length} stored session keys:`)
+        keys.forEach((key, i) => {
+            const now = Math.floor(Date.now() / 1000)
+            const expired = key.expiry <= now
+            const hasUsdcSpend = key.permissions?.spend?.some(s =>
+                s.token && s.token !== '0x0000000000000000000000000000000000000000'
+            )
+            const hasUsdcCalls = key.permissions?.calls?.length > 1
+            console.log(`  Key ${i}:`)
+            console.log(`    publicKey: ${key.publicKey}`)
+            console.log(`    expiry: ${new Date(key.expiry * 1000).toLocaleString()} (${expired ? 'EXPIRED' : 'valid'})`)
+            console.log(`    address: ${key.address}`)
+            console.log(`    hasUsdcSpend: ${hasUsdcSpend}`)
+            console.log(`    hasUsdcCalls: ${hasUsdcCalls}`)
+            console.log(`    calls:`, key.permissions?.calls)
+            console.log(`    spend:`, key.permissions?.spend)
+        })
+        return keys
+    }
 }
 
 export function signWithSessionKey(digest, sessionKey) {

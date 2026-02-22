@@ -18,4 +18,8 @@ contract GachaToken is ERC20, Ownable {
         require(isMinter[msg.sender], "Not a minter");
         _mint(to, amount);
     }
+
+    function burn(uint256 amount) public {
+        _burn(msg.sender, amount);
+    }
 }
