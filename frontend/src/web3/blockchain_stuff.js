@@ -13,7 +13,9 @@ import {
   GAS_LIMIT,
   GAS_FEE_BUFFER_ETH,
   BALANCE_POLL_INTERVAL,
-  CHAIN
+  CHAIN,
+  SESSION_KEY_EXPIRY_SECONDS,
+  SESSION_KEY_STORAGE_PREFIX
 } from './walletConfig.js'
 
 import {
@@ -22,10 +24,12 @@ import {
   createSessionKey as createNewSessionKey,
   signWithSessionKey,
   getSessionKeyTimeRemaining,
+  getStoredSessionKeys,
   clearAllSessionKeys
 } from './sessionKeyManager.js'
 
-import { getFunctionSelector } from './gamePermissions.js'
+import { getFunctionSelector, GAME_PERMISSIONS } from './gamePermissions.js'
+import { P256, PublicKey } from 'ox'
 import twoPartyWarGameAbiJson from '../abi/TwoPartyWarGame_v3.json'
 import usdcAbiJson from '../abi/USDC.json'
 
@@ -144,7 +148,6 @@ async function updateSessionKeyWithUsdcPermissions() {
 
   // IMPORTANT: First, try to revoke ALL old session keys from the Rise backend
   // This is necessary because the relayer may randomly pick old keys without USDC permissions
-  const { getStoredSessionKeys } = await import('./sessionKeyManager.js')
   const oldKeys = getStoredSessionKeys()
   console.log('🔑 Found', oldKeys.length, 'old session keys to revoke')
 
@@ -199,10 +202,6 @@ async function updateSessionKeyWithUsdcPermissions() {
 
 // Create session key with USDC-specific spend limits
 async function createNewSessionKeyWithUsdcSpend(provider, walletAddress, additionalCalls, usdcSpendLimit) {
-  const { P256, PublicKey } = await import('ox')
-  const { SESSION_KEY_EXPIRY_SECONDS, SESSION_KEY_STORAGE_PREFIX } = await import('./walletConfig.js')
-  const { GAME_PERMISSIONS } = await import('./gamePermissions.js')
-
   console.log('🔑 Creating session key with USDC spend limit...')
 
   // Merge base permissions with additional calls and USDC spend limit
@@ -1111,7 +1110,6 @@ export async function rollDice() {
   console.log('🎲 rollDice called')
 
   // Debug: Log all stored session keys
-  const { getStoredSessionKeys } = await import('./sessionKeyManager.js')
   const allKeys = getStoredSessionKeys()
   console.log('🎲 All stored session keys:', allKeys.length)
   allKeys.forEach((key, i) => {
@@ -1728,7 +1726,6 @@ export {
 if (typeof window !== 'undefined') {
   // Revoke all stored session keys from Rise backend and clear localStorage
   window.revokeAllSessionKeys = async () => {
-    const { getStoredSessionKeys, clearAllSessionKeys } = await import('./sessionKeyManager.js')
     const keys = getStoredSessionKeys()
 
     if (!riseWalletInstance) {
@@ -1783,7 +1780,6 @@ if (typeof window !== 'undefined') {
     await updateSessionKeyWithUsdcPermissions()
 
     // Verify the new key
-    const { getStoredSessionKeys } = await import('./sessionKeyManager.js')
     const newKeys = getStoredSessionKeys()
     console.log('🔑 New session keys:', newKeys.length)
     if (newKeys.length > 0) {
