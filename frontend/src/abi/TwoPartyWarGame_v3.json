@@ -699,6 +699,19 @@
   },
   {
     "type": "function",
+    "name": "setUsdcToken",
+    "inputs": [
+      {
+        "name": "_usdcToken",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "tieRewardMultiplier",
     "inputs": [],
     "outputs": [
