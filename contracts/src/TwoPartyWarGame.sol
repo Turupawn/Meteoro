@@ -395,6 +395,19 @@ contract TwoPartyWarGame is Initializable, Context, Pausable, UUPSUpgradeable, I
         usdcToken.safeTransferFrom(msg.sender, address(this), amount);
     }
 
+    function clearStuckGame(address player) external onlyOwner {
+        require(hasPendingGame[player], "No pending game");
+        uint256 gameId = getCurrentGameId(player);
+        Game storage game = games[gameId];
+        require(game.gameState == State.Pending, "Game not pending");
+
+        game.gameState = State.Completed;
+        hasPendingGame[player] = false;
+
+        // Refund the bet
+        _transferUsdc(player, game.betAmount);
+    }
+
     function pause() external onlyOwner {
         _pause();
     }
