@@ -660,20 +660,7 @@ export async function connectWallet() {
   }
 }
 
-// =============================================================================
-// DUPLICATE NONCE RETRY WORKAROUND
-// Rise Wallet relay sometimes returns stale nonces causing "duplicate call" errors.
-// Set ENABLE_DUPLICATE_RETRY to false to disable the retry mechanism.
-// TODO: Remove this workaround once Rise Wallet fixes their relay nonce management.
-// =============================================================================
-const ENABLE_DUPLICATE_RETRY = true
-const MAX_DUPLICATE_RETRIES = 4
-const RETRY_DELAY_MS = 500
-
-// Track seen nonces to detect duplicates (only used when retry is enabled)
-const seenNonces = new Map()
-
-async function sendMultiCallTransaction(calls, retryCount = 0) {
+async function sendMultiCallTransaction(calls) {
   console.log('📤 sendMultiCallTransaction called with', calls.length, 'calls')
 
   if (!riseWalletInstance) throw new Error("Rise Wallet not initialized")
@@ -705,40 +692,15 @@ async function sendMultiCallTransaction(calls, retryCount = 0) {
   console.log('📤 wallet_prepareCalls response (multi-call):', JSON.stringify(prepared, (key, value) =>
     typeof value === 'bigint' ? value.toString() : value, 2))
 
-  const nonce = prepared.context?.quote?.quotes?.[0]?.intent?.nonce
-
-  if (ENABLE_DUPLICATE_RETRY && nonce && seenNonces.has(nonce)) {
-    if (retryCount < MAX_DUPLICATE_RETRIES) {
-      console.log(`Duplicate nonce detected, retry ${retryCount + 1}/${MAX_DUPLICATE_RETRIES}...`)
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS))
-      return sendMultiCallTransaction(calls, retryCount + 1)
-    }
-  }
-
-  if (ENABLE_DUPLICATE_RETRY && nonce) {
-    seenNonces.set(nonce, Date.now())
-  }
-
   const { digest, ...requestParams } = prepared
   const signature = signWithSessionKey(digest, sessionKey)
 
   const sendParams = [{ ...requestParams, signature }]
 
-  let response
-  try {
-    response = await provider.request({
-      method: 'wallet_sendPreparedCalls',
-      params: sendParams
-    })
-  } catch (sendError) {
-    if (ENABLE_DUPLICATE_RETRY && sendError.message?.includes('duplicate') && retryCount < MAX_DUPLICATE_RETRIES) {
-      console.log(`Duplicate call error, retry ${retryCount + 1}/${MAX_DUPLICATE_RETRIES}...`)
-      if (nonce) seenNonces.delete(nonce)
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS))
-      return sendMultiCallTransaction(calls, retryCount + 1)
-    }
-    throw sendError
-  }
+  const response = await provider.request({
+    method: 'wallet_sendPreparedCalls',
+    params: sendParams
+  })
 
   let callId
   if (Array.isArray(response) && response.length > 0 && response[0].id) {
@@ -749,19 +711,10 @@ async function sendMultiCallTransaction(calls, retryCount = 0) {
     return response
   }
 
-  const txHash = await waitForTransactionStatus(provider, callId)
-
-  if (ENABLE_DUPLICATE_RETRY) {
-    const now = Date.now()
-    for (const [n, timestamp] of seenNonces) {
-      if (now - timestamp > 60000) seenNonces.delete(n)
-    }
-  }
-
-  return txHash
+  return await waitForTransactionStatus(provider, callId)
 }
 
-async function sendSessionTransaction({ to, value, data }, retryCount = 0) {
+async function sendSessionTransaction({ to, value, data }) {
   console.log('📤 sendSessionTransaction called with:', { to, value: value?.toString(), dataLength: data?.length })
 
   if (!riseWalletInstance) throw new Error("Rise Wallet not initialized")
@@ -822,42 +775,15 @@ async function sendSessionTransaction({ to, value, data }, retryCount = 0) {
   console.log('📤 wallet_prepareCalls response:', JSON.stringify(prepared, (key, value) =>
     typeof value === 'bigint' ? value.toString() : value, 2))
 
-  const nonce = prepared.context?.quote?.quotes?.[0]?.intent?.nonce
-
-  // Duplicate nonce detection and retry (workaround for Rise Wallet relay bug)
-  if (ENABLE_DUPLICATE_RETRY && nonce && seenNonces.has(nonce)) {
-    if (retryCount < MAX_DUPLICATE_RETRIES) {
-      console.log(`Duplicate nonce detected, retry ${retryCount + 1}/${MAX_DUPLICATE_RETRIES}...`)
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS))
-      return sendSessionTransaction({ to, value, data }, retryCount + 1)
-    }
-  }
-
-  if (ENABLE_DUPLICATE_RETRY && nonce) {
-    seenNonces.set(nonce, Date.now())
-  }
-
   const { digest, ...requestParams } = prepared
   const signature = signWithSessionKey(digest, sessionKey)
 
   const sendParams = [{ ...requestParams, signature }]
 
-  let response
-  try {
-    response = await provider.request({
-      method: 'wallet_sendPreparedCalls',
-      params: sendParams
-    })
-  } catch (sendError) {
-    // Retry on duplicate call error (workaround for Rise Wallet relay bug)
-    if (ENABLE_DUPLICATE_RETRY && sendError.message?.includes('duplicate') && retryCount < MAX_DUPLICATE_RETRIES) {
-      console.log(`Duplicate call error, retry ${retryCount + 1}/${MAX_DUPLICATE_RETRIES}...`)
-      if (nonce) seenNonces.delete(nonce)
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS))
-      return sendSessionTransaction({ to, value, data }, retryCount + 1)
-    }
-    throw sendError
-  }
+  const response = await provider.request({
+    method: 'wallet_sendPreparedCalls',
+    params: sendParams
+  })
 
   let callId
   if (Array.isArray(response) && response.length > 0 && response[0].id) {
@@ -868,17 +794,7 @@ async function sendSessionTransaction({ to, value, data }, retryCount = 0) {
     return response
   }
 
-  const txHash = await waitForTransactionStatus(provider, callId)
-
-  // Clean up old nonce entries
-  if (ENABLE_DUPLICATE_RETRY) {
-    const now = Date.now()
-    for (const [n, timestamp] of seenNonces) {
-      if (now - timestamp > 60000) seenNonces.delete(n)
-    }
-  }
-
-  return txHash
+  return await waitForTransactionStatus(provider, callId)
 }
 
 async function waitForTransactionStatus(provider, callId, maxAttempts = 30) {
